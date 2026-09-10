@@ -1,0 +1,70 @@
+services:
+  # Database service: PostgreSQL 16
+  db:
+    image: postgres:16-alpine
+    container_name: vn_stock_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-vn_stock}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Backend API service: FastAPI
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    container_name: vn_stock_api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-vn_stock}
+      ENVIRONMENT: production
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Frontend Web service: Next.js
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+    container_name: vn_stock_web
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+  # =========================================================================
+  # ML Job / Scheduled Worker (Không chạy thường trực dạng service)
+  # Uncomment khi cần chạy pipeline huấn luyện lại mô hình định kỳ (Cron / Batch)
+  # =========================================================================
+  # ml-job:
+  #   build:
+  #     context: ../apps/ml
+  #     dockerfile: Dockerfile
+  #   container_name: vn_stock_ml_job
+  #   environment:
+  #     DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-vn_stock}
+  #   volumes:
+  #     - ../apps/ml/data:/app/data
+  #     - ../apps/ml/models:/app/models
+  #   command: ["make", "train"]
+  #   profiles: ["jobs"]
+
+volumes:
+  postgres_data:
+    driver: local

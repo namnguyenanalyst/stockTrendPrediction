@@ -1,0 +1,43 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "vn_stock"
+version = "0.1.0"
+description = "Hệ thống dự báo xu hướng thị trường chứng khoán Việt Nam"
+authors = [
+  { name = "Antigravity Team" },
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "ipython",
+    "jupyterlab",
+    "matplotlib",
+    "notebook",
+    "numpy",
+    "pandas",
+    "pytest",
+    "python-dotenv",
+    "requests",
+    "ruff",
+    "scikit-learn",
+    "torch",
+]
+
+[tool.ruff]
+line-length = 99
+src = ["vn_stock"]
+include = ["pyproject.toml", "vn_stock/**/*.py"]
+
+[tool.ruff.lint]
+extend-select = ["I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["vn_stock"]
+force-sort-within-sections = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
