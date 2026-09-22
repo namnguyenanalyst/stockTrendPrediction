@@ -14,6 +14,7 @@ requires-python = ">=3.10"
 dependencies = [
     "ipython",
     "jupyterlab",
+    "lightgbm>=4.7.0",
     "matplotlib",
     "notebook",
     "numpy",
