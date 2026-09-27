@@ -20,12 +20,12 @@ help:
 ## Thu thập dữ liệu cổ phiếu vào data/raw/
 .PHONY: data
 data:
-	$(PYTHON) -c "from vn_stock.dataset import fetch_stock_data; df = fetch_stock_data('VIC'); print(f'Đã tải {len(df)} dòng dữ liệu VIC')"
+	$(PYTHON) -c "from vn_stock.data_ingestion import fetch_stock_data; df = fetch_stock_data('VIC'); print(f'Đã tải {len(df)} dòng dữ liệu VIC')"
 
 ## Tính toán các chỉ báo kỹ thuật
 .PHONY: features
 features:
-	$(PYTHON) -c "from vn_stock.dataset import load_local_data; from vn_stock.features import compute_technical_indicators; df = load_local_data('VIC'); res = compute_technical_indicators(df); print(f'Đã tính {len(res.columns)} cột chỉ báo kỹ thuật')"
+	$(PYTHON) -c "from vn_stock.data_ingestion import load_local_data; from vn_stock.features import compute_features_per_symbol, ALL_FEATURE_COLS; df = load_local_data('VIC'); res = compute_features_per_symbol(df, drop_na=False); print(f'Đã tính đặc trưng cho {res[\"Symbol\"].nunique()} mã ({len(res)} dòng, ví dụ mã {df[\"Symbol\"].iloc[0]}): DataFrame gồm {len(res.columns)} cột (7 cột cơ sở + {len(ALL_FEATURE_COLS)} cột feature chuẩn ALL_FEATURE_COLS)')"
 
 ## Huấn luyện mô hình PyTorch LSTM
 .PHONY: train
@@ -40,7 +40,7 @@ predict:
 ## Kiểm thử chiến lược giao dịch Backtesting
 .PHONY: backtest
 backtest:
-	$(PYTHON) -c "import numpy as np; from vn_stock.dataset import load_local_data; from vn_stock.backtest import run_simple_backtest; df = load_local_data('VIC'); prices = df['Close'].values if 'Close' in df.columns else df['Giá đóng cửa'].values; m = run_simple_backtest(prices=prices[-200:], predictions=prices[-200:] * 1.02); print(f'Backtest Return: {m.total_return_pct}% | MDD: {m.max_drawdown_pct}% | WinRate: {m.win_rate_pct}%')"
+	$(PYTHON) -c "import numpy as np; from vn_stock.data_ingestion import load_local_data; from vn_stock.backtest import run_simple_backtest; df = load_local_data('VIC'); prices = df['Close'].values if 'Close' in df.columns else df['Giá đóng cửa'].values; m = run_simple_backtest(prices=prices[-200:], predictions=prices[-200:] * 1.02); print(f'Backtest Return: {m.total_return_pct}% | MDD: {m.max_drawdown_pct}% | WinRate: {m.win_rate_pct}%')"
 
 ## Chạy unit tests
 .PHONY: test

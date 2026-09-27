@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 import os
 from pathlib import Path
+import time
 from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
 import pandas as pd
@@ -201,3 +202,75 @@ class SSIFastConnectClient:
                         result_symbols.append(symbol)
 
         return result_symbols
+
+    def get_daily_index(
+        self,
+        index_id: str = "VNINDEX",
+        start_date: str = "2023-01-01",
+        end_date: Optional[str] = None,
+        chunk_days: int = 25,
+    ) -> pd.DataFrame:
+        """
+        Truy vấn chuỗi chỉ số thị trường lịch sử (VNINDEX, VN30, ...) từ SSI FC-Data API.
+        Tự động phân đoạn chu kỳ truy vấn (chunk 25 ngày) và áp dụng cơ chế retry + rate limit.
+        """
+        token = self._get_access_token()
+        headers = {
+            **self._headers,
+            "Authorization": f"Bearer {token}",
+        }
+        url = self.api_url + "api/v2/Market/DailyIndex"
+
+        start_dt = (
+            datetime.strptime(start_date, "%Y-%m-%d")
+            if "-" in start_date
+            else datetime.strptime(start_date, "%d/%m/%Y")
+        )
+        if end_date is None:
+            end_dt = datetime.now()
+        else:
+            end_dt = (
+                datetime.strptime(end_date, "%Y-%m-%d")
+                if "-" in end_date
+                else datetime.strptime(end_date, "%d/%m/%Y")
+            )
+
+        records: List[Dict[str, Any]] = []
+        cur_start = start_dt
+
+        while cur_start <= end_dt:
+            cur_end = min(cur_start + timedelta(days=chunk_days), end_dt)
+            params = {
+                "indexId": index_id.upper(),
+                "fromDate": cur_start.strftime("%d/%m/%Y"),
+                "toDate": cur_end.strftime("%d/%m/%Y"),
+                "pageIndex": 1,
+                "pageSize": 100,
+                "ascending": True,
+            }
+            # Cơ chế Thử lại (Retry) tối đa 3 lần cho mỗi chunk
+            for attempt in range(3):
+                try:
+                    res = self._session.get(url, params=params, headers=headers, timeout=15)
+                    if res.status_code == 200:
+                        d = res.json()
+                        status_str = str(d.get("status", "")).lower()
+                        if status_str in ["200", "success"] and d.get("data"):
+                            records.extend(d["data"])
+                            break
+                except Exception:
+                    pass
+                time.sleep(1.2)
+
+            cur_start = cur_end + timedelta(days=1)
+            time.sleep(1.05)  # Tránh vượt quá rate limit của SSI API
+
+        close_col = f"{index_id.upper()}_Close"
+        if not records:
+            return pd.DataFrame(columns=["Date", close_col])
+
+        df = pd.DataFrame(records)
+        df["Date"] = pd.to_datetime(df["TradingDate"], format="%d/%m/%Y")
+        df[close_col] = pd.to_numeric(df["IndexValue"], errors="coerce")
+        df = df.drop_duplicates(subset=["Date"]).sort_values("Date").reset_index(drop=True)
+        return df[["Date", close_col]]

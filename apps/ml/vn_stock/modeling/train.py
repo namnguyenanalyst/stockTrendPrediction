@@ -22,10 +22,10 @@ from vn_stock.config import (
     DEFAULT_SYMBOL,
     MODELS_DIR,
 )
-from vn_stock.dataset import fetch_stock_data, load_local_data
+from vn_stock.data_ingestion import fetch_stock_data, load_local_data
 from vn_stock.features import create_sequences
 from vn_stock.modeling.model import PredictionModel
-from vn_stock.validation import time_series_split
+from vn_stock.splitting_data import time_series_split
 
 
 def train_lstm_model(

@@ -54,3 +54,37 @@ def test_ssi_client_parsing_ohlcv():
     assert pytest.approx(df.iloc[0]["Close"]) == 22.1
     assert pytest.approx(df.iloc[1]["Close"]) == 22.2
     assert df.iloc[0]["Volume"] == 1500000
+
+
+def test_ssi_client_parsing_daily_index():
+    client = SSIFastConnectClient(consumer_id="mock_id", consumer_secret="mock_secret")
+    client._get_access_token = MagicMock(return_value="mock_token")
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "status": "Success",
+        "message": "Success",
+        "data": [
+            {
+                "IndexId": "VNINDEX",
+                "TradingDate": "02/01/2024",
+                "IndexValue": "1131.72",
+            },
+            {
+                "IndexId": "VNINDEX",
+                "TradingDate": "03/01/2024",
+                "IndexValue": "1144.17",
+            },
+        ],
+    }
+    client._session.get = MagicMock(return_value=mock_response)
+
+    with patch("time.sleep", return_value=None):
+        df = client.get_daily_index("VNINDEX", start_date="2024-01-01", end_date="2024-01-05", chunk_days=25)
+
+    assert len(df) == 2
+    assert "Date" in df.columns
+    assert "VNINDEX_Close" in df.columns
+    assert pytest.approx(df.iloc[0]["VNINDEX_Close"]) == 1131.72
+    assert pytest.approx(df.iloc[1]["VNINDEX_Close"]) == 1144.17

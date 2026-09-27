@@ -10,16 +10,27 @@ RAW_DATA_DIR = DATA_DIR / "raw"
 INTERIM_DATA_DIR = DATA_DIR / "interim"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 EXTERNAL_DATA_DIR = DATA_DIR / "external"
+PANEL_DATA_DIR = INTERIM_DATA_DIR / "panel"
 
 MODELS_DIR = PROJ_ROOT / "models"
 REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 NOTEBOOKS_DIR = PROJ_ROOT / "notebooks"
 
-# Cấu hình mặc định cho dữ liệu & mô hình
+# Cấu hình mặc định cho dữ liệu & mô hình (chuẩn PoC v2.1)
 DEFAULT_SYMBOL = "VIC"
-DEFAULT_START_DATE = "2020-01-01"
-DEFAULT_SEQ_LENGTH = 30
+DEFAULT_SYMBOLS = ["VIC", "HPG", "FPT", "VNM", "MWG"]
+DEFAULT_START_DATE = "2023-01-01"
+DEFAULT_END_DATE = "2026-09-11"
+DEFAULT_SEQ_LENGTH = 20
+
+# Bảng mã hóa cố định định danh cổ phiếu (Symbol -> Code) đảm bảo tính nhất quán tuyệt đối giữa Train và Inference
+VN30_SYMBOLS = [
+    "ACB", "BCM", "BID", "BVH", "CTG", "FPT", "GAS", "GVR", "HDB", "HPG",
+    "MBB", "MSN", "MWG", "PLX", "POW", "SAB", "SHB", "SSB", "SSI", "STB",
+    "TCB", "TPB", "VCB", "VHM", "VIB", "VIC", "VJC", "VNM", "VPB", "VRE"
+]
+SYMBOL_TO_CODE = {sym: idx for idx, sym in enumerate(VN30_SYMBOLS)}
 
 # Siêu tham số PyTorch LSTM
 DEFAULT_INPUT_SIZE = 1

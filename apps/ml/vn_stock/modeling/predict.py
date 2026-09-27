@@ -17,7 +17,7 @@ from vn_stock.config import (
     DEFAULT_SYMBOL,
     MODELS_DIR,
 )
-from vn_stock.dataset import fetch_stock_data, load_local_data
+from vn_stock.data_ingestion import fetch_stock_data, load_local_data
 from vn_stock.modeling.model import PredictionModel
 
 
