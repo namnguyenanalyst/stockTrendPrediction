@@ -17,13 +17,15 @@ dependencies = [
     "lightgbm>=4.7.0",
     "matplotlib",
     "notebook",
-    "numpy",
+    "numpy<2",
     "pandas",
+    "pyarrow>=25.0.1",
     "pytest",
     "python-dotenv",
     "requests",
     "ruff",
     "scikit-learn",
+    "scipy<1.14",
     "torch",
 ]
 

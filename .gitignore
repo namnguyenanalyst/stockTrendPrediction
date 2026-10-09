@@ -119,3 +119,9 @@ docs/
 !.vscode/extensions.json
 *.code-workspace
 .idea/
+
+# MCP Local Configuration
+.mcp.json
+
+# AI Assistant Local Workspaces & Skills
+.agents/

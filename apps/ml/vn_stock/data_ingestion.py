@@ -1,8 +1,7 @@
-"""Module thu thập, lưu trữ Parquet và chuẩn hóa dữ liệu Long-format Panel cho rổ VN30 và VN-Index."""
-
-from datetime import datetime
+import logging
 from pathlib import Path
-from typing import List, Optional, Union
+import shutil
+import time
 
 import pandas as pd
 
@@ -16,8 +15,115 @@ from vn_stock.config import (
 )
 from vn_stock.ssi_client import SSIFastConnectClient
 
+logger = logging.getLogger(__name__)
 
-def clean_stock_data(df: pd.DataFrame, symbol: Optional[str] = None) -> pd.DataFrame:
+
+class InsufficientDataCoverageError(ValueError):
+    """Ngoại lệ khi dữ liệu của một mã không bao phủ đủ dải ngày yêu cầu trong panel."""
+
+
+def validate_downloaded_data(
+    df: pd.DataFrame,
+    expected_start: str,
+    expected_end: str | None = None,
+    is_index: bool = False,
+    symbol_name: str = "",
+) -> None:
+    """Kiểm tra tính toàn vẹn 5 điều kiện hợp lệ trước khi ghi nguyên tử ra đĩa."""
+    if df.empty:
+        raise ValueError(f"Dữ liệu tải về của {symbol_name} rỗng.")
+
+    if "Date" not in df.columns:
+        raise ValueError(f"Dữ liệu của {symbol_name} thiếu cột 'Date'.")
+
+    # 1. Date không trùng lặp và tăng dần đơn điệu
+    dup_dates = df["Date"].duplicated().sum()
+    if dup_dates > 0:
+        raise ValueError(f"Dữ liệu {symbol_name} có {dup_dates} ngày bị trùng lặp.")
+    if not df["Date"].is_monotonic_increasing:
+        raise ValueError(f"Cột 'Date' của {symbol_name} chưa được sắp xếp tăng dần đơn điệu.")
+
+    # 2. High >= Low và Close > 0
+    if not is_index:
+        if "High" in df.columns and "Low" in df.columns:
+            invalid_hl = (df["High"] < df["Low"]).sum()
+            if invalid_hl > 0:
+                raise ValueError(f"Dữ liệu {symbol_name} có {invalid_hl} phiên High < Low bất thường.")
+        if "Close" in df.columns and (df["Close"] <= 0).any():
+            raise ValueError(f"Dữ liệu {symbol_name} có phiên Close <= 0.")
+        if "Volume" in df.columns:
+            zero_vol = (df["Volume"] == 0).sum()
+            if zero_vol > 0:
+                logger.warning("Mã %s có %d phiên có Volume = 0.", symbol_name, zero_vol)
+    else:
+        close_col = [c for c in df.columns if "Close" in c]
+        if close_col and (df[close_col[0]] <= 0).any():
+            raise ValueError(f"Dữ liệu chỉ số {symbol_name} có phiên Close <= 0.")
+
+    # 3. Phủ đúng khoảng ngày yêu cầu
+    min_date = df["Date"].min()
+    max_date = df["Date"].max()
+    target_start = pd.to_datetime(expected_start)
+
+    if min_date > target_start + pd.Timedelta(days=4):
+        raise ValueError(
+            f"Dữ liệu {symbol_name} không phủ đủ ngày bắt đầu: min_date={min_date.strftime('%Y-%m-%d')} "
+            f"> expected_start={expected_start}."
+        )
+    elif min_date > target_start:
+        logger.info(
+            "Mã %s: Ngày đầu (%s) khớp start_date (%s) sau dung sai ngày nghỉ lễ/cuối tuần.",
+            symbol_name,
+            min_date.strftime("%Y-%m-%d"),
+            expected_start,
+        )
+
+    if expected_end is not None:
+        target_end = pd.to_datetime(expected_end)
+        if max_date < target_end:
+            raise ValueError(
+                f"Dữ liệu {symbol_name} không phủ đủ ngày kết thúc cố định: max_date={max_date.strftime('%Y-%m-%d')} "
+                f"< expected_end={expected_end}."
+            )
+
+
+def check_cache_coverage(df: pd.DataFrame, start_date: str, end_date: str | None) -> bool:
+    """Kiểm tra DataFrame từ cache có bao phủ đủ khoảng ngày yêu cầu không."""
+    if df is None or df.empty or "Date" not in df.columns:
+        return False
+    min_d = df["Date"].min()
+    max_d = df["Date"].max()
+    target_start = pd.to_datetime(start_date)
+
+    if min_d > target_start + pd.Timedelta(days=4):
+        return False
+
+    if end_date is not None:
+        target_end = pd.to_datetime(end_date)
+        if max_d < target_end:
+            return False
+    else:
+        # Khi end_date=None (truy vấn thời gian thực), cho phép dung sai 4 ngày
+        target_end = pd.Timestamp.now().normalize() - pd.Timedelta(days=4)
+        if max_d < target_end:
+            return False
+
+    return True
+
+
+def _atomic_save_parquet(df: pd.DataFrame, target_path: Path) -> None:
+    """Ghi DataFrame ra file Parquet theo cơ chế nguyên tử (atomic write qua file tạm .tmp)."""
+    tmp_path = target_path.with_name(f"{target_path.name}.tmp_{int(time.time()*1000)}")
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        df.to_parquet(tmp_path, index=False, engine="pyarrow")
+        tmp_path.replace(target_path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+
+def clean_stock_data(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFrame:
     """Chuẩn hóa tên cột sang tiếng Anh nhất quán, sửa lỗi thuật ngữ và sắp xếp thời gian."""
     data = df.copy()
 
@@ -59,7 +165,7 @@ def clean_stock_data(df: pd.DataFrame, symbol: Optional[str] = None) -> pd.DataF
 def load_local_data(
     symbol: str = DEFAULT_SYMBOL,
     data_dir: Path = RAW_DATA_DIR,
-) -> Optional[pd.DataFrame]:
+) -> pd.DataFrame | None:
     """Đọc dữ liệu lịch sử giá đã lưu trong data/raw/ (ưu tiên Parquet, fallback CSV)."""
     # 1. Thử đọc Parquet
     parquet_path = data_dir / f"{symbol.upper()}.parquet"
@@ -85,7 +191,7 @@ def load_local_data(
 def fetch_daily_index(
     index_id: str = "VNINDEX",
     start_date: str = DEFAULT_START_DATE,
-    end_date: Optional[str] = DEFAULT_END_DATE,
+    end_date: str | None = DEFAULT_END_DATE,
     save_to_raw: bool = True,
     force_refresh: bool = False,
 ) -> pd.DataFrame:
@@ -94,32 +200,45 @@ def fetch_daily_index(
     raw_csv_path = RAW_DATA_DIR / f"{index_id.upper()}.csv"
 
     if not force_refresh:
+        cached_df = None
         if raw_parquet_path.exists():
-            df = pd.read_parquet(raw_parquet_path)
-            df["Date"] = pd.to_datetime(df["Date"])
-            ret_col = f"{index_id.upper()}_Return_1d"
-            if ret_col not in df.columns:
-                df[ret_col] = df[f"{index_id.upper()}_Close"].pct_change(1)
-            return df
+            cached_df = pd.read_parquet(raw_parquet_path)
         elif raw_csv_path.exists():
-            df = pd.read_csv(raw_csv_path)
-            df["Date"] = pd.to_datetime(df["Date"])
-            ret_col = f"{index_id.upper()}_Return_1d"
-            if ret_col not in df.columns:
-                df[ret_col] = df[f"{index_id.upper()}_Close"].pct_change(1)
-            return df
+            cached_df = pd.read_csv(raw_csv_path)
 
-    # Tải mới từ API
+        if cached_df is not None and not cached_df.empty:
+            cached_df["Date"] = pd.to_datetime(cached_df["Date"])
+            # Kiểm tra bao phủ cache
+            if check_cache_coverage(cached_df, start_date=start_date, end_date=end_date):
+                ret_col = f"{index_id.upper()}_Return_1d"
+                if ret_col not in cached_df.columns:
+                    cached_df[ret_col] = cached_df[f"{index_id.upper()}_Close"].pct_change(1)
+                return cached_df
+            elif end_date is not None and cached_df["Date"].max() < pd.to_datetime(end_date):
+                # Thử gọi API cho đoạn (max_date + 1, end_date] xem có phiên mới không
+                max_cache_date = cached_df["Date"].max()
+                next_start = (max_cache_date + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+                try:
+                    ssi_client = SSIFastConnectClient()
+                    tail_df = ssi_client.get_daily_index(index_id=index_id, start_date=next_start, end_date=end_date)
+                    if tail_df.empty:
+                        # Đoạn cuối không có phiên giao dịch mới -> Cache HIT
+                        ret_col = f"{index_id.upper()}_Return_1d"
+                        if ret_col not in cached_df.columns:
+                            cached_df[ret_col] = cached_df[f"{index_id.upper()}_Close"].pct_change(1)
+                        return cached_df
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Không thể kiểm tra đoạn ngày mới cho %s: %s. Fallback tải lại toàn bộ.", index_id, exc)
+
+    # Tải mới toàn bộ từ API
     ssi_client = SSIFastConnectClient()
     df = ssi_client.get_daily_index(index_id=index_id, start_date=start_date, end_date=end_date)
-    if df.empty:
-        raise RuntimeError(f"Không thể tải dữ liệu chỉ số {index_id} từ SSI API")
+    validate_downloaded_data(df, expected_start=start_date, expected_end=end_date, is_index=True, symbol_name=index_id)
 
     df[f"{index_id.upper()}_Return_1d"] = df[f"{index_id.upper()}_Close"].pct_change(1)
 
     if save_to_raw:
-        RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
-        df.to_parquet(raw_parquet_path, index=False, engine="pyarrow")
+        _atomic_save_parquet(df, raw_parquet_path)
 
     return df
 
@@ -127,16 +246,20 @@ def fetch_daily_index(
 def fetch_stock_data(
     symbol: str = DEFAULT_SYMBOL,
     start_date: str = DEFAULT_START_DATE,
-    end_date: Optional[str] = DEFAULT_END_DATE,
+    end_date: str | None = DEFAULT_END_DATE,
     save_to_raw: bool = True,
     force_refresh: bool = False,
     unit: str = "kVND",
 ) -> pd.DataFrame:
-    """Tải dữ liệu OHLCV đơn mã (ưu tiên đọc Parquet cache, fallback API)."""
+    """Tải dữ liệu OHLCV đơn mã (ưu tiên đọc Parquet cache có kiểm tra bao phủ ngày, fallback API)."""
     symbol = symbol.upper()
     if not force_refresh:
         local_df = load_local_data(symbol)
-        if local_df is not None and not local_df.empty:
+        if (
+            local_df is not None
+            and not local_df.empty
+            and check_cache_coverage(local_df, start_date=start_date, end_date=end_date)
+        ):
             return local_df
 
     try:
@@ -151,24 +274,25 @@ def fetch_stock_data(
             raise ValueError(f"SSI không trả về dữ liệu cho mã {symbol}")
     except Exception as exc:
         local_df = load_local_data(symbol)
-        if local_df is not None:
+        if local_df is not None and not local_df.empty:
+            logger.warning("Không thể tải từ API cho %s (%s). Sử dụng cache sẵn có.", symbol, exc)
             return local_df
         raise RuntimeError(f"Lỗi thu thập dữ liệu mã {symbol}: {exc}") from exc
 
     cleaned_df = clean_stock_data(df, symbol=symbol)
+    validate_downloaded_data(cleaned_df, expected_start=start_date, expected_end=end_date, is_index=False, symbol_name=symbol)
 
     if save_to_raw:
-        RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
         parquet_path = RAW_DATA_DIR / f"{symbol}.parquet"
-        cleaned_df.to_parquet(parquet_path, index=False, engine="pyarrow")
+        _atomic_save_parquet(cleaned_df, parquet_path)
 
     return cleaned_df
 
 
 def build_panel_dataset(
-    symbols: Optional[Union[List[str], str]] = None,
+    symbols: list[str] | str | None = None,
     start_date: str = DEFAULT_START_DATE,
-    end_date: Optional[str] = DEFAULT_END_DATE,
+    end_date: str | None = DEFAULT_END_DATE,
     save_to_interim: bool = True,
     force_refresh: bool = False,
 ) -> pd.DataFrame:
@@ -192,21 +316,19 @@ def build_panel_dataset(
     else:
         target_symbols = [s.upper() for s in symbols]
 
-    dfs: List[pd.DataFrame] = []
+    dfs: list[pd.DataFrame] = []
     for sym in target_symbols:
-        try:
-            df_sym = fetch_stock_data(
-                symbol=sym,
-                start_date=start_date,
-                end_date=end_date,
-                force_refresh=force_refresh,
+        df_sym = fetch_stock_data(
+            symbol=sym,
+            start_date=start_date,
+            end_date=end_date,
+            force_refresh=force_refresh,
+        )
+        if not check_cache_coverage(df_sym, start_date=start_date, end_date=end_date):
+            raise InsufficientDataCoverageError(
+                f"Mã {sym} không bao phủ đủ dải ngày yêu cầu [{start_date} -> {end_date}]. Dừng tạo panel."
             )
-            dfs.append(df_sym)
-        except Exception as e:
-            print(f"⚠️ Cảnh báo: Bỏ qua mã {sym} do lỗi thu thập: {e}")
-
-    if not dfs:
-        raise RuntimeError("Không thu thập được dữ liệu cho bất kỳ mã cổ phiếu nào.")
+        dfs.append(df_sym)
 
     panel_df = pd.concat(dfs, ignore_index=True)
     panel_df = panel_df.sort_values(["Date", "Symbol"]).reset_index(drop=True)
@@ -218,6 +340,43 @@ def build_panel_dataset(
         end_date=end_date,
         force_refresh=force_refresh,
     )
+
+    # Kiểm tra VNINDEX phủ đủ mọi ngày của mọi mã cổ phiếu
+    stock_dates = set(panel_df["Date"].unique())
+    vni_dates = set(df_vnindex["Date"].unique())
+    missing_in_vni = stock_dates - vni_dates
+    if missing_in_vni:
+        raise ValueError(
+            f"Dữ liệu VNINDEX thiếu {len(missing_in_vni)} ngày so với các mã cổ phiếu trong panel: "
+            f"{sorted(missing_in_vni)[:10]}"
+        )
+
+    # Ngược lại, nếu ngày VNINDEX không có ở mã nào -> cảnh báo
+    for sym in target_symbols:
+        sym_dates = set(panel_df[panel_df["Symbol"] == sym]["Date"].unique())
+        missing_in_sym = vni_dates - sym_dates
+        if missing_in_sym:
+            logger.warning(
+                "Mã %s thiếu %d ngày so với lịch VNINDEX trong dải ngày: %s",
+                sym,
+                len(missing_in_sym),
+                sorted(missing_in_sym)[:5],
+            )
+
+    # Cảnh báo (không chặn) nếu có |lợi suất ngày| > 7.5% (biên độ giá HOSE +-7%)
+    for sym in target_symbols:
+        sub = panel_df[panel_df["Symbol"] == sym].sort_values("Date").copy()
+        sub["Ret_1d"] = sub["Close"].pct_change(1)
+        extreme_rows = sub[sub["Ret_1d"].abs() > 0.075]
+        if not extreme_rows.empty:
+            dates_str = [d.strftime("%Y-%m-%d") for d in extreme_rows["Date"]]
+            logger.warning(
+                "Mã %s có %d phiên có |lợi suất ngày| > 7.5%% (biên độ HOSE): %s",
+                sym,
+                len(extreme_rows),
+                dates_str[:5],
+            )
+
     panel_df = pd.merge(
         panel_df,
         df_vnindex[["Date", "VNINDEX_Return_1d"]],
@@ -226,20 +385,39 @@ def build_panel_dataset(
     )
 
     if save_to_interim:
-        PANEL_DATA_DIR.mkdir(parents=True, exist_ok=True)
-        # Lưu phân vùng theo cột Symbol vào thư mục interim
-        panel_df.to_parquet(
-            PANEL_DATA_DIR,
-            partition_cols=["Symbol"],
-            engine="pyarrow",
-            index=False,
-        )
+        PANEL_DATA_DIR.parent.mkdir(parents=True, exist_ok=True)
+        tmp_panel_dir = PANEL_DATA_DIR.parent / f"panel_tmp_{int(time.time()*1000)}"
+        old_panel_dir = PANEL_DATA_DIR.parent / f"panel_old_{int(time.time()*1000)}"
+        try:
+            tmp_panel_dir.mkdir(parents=True, exist_ok=True)
+            panel_df.to_parquet(
+                tmp_panel_dir,
+                partition_cols=["Symbol"],
+                engine="pyarrow",
+                index=False,
+            )
+            # Kiểm tra đọc lại từ thư mục tạm trước khi hoán đổi
+            check_df = pd.read_parquet(tmp_panel_dir, engine="pyarrow")
+            if len(check_df) != len(panel_df):
+                raise RuntimeError(
+                    f"Thư mục tạm panel ghi thiếu dữ liệu: {len(check_df)} != {len(panel_df)} dòng."
+                )
+
+            if PANEL_DATA_DIR.exists():
+                PANEL_DATA_DIR.rename(old_panel_dir)
+            tmp_panel_dir.rename(PANEL_DATA_DIR)
+
+            if old_panel_dir.exists():
+                shutil.rmtree(old_panel_dir)
+        finally:
+            if tmp_panel_dir.exists():
+                shutil.rmtree(tmp_panel_dir)
 
     return panel_df
 
 
 def load_panel_dataset(
-    symbols: Optional[List[str]] = None,
+    symbols: list[str] | None = None,
     panel_dir: Path = PANEL_DATA_DIR,
 ) -> pd.DataFrame:
     """Nạp nhanh dữ liệu Long-format từ thư mục Parquet phân vùng theo danh sách mã."""
@@ -252,4 +430,6 @@ def load_panel_dataset(
         filters = [("Symbol", "in", clean_symbols)]
 
     df = pd.read_parquet(panel_dir, filters=filters, engine="pyarrow")
+    if "Symbol" in df.columns:
+        df["Symbol"] = df["Symbol"].astype(str)
     return df.sort_values(["Date", "Symbol"]).reset_index(drop=True)

@@ -1,7 +1,7 @@
 """Kiểm thử cho SSI Fast Connect Client."""
 
 from unittest.mock import MagicMock, patch
-import pandas as pd
+
 import pytest
 
 from vn_stock.ssi_client import SSIFastConnectClient
@@ -88,3 +88,26 @@ def test_ssi_client_parsing_daily_index():
     assert "VNINDEX_Close" in df.columns
     assert pytest.approx(df.iloc[0]["VNINDEX_Close"]) == 1131.72
     assert pytest.approx(df.iloc[1]["VNINDEX_Close"]) == 1144.17
+
+
+def test_ssi_client_daily_index_empty_chunk_success():
+    """Kiểm tra khi chunk trả về status Success nhưng data rỗng (nghỉ lễ), hàm coi là thành công."""
+    client = SSIFastConnectClient(consumer_id="mock_id", consumer_secret="mock_secret")
+    client._get_access_token = MagicMock(return_value="mock_token")
+
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "status": "Success",
+        "message": "Success",
+        "data": [],
+    }
+    client._session.get = MagicMock(return_value=mock_response)
+
+    with patch("time.sleep", return_value=None):
+        df = client.get_daily_index("VNINDEX", start_date="2024-02-08", end_date="2024-02-14", chunk_days=25)
+
+    assert df.empty
+    assert "Date" in df.columns
+    assert "VNINDEX_Close" in df.columns
+

@@ -1,10 +1,14 @@
 """Module tính toán bộ 13 đặc trưng tương đối và tạo chuỗi 3D đa biến có Warm-up cho mô hình Global Model."""
 
-from typing import List, Optional, Tuple
+
+import logging
+
 import numpy as np
 import pandas as pd
 
 from vn_stock.config import DEFAULT_SEQ_LENGTH, SYMBOL_TO_CODE
+
+logger = logging.getLogger(__name__)
 
 # Danh sách 13 đặc trưng số học tương đối (không dùng giá/khối lượng tuyệt đối)
 FEATURE_COLS = [
@@ -109,10 +113,10 @@ def compute_features_per_symbol(
 
 def create_multivariate_sequences(
     df: pd.DataFrame,
-    warmup_df: Optional[pd.DataFrame] = None,
-    feature_cols: List[str] = ALL_FEATURE_COLS,
+    warmup_df: pd.DataFrame | None = None,
+    feature_cols: list[str] = ALL_FEATURE_COLS,
     seq_length: int = DEFAULT_SEQ_LENGTH,
-) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+) -> tuple[np.ndarray, np.ndarray | None]:
     """
     Tạo chuỗi trượt 3D đa biến cho PyTorch LSTM với cơ chế Warm-up bảo toàn mẫu.
     
@@ -132,22 +136,35 @@ def create_multivariate_sequences(
     for sym in df["Symbol"].unique():
         curr_sym = df[df["Symbol"] == sym].sort_values("Date")
         if warmup_df is not None and not warmup_df.empty and sym in warmup_df["Symbol"].values:
-            warm_sym = warmup_df[warmup_df["Symbol"] == sym].sort_values("Date").tail(seq_length)
+            warm_sym = warmup_df[warmup_df["Symbol"] == sym].sort_values("Date").tail(seq_length - 1)
             combined = pd.concat([warm_sym, curr_sym], ignore_index=True)
             start_idx = len(warm_sym)
         else:
             combined = curr_sym
-            start_idx = seq_length
+            start_idx = seq_length - 1
+
+        # Guard chống slice âm: Tổng số dòng phải đạt tối thiểu seq_length
+        if len(combined) < seq_length:
+            logger.warning(
+                "Mã %s có tổng cộng %d dòng (ít hơn seq_length=%d), không đủ tạo chuỗi trượt hợp lệ.",
+                sym,
+                len(combined),
+                seq_length,
+            )
+            continue
+
+        # Đảm bảo start_idx luôn >= seq_length - 1 để không bao giờ có slice âm
+        start_idx = max(start_idx, seq_length - 1)
 
         features = combined[feature_cols].values
         labels = combined["Label"].values if has_label else None
 
         for i in range(start_idx, len(combined)):
-            xs.append(features[i - seq_length : i])
+            xs.append(features[i - seq_length + 1 : i + 1])
             if has_label:
                 ys.append(labels[i])
 
-    x_arr = np.array(xs, dtype=np.float32)
-    y_arr = np.array(ys, dtype=np.int64) if has_label else None
+    x_arr = np.array(xs, dtype=np.float32) if xs else np.empty((0, seq_length, len(feature_cols)), dtype=np.float32)
+    y_arr = np.array(ys, dtype=np.int64) if (has_label and ys) else (np.empty(0, dtype=np.int64) if has_label else None)
 
     return x_arr, y_arr

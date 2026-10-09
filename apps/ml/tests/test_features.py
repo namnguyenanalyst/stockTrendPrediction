@@ -117,16 +117,16 @@ def test_create_multivariate_sequences_without_and_with_warmup():
     seq_len = 20
 
     # 1. Trường hợp KHÔNG có warmup_df
-    # Mỗi mã có 30 phiên, không có warmup sẽ mất seq_len mẫu đầu -> mỗi mã còn 30 - 20 = 10 mẫu
-    # Tổng cộng 2 mã = 20 mẫu
+    # Mỗi mã có 30 phiên, chuỗi gồm ngày i (cần 20 phiên từ i-19 đến i) -> bắt đầu tại i=19
+    # Mỗi mã có 30 - 19 = 11 mẫu -> Tổng cộng 2 mã = 22 mẫu
     xs_no_warmup, ys_no_warmup = create_multivariate_sequences(
         df_full,
         warmup_df=None,
         feature_cols=ALL_FEATURE_COLS,
         seq_length=seq_len,
     )
-    assert xs_no_warmup.shape == (20, seq_len, len(ALL_FEATURE_COLS))
-    assert ys_no_warmup.shape == (20,)
+    assert xs_no_warmup.shape == (22, seq_len, len(ALL_FEATURE_COLS))
+    assert ys_no_warmup.shape == (22,)
     assert not np.isnan(xs_no_warmup).any()
 
     # 2. Trường hợp CÓ warmup_df (mô phỏng tập Validation / Test nhận đuôi tập trước)
@@ -144,3 +144,25 @@ def test_create_multivariate_sequences_without_and_with_warmup():
     assert xs_warmup.shape == (20, seq_len, len(ALL_FEATURE_COLS))
     assert ys_warmup.shape == (20,)
     assert not np.isnan(xs_warmup).any()
+
+
+def test_create_multivariate_sequences_insufficient_length_guard():
+    """Kiểm tra guard khi một mã có số dòng ít hơn seq_length thì không bị slice âm."""
+    df_short = pd.DataFrame({
+        "Date": pd.date_range("2024-01-01", periods=5),
+        "Symbol": ["SHORT"] * 5,
+        "F1": [1.0, 2.0, 3.0, 4.0, 5.0],
+        "Label": [0, 1, 2, 1, 0],
+    })
+    # seq_length = 10 trong khi df_short chỉ có 5 dòng
+    xs, ys = create_multivariate_sequences(
+        df=df_short,
+        warmup_df=None,
+        feature_cols=["F1"],
+        seq_length=10,
+    )
+    # Bỏ qua mã này và trả về mảng rỗng shape (0, 10, 1)
+    assert len(xs) == 0
+    assert len(ys) == 0
+    assert xs.shape == (0, 10, 1)
+

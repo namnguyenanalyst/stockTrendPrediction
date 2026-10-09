@@ -1,15 +1,19 @@
 """Client kết nối dịch vụ SSI Fast Connect Data (FC-Data) để thu thập dữ liệu chứng khoán chuyên nghiệp."""
 
 from datetime import datetime, timedelta
+import logging
 import os
 from pathlib import Path
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from dotenv import load_dotenv
 import pandas as pd
 import requests
 
 from vn_stock.config import MONOREPO_ROOT, PROJ_ROOT
+
+logger = logging.getLogger(__name__)
 
 # Tự động nạp cấu hình từ .env ở root repo hoặc apps/ml hoặc cwd
 for env_path in [
@@ -27,16 +31,16 @@ class SSIFastConnectClient:
 
     def __init__(
         self,
-        consumer_id: Optional[str] = None,
-        consumer_secret: Optional[str] = None,
-        api_url: Optional[str] = None,
+        consumer_id: str | None = None,
+        consumer_secret: str | None = None,
+        api_url: str | None = None,
     ):
         self.consumer_id = consumer_id or os.getenv("SSI_CONSUMER_ID", "")
         self.consumer_secret = consumer_secret or os.getenv("SSI_CONSUMER_SECRET", "")
         self.api_url = (api_url or os.getenv("SSI_API_URL", "https://fc-data.ssi.com.vn/")).rstrip("/") + "/"
 
-        self._access_token: Optional[str] = None
-        self._token_expiry: Optional[datetime] = None
+        self._access_token: str | None = None
+        self._token_expiry: datetime | None = None
         self._session = requests.Session()
         self._headers = {
             "Content-Type": "application/json",
@@ -45,7 +49,7 @@ class SSIFastConnectClient:
 
     def _get_access_token(self) -> str:
         """Lấy JWT Access Token từ SSI hoặc tái sử dụng token đã cache nếu còn hạn."""
-        now = datetime.now()
+        now = datetime.now()  # noqa: DTZ005
         if (
             self._access_token is not None
             and self._token_expiry is not None
@@ -82,16 +86,16 @@ class SSIFastConnectClient:
             # Nếu đã là định dạng DD/MM/YYYY
             if "/" in date_str:
                 return date_str
-            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            dt = datetime.strptime(date_str, "%Y-%m-%d")  # noqa: DTZ007
             return dt.strftime("%d/%m/%Y")
-        except Exception:
+        except (ValueError, TypeError):
             return date_str
 
     def get_daily_ohlcv(
         self,
         symbol: str,
         start_date: str = "2020-01-01",
-        end_date: Optional[str] = None,
+        end_date: str | None = None,
         unit: str = "kVND",  # "kVND" (chia 1000 để tương thích dự án cũ) hoặc "VND"
     ) -> pd.DataFrame:
         """
@@ -111,11 +115,11 @@ class SSIFastConnectClient:
 
         from_date_ssi = self._format_date_for_ssi(start_date)
         if end_date is None:
-            to_date_ssi = datetime.now().strftime("%d/%m/%Y")
+            to_date_ssi = datetime.now().strftime("%d/%m/%Y")  # noqa: DTZ005
         else:
             to_date_ssi = self._format_date_for_ssi(end_date)
 
-        all_records: List[Dict[str, Any]] = []
+        all_records: list[dict[str, Any]] = []
         page_index = 1
         page_size = 1000
 
@@ -173,7 +177,7 @@ class SSIFastConnectClient:
 
         return df[["Date", "Open", "High", "Low", "Close", "Volume"]]
 
-    def get_index_components(self, index_code: str = "VN30") -> List[str]:
+    def get_index_components(self, index_code: str = "VN30") -> list[str]:
         """Lấy danh sách các mã cổ phiếu trong rổ chỉ số (VN30, VN100, ...)."""
         token = self._get_access_token()
         headers = {
@@ -191,7 +195,7 @@ class SSIFastConnectClient:
         if status_str not in ["200", "success"]:
             raise RuntimeError(f"Lỗi lấy rổ chỉ số {index_code}: {data.get('message')}")
 
-        result_symbols: List[str] = []
+        result_symbols: list[str] = []
         data_list = data.get("data", [])
         if isinstance(data_list, list):
             for index_group in data_list:
@@ -207,7 +211,7 @@ class SSIFastConnectClient:
         self,
         index_id: str = "VNINDEX",
         start_date: str = "2023-01-01",
-        end_date: Optional[str] = None,
+        end_date: str | None = None,
         chunk_days: int = 25,
     ) -> pd.DataFrame:
         """
@@ -222,20 +226,20 @@ class SSIFastConnectClient:
         url = self.api_url + "api/v2/Market/DailyIndex"
 
         start_dt = (
-            datetime.strptime(start_date, "%Y-%m-%d")
+            datetime.strptime(start_date, "%Y-%m-%d")  # noqa: DTZ007
             if "-" in start_date
-            else datetime.strptime(start_date, "%d/%m/%Y")
+            else datetime.strptime(start_date, "%d/%m/%Y")  # noqa: DTZ007
         )
         if end_date is None:
-            end_dt = datetime.now()
+            end_dt = datetime.now()  # noqa: DTZ005
         else:
             end_dt = (
-                datetime.strptime(end_date, "%Y-%m-%d")
+                datetime.strptime(end_date, "%Y-%m-%d")  # noqa: DTZ007
                 if "-" in end_date
-                else datetime.strptime(end_date, "%d/%m/%Y")
+                else datetime.strptime(end_date, "%d/%m/%Y")  # noqa: DTZ007
             )
 
-        records: List[Dict[str, Any]] = []
+        records: list[dict[str, Any]] = []
         cur_start = start_dt
 
         while cur_start <= end_dt:
@@ -249,18 +253,56 @@ class SSIFastConnectClient:
                 "ascending": True,
             }
             # Cơ chế Thử lại (Retry) tối đa 3 lần cho mỗi chunk
+            chunk_success = False
+            last_err_msg = ""
             for attempt in range(3):
                 try:
                     res = self._session.get(url, params=params, headers=headers, timeout=15)
                     if res.status_code == 200:
                         d = res.json()
                         status_str = str(d.get("status", "")).lower()
-                        if status_str in ["200", "success"] and d.get("data"):
-                            records.extend(d["data"])
+                        if status_str in ["200", "success"]:
+                            if d.get("data"):
+                                records.extend(d["data"])
+                            chunk_success = True
                             break
-                except Exception:
-                    pass
+                        else:
+                            last_err_msg = f"API trả về status {status_str}: {d.get('message')}"
+                            logger.warning(
+                                "Truy vấn %s chunk [%s -> %s] lần %d/3 không thành công: %s",
+                                index_id,
+                                cur_start.strftime("%d/%m/%Y"),
+                                cur_end.strftime("%d/%m/%Y"),
+                                attempt + 1,
+                                last_err_msg,
+                            )
+                    else:
+                        last_err_msg = f"HTTP status {res.status_code}: {res.text[:100]}"
+                        logger.warning(
+                            "Truy vấn %s chunk [%s -> %s] lần %d/3 lỗi HTTP %d",
+                            index_id,
+                            cur_start.strftime("%d/%m/%Y"),
+                            cur_end.strftime("%d/%m/%Y"),
+                            attempt + 1,
+                            res.status_code,
+                        )
+                except Exception as exc:  # noqa: BLE001
+                    last_err_msg = str(exc)
+                    logger.warning(
+                        "Truy vấn %s chunk [%s -> %s] lần %d/3 gặp ngoại lệ: %s",
+                        index_id,
+                        cur_start.strftime("%d/%m/%Y"),
+                        cur_end.strftime("%d/%m/%Y"),
+                        attempt + 1,
+                        exc,
+                    )
                 time.sleep(1.2)
+
+            if not chunk_success:
+                raise RuntimeError(
+                    f"Truy vấn {index_id} thất bại sau 3 lần thử cho khoảng ngày "
+                    f"[{cur_start.strftime('%d/%m/%Y')} -> {cur_end.strftime('%d/%m/%Y')}]: {last_err_msg}"
+                )
 
             cur_start = cur_end + timedelta(days=1)
             time.sleep(1.05)  # Tránh vượt quá rate limit của SSI API

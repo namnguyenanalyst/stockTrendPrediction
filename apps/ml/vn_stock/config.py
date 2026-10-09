@@ -17,10 +17,18 @@ REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 NOTEBOOKS_DIR = PROJ_ROOT / "notebooks"
 
+# Cấu hình mốc thời gian thu thập và nghiên cứu
+# FETCH_START_DATE: Ngày bắt đầu tải dữ liệu lịch sử từ SSI API (cung cấp ~250 phiên năm 2022 làm vùng đệm rolling 200 ngày)
+FETCH_START_DATE = "2022-01-01"
+
+# STUDY_START_DATE: Ngày bắt đầu chính thức của cửa sổ nghiên cứu (cắt lại sau feature computation)
+# MWG 2022-06-16 SSI chưa điều chỉnh lùi sự kiện chia cổ phiếu 1:1 (hệ số 0,5), làm nhiễu SMA_200_Dev và CV_200 của MWG trong 58 phiên đầu; tính cửa sổ 200 phiên thì phiên sạch đầu tiên là 2023-04-03.
+STUDY_START_DATE = "2023-04-03"
+
 # Cấu hình mặc định cho dữ liệu & mô hình (chuẩn PoC v2.1)
 DEFAULT_SYMBOL = "VIC"
 DEFAULT_SYMBOLS = ["VIC", "HPG", "FPT", "VNM", "MWG"]
-DEFAULT_START_DATE = "2023-01-01"
+DEFAULT_START_DATE = FETCH_START_DATE
 DEFAULT_END_DATE = "2026-09-11"
 DEFAULT_SEQ_LENGTH = 20
 

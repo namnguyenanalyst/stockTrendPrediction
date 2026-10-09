@@ -22,10 +22,10 @@ help:
 data:
 	$(PYTHON) -c "from vn_stock.data_ingestion import fetch_stock_data; df = fetch_stock_data('VIC'); print(f'Đã tải {len(df)} dòng dữ liệu VIC')"
 
-## Tính toán các chỉ báo kỹ thuật
+## Tính toán các chỉ báo kỹ thuật trên toàn bộ panel
 .PHONY: features
 features:
-	$(PYTHON) -c "from vn_stock.data_ingestion import load_local_data; from vn_stock.features import compute_features_per_symbol, ALL_FEATURE_COLS; df = load_local_data('VIC'); res = compute_features_per_symbol(df, drop_na=False); print(f'Đã tính đặc trưng cho {res[\"Symbol\"].nunique()} mã ({len(res)} dòng, ví dụ mã {df[\"Symbol\"].iloc[0]}): DataFrame gồm {len(res.columns)} cột (7 cột cơ sở + {len(ALL_FEATURE_COLS)} cột feature chuẩn ALL_FEATURE_COLS)')"
+	$(PYTHON) -c "from vn_stock.data_ingestion import load_panel_dataset; from vn_stock.features import compute_features_per_symbol, ALL_FEATURE_COLS; df = load_panel_dataset(); res = compute_features_per_symbol(df, drop_na=True); print(f'Đã tính {len(ALL_FEATURE_COLS)} đặc trưng cho {res[\"Symbol\"].nunique()} mã {sorted(res[\"Symbol\"].unique())} (Tổng {len(res)} dòng, {res[\"Date\"].nunique()} ngày giao dịch): DataFrame gồm {len(res.columns)} cột (7 cơ sở + {len(ALL_FEATURE_COLS)} feature chuẩn)')"
 
 ## Huấn luyện mô hình PyTorch LSTM
 .PHONY: train
