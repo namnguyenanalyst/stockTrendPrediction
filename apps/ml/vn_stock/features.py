@@ -1,6 +1,5 @@
 """Module tính toán bộ 13 đặc trưng tương đối và tạo chuỗi 3D đa biến có Warm-up cho mô hình Global Model."""
 
-
 import logging
 
 import numpy as np
@@ -84,7 +83,7 @@ def compute_features_per_symbol(
 ) -> pd.DataFrame:
     """
     Tính toán bộ đặc trưng tương đối độc lập theo từng mã bằng groupby('Symbol').
-    
+
     Args:
         df: DataFrame Long-format (bắt buộc có Date, Symbol, Open, High, Low, Close, Volume, VNINDEX_Return_1d)
         drop_na: Nếu True, loại bỏ các dòng có NaN do cửa sổ rolling 200 phiên ban đầu.
@@ -119,13 +118,13 @@ def create_multivariate_sequences(
 ) -> tuple[np.ndarray, np.ndarray | None]:
     """
     Tạo chuỗi trượt 3D đa biến cho PyTorch LSTM với cơ chế Warm-up bảo toàn mẫu.
-    
+
     Args:
         df: Tập dữ liệu chính (train, val hoặc test)
         warmup_df: Tập dữ liệu liền trước (ví dụ lấy đuôi train làm warm-up cho val/test)
         feature_cols: Danh sách các cột đặc trưng đưa vào chuỗi 3D
         seq_length: Độ dài chuỗi quan sát quá khứ (mặc định 20 phiên)
-        
+
     Returns:
         xs: Mảng numpy 3D shape (N, seq_length, len(feature_cols)) dạng float32
         ys: Mảng numpy 1D shape (N,) dạng int64 (nếu có cột Label, ngược lại None)
@@ -136,7 +135,9 @@ def create_multivariate_sequences(
     for sym in df["Symbol"].unique():
         curr_sym = df[df["Symbol"] == sym].sort_values("Date")
         if warmup_df is not None and not warmup_df.empty and sym in warmup_df["Symbol"].values:
-            warm_sym = warmup_df[warmup_df["Symbol"] == sym].sort_values("Date").tail(seq_length - 1)
+            warm_sym = (
+                warmup_df[warmup_df["Symbol"] == sym].sort_values("Date").tail(seq_length - 1)
+            )
             combined = pd.concat([warm_sym, curr_sym], ignore_index=True)
             start_idx = len(warm_sym)
         else:
@@ -164,7 +165,15 @@ def create_multivariate_sequences(
             if has_label:
                 ys.append(labels[i])
 
-    x_arr = np.array(xs, dtype=np.float32) if xs else np.empty((0, seq_length, len(feature_cols)), dtype=np.float32)
-    y_arr = np.array(ys, dtype=np.int64) if (has_label and ys) else (np.empty(0, dtype=np.int64) if has_label else None)
+    x_arr = (
+        np.array(xs, dtype=np.float32)
+        if xs
+        else np.empty((0, seq_length, len(feature_cols)), dtype=np.float32)
+    )
+    y_arr = (
+        np.array(ys, dtype=np.int64)
+        if (has_label and ys)
+        else (np.empty(0, dtype=np.int64) if has_label else None)
+    )
 
     return x_arr, y_arr

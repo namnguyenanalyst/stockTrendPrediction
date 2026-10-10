@@ -34,13 +34,40 @@ DEFAULT_SEQ_LENGTH = 20
 
 # Bảng mã hóa cố định định danh cổ phiếu (Symbol -> Code) đảm bảo tính nhất quán tuyệt đối giữa Train và Inference
 VN30_SYMBOLS = [
-    "ACB", "BCM", "BID", "BVH", "CTG", "FPT", "GAS", "GVR", "HDB", "HPG",
-    "MBB", "MSN", "MWG", "PLX", "POW", "SAB", "SHB", "SSB", "SSI", "STB",
-    "TCB", "TPB", "VCB", "VHM", "VIB", "VIC", "VJC", "VNM", "VPB", "VRE"
+    "ACB",
+    "BCM",
+    "BID",
+    "BVH",
+    "CTG",
+    "FPT",
+    "GAS",
+    "GVR",
+    "HDB",
+    "HPG",
+    "MBB",
+    "MSN",
+    "MWG",
+    "PLX",
+    "POW",
+    "SAB",
+    "SHB",
+    "SSB",
+    "SSI",
+    "STB",
+    "TCB",
+    "TPB",
+    "VCB",
+    "VHM",
+    "VIB",
+    "VIC",
+    "VJC",
+    "VNM",
+    "VPB",
+    "VRE",
 ]
 SYMBOL_TO_CODE = {sym: idx for idx, sym in enumerate(VN30_SYMBOLS)}
 
-# Siêu tham số PyTorch LSTM
+# Siêu tham số PyTorch LSTM (Kế thừa tương thích ngược)
 DEFAULT_INPUT_SIZE = 1
 DEFAULT_HIDDEN_SIZE = 32
 DEFAULT_NUM_LAYERS = 2
@@ -49,8 +76,41 @@ DEFAULT_LEARNING_RATE = 0.001
 DEFAULT_EPOCHS = 50
 DEFAULT_BATCH_SIZE = 32
 
+# Cấu hình Phân loại Xu hướng 3 Lớp có ngưỡng (3-class Trend Classification)
+DEFAULT_LABEL_THRESHOLD = (
+    0.01  # Ngưỡng ±1.0% phân loại Tăng (>=+1%), Đi ngang ((-1%, +1%)), Giảm (<=-1%)
+)
+NUM_CLASSES = 3
+CLASS_NAMES = {0: "GIẢM", 1: "ĐI NGANG", 2: "TĂNG"}
+SIGNAL_RECOMMENDATIONS = {0: "BÁN (SELL)", 1: "NẮM GIỮ (HOLD)", 2: "MUA (BUY)"}
+RANDOM_SEED = 42
+
+# Siêu tham số PyTorch Global LSTM Classifier (Đa biến, chuỗi 3D)
+DEFAULT_LSTM_INPUT_SIZE = 14  # 13 đặc trưng tương đối + 1 Symbol_Code (ALL_FEATURE_COLS)
+DEFAULT_LSTM_HIDDEN_SIZE = 64
+DEFAULT_LSTM_NUM_LAYERS = 2
+DEFAULT_LSTM_DROPOUT = 0.2
+DEFAULT_LSTM_EPOCHS = 40
+DEFAULT_LSTM_BATCH_SIZE = 64
+DEFAULT_LSTM_LR = 0.001
+DEFAULT_LSTM_WEIGHT_DECAY = 1e-4
+
+# Siêu tham số LightGBM Classifier (Dạng bảng đa mã)
+DEFAULT_LGB_PARAMS = {
+    "n_estimators": 300,
+    "learning_rate": 0.03,
+    "max_depth": 5,
+    "num_leaves": 20,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "random_state": RANDOM_SEED,
+    "n_jobs": 1,
+    "verbose": -1,
+}
+DEFAULT_EARLY_STOPPING_ROUNDS = 30
+
 # Giả định chi phí giao dịch thị trường chứng khoán Việt Nam
 TRANSACTION_FEE_RATE = 0.0015  # 0.15% phí giao dịch
-TAX_RATE = 0.0010              # 0.10% thuế bán chứng khoán
+TAX_RATE = 0.0010  # 0.10% thuế bán chứng khoán
 INITIAL_CAPITAL = 100_000_000  # 100 triệu VNĐ
-LOT_SIZE = 100                 # Lô chẵn 100 cổ phiếu
+LOT_SIZE = 100  # Lô chẵn 100 cổ phiếu

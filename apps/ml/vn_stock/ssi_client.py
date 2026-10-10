@@ -37,7 +37,9 @@ class SSIFastConnectClient:
     ):
         self.consumer_id = consumer_id or os.getenv("SSI_CONSUMER_ID", "")
         self.consumer_secret = consumer_secret or os.getenv("SSI_CONSUMER_SECRET", "")
-        self.api_url = (api_url or os.getenv("SSI_API_URL", "https://fc-data.ssi.com.vn/")).rstrip("/") + "/"
+        self.api_url = (api_url or os.getenv("SSI_API_URL", "https://fc-data.ssi.com.vn/")).rstrip(
+            "/"
+        ) + "/"
 
         self._access_token: str | None = None
         self._token_expiry: datetime | None = None
@@ -100,7 +102,7 @@ class SSIFastConnectClient:
     ) -> pd.DataFrame:
         """
         Truy vấn nến lịch sử ngày (Daily OHLCV) có hỗ trợ phân trang tự động.
-        
+
         Args:
             symbol: Mã cổ phiếu (VIC, FPT, HPG, ...)
             start_date: Ngày bắt đầu (YYYY-MM-DD hoặc DD/MM/YYYY)

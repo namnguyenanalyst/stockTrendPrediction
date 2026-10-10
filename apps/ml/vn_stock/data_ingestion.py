@@ -48,7 +48,9 @@ def validate_downloaded_data(
         if "High" in df.columns and "Low" in df.columns:
             invalid_hl = (df["High"] < df["Low"]).sum()
             if invalid_hl > 0:
-                raise ValueError(f"Dữ liệu {symbol_name} có {invalid_hl} phiên High < Low bất thường.")
+                raise ValueError(
+                    f"Dữ liệu {symbol_name} có {invalid_hl} phiên High < Low bất thường."
+                )
         if "Close" in df.columns and (df["Close"] <= 0).any():
             raise ValueError(f"Dữ liệu {symbol_name} có phiên Close <= 0.")
         if "Volume" in df.columns:
@@ -113,7 +115,7 @@ def check_cache_coverage(df: pd.DataFrame, start_date: str, end_date: str | None
 
 def _atomic_save_parquet(df: pd.DataFrame, target_path: Path) -> None:
     """Ghi DataFrame ra file Parquet theo cơ chế nguyên tử (atomic write qua file tạm .tmp)."""
-    tmp_path = target_path.with_name(f"{target_path.name}.tmp_{int(time.time()*1000)}")
+    tmp_path = target_path.with_name(f"{target_path.name}.tmp_{int(time.time() * 1000)}")
     target_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         df.to_parquet(tmp_path, index=False, engine="pyarrow")
@@ -139,7 +141,7 @@ def clean_stock_data(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFram
         "Giá trần": "High",  # Alias tương thích ngược
         "low": "Low",
         "Giá thấp nhất": "Low",
-        "Giá sàn": "Low",   # Alias tương thích ngược
+        "Giá sàn": "Low",  # Alias tương thích ngược
         "close": "Close",
         "Giá đóng cửa": "Close",
         "volume": "Volume",
@@ -157,7 +159,11 @@ def clean_stock_data(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFram
     if symbol is not None and "Symbol" not in data.columns:
         data["Symbol"] = symbol.upper()
 
-    expected_cols = [c for c in ["Date", "Symbol", "Open", "High", "Low", "Close", "Volume"] if c in data.columns]
+    expected_cols = [
+        c
+        for c in ["Date", "Symbol", "Open", "High", "Low", "Close", "Volume"]
+        if c in data.columns
+    ]
     other_cols = [c for c in data.columns if c not in expected_cols]
     return data[expected_cols + other_cols]
 
@@ -220,20 +226,30 @@ def fetch_daily_index(
                 next_start = (max_cache_date + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
                 try:
                     ssi_client = SSIFastConnectClient()
-                    tail_df = ssi_client.get_daily_index(index_id=index_id, start_date=next_start, end_date=end_date)
+                    tail_df = ssi_client.get_daily_index(
+                        index_id=index_id, start_date=next_start, end_date=end_date
+                    )
                     if tail_df.empty:
                         # Đoạn cuối không có phiên giao dịch mới -> Cache HIT
                         ret_col = f"{index_id.upper()}_Return_1d"
                         if ret_col not in cached_df.columns:
-                            cached_df[ret_col] = cached_df[f"{index_id.upper()}_Close"].pct_change(1)
+                            cached_df[ret_col] = cached_df[f"{index_id.upper()}_Close"].pct_change(
+                                1
+                            )
                         return cached_df
                 except Exception as exc:  # noqa: BLE001
-                    logger.warning("Không thể kiểm tra đoạn ngày mới cho %s: %s. Fallback tải lại toàn bộ.", index_id, exc)
+                    logger.warning(
+                        "Không thể kiểm tra đoạn ngày mới cho %s: %s. Fallback tải lại toàn bộ.",
+                        index_id,
+                        exc,
+                    )
 
     # Tải mới toàn bộ từ API
     ssi_client = SSIFastConnectClient()
     df = ssi_client.get_daily_index(index_id=index_id, start_date=start_date, end_date=end_date)
-    validate_downloaded_data(df, expected_start=start_date, expected_end=end_date, is_index=True, symbol_name=index_id)
+    validate_downloaded_data(
+        df, expected_start=start_date, expected_end=end_date, is_index=True, symbol_name=index_id
+    )
 
     df[f"{index_id.upper()}_Return_1d"] = df[f"{index_id.upper()}_Close"].pct_change(1)
 
@@ -280,7 +296,13 @@ def fetch_stock_data(
         raise RuntimeError(f"Lỗi thu thập dữ liệu mã {symbol}: {exc}") from exc
 
     cleaned_df = clean_stock_data(df, symbol=symbol)
-    validate_downloaded_data(cleaned_df, expected_start=start_date, expected_end=end_date, is_index=False, symbol_name=symbol)
+    validate_downloaded_data(
+        cleaned_df,
+        expected_start=start_date,
+        expected_end=end_date,
+        is_index=False,
+        symbol_name=symbol,
+    )
 
     if save_to_raw:
         parquet_path = RAW_DATA_DIR / f"{symbol}.parquet"
@@ -298,7 +320,7 @@ def build_panel_dataset(
 ) -> pd.DataFrame:
     """
     Thu thập dữ liệu đa mã, tích hợp chỉ số VN-Index và lưu dạng Parquet phân vùng theo Symbol.
-    
+
     Args:
         symbols: Danh sách mã, hoặc 'VN30' để tự lấy 30 mã rổ chỉ số, hoặc None (5 mã mặc định).
         start_date: Ngày bắt đầu.
@@ -386,8 +408,8 @@ def build_panel_dataset(
 
     if save_to_interim:
         PANEL_DATA_DIR.parent.mkdir(parents=True, exist_ok=True)
-        tmp_panel_dir = PANEL_DATA_DIR.parent / f"panel_tmp_{int(time.time()*1000)}"
-        old_panel_dir = PANEL_DATA_DIR.parent / f"panel_old_{int(time.time()*1000)}"
+        tmp_panel_dir = PANEL_DATA_DIR.parent / f"panel_tmp_{int(time.time() * 1000)}"
+        old_panel_dir = PANEL_DATA_DIR.parent / f"panel_old_{int(time.time() * 1000)}"
         try:
             tmp_panel_dir.mkdir(parents=True, exist_ok=True)
             panel_df.to_parquet(
@@ -422,7 +444,9 @@ def load_panel_dataset(
 ) -> pd.DataFrame:
     """Nạp nhanh dữ liệu Long-format từ thư mục Parquet phân vùng theo danh sách mã."""
     if not panel_dir.exists():
-        raise FileNotFoundError(f"Chưa có dữ liệu panel tại {panel_dir}. Hãy gọi build_panel_dataset() trước.")
+        raise FileNotFoundError(
+            f"Chưa có dữ liệu panel tại {panel_dir}. Hãy gọi build_panel_dataset() trước."
+        )
 
     filters = None
     if symbols is not None and len(symbols) > 0:

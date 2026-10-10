@@ -130,7 +130,7 @@ def drop_ignored_labels(X: Any, y: np.ndarray) -> tuple[Any, np.ndarray]:
     Returns:
         tuple[X_valid, y_valid] chỉ chứa các mẫu có nhãn hợp lệ (y != -1).
     """
-    valid_mask = (y != -1)
+    valid_mask = y != -1
     if isinstance(X, pd.DataFrame):
         X_valid = X.loc[valid_mask].reset_index(drop=True)
     elif isinstance(X, np.ndarray):
@@ -241,7 +241,7 @@ def generate_walk_forward_windows(
         missing_in_train = all_symbols - train_symbols
         if missing_in_train:
             warnings.warn(
-                f"Cửa sổ {idx} (Train {t_ratio*100:.0f}%): Các mã {sorted(missing_in_train)} "
+                f"Cửa sổ {idx} (Train {t_ratio * 100:.0f}%): Các mã {sorted(missing_in_train)} "
                 f"hoàn toàn không có dữ liệu trong tập Train (có thể do niêm yết muộn sau {train_end_date}).",
                 UserWarning,
                 stacklevel=2,
@@ -441,9 +441,9 @@ def prepare_all_windows(
                 val_s.loc[val_s[date_col] == va_end, "Label"] = -1
 
             # Cột Valid_Label luôn suy ra từ Label != -1
-            train_s["Valid_Label"] = (train_s["Label"] != -1)
-            val_s["Valid_Label"] = (val_s["Label"] != -1)
-            test_s["Valid_Label"] = (test_s["Label"] != -1)
+            train_s["Valid_Label"] = train_s["Label"] != -1
+            val_s["Valid_Label"] = val_s["Label"] != -1
+            test_s["Valid_Label"] = test_s["Label"] != -1
 
         # Trích xuất warm-up tails (seq_length - 1 dòng đuôi)
         val_warmup = get_warmup_tail(

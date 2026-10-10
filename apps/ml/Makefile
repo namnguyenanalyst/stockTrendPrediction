@@ -2,7 +2,8 @@
 # VN_STOCK ML MAKEFILE (CCDS v2)                                                #
 #################################################################################
 
-PYTHON ?= python3
+PYTHON ?= uv run python
+
 
 .PHONY: help
 help:

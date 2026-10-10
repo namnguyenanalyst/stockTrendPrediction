@@ -1,9 +1,8 @@
 """Module mô phỏng kiểm thử chiến lược đầu tư (Backtesting Engine) có tính chi phí giao dịch thực tế tại Việt Nam."""
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
+
 import numpy as np
-import pandas as pd
 
 from vn_stock.config import INITIAL_CAPITAL, LOT_SIZE, TAX_RATE, TRANSACTION_FEE_RATE
 
@@ -19,7 +18,7 @@ class BacktestMetrics:
     total_trades: int
     winning_trades: int
     losing_trades: int
-    equity_curve: List[float] = field(default_factory=list)
+    equity_curve: list[float] = field(default_factory=list)
 
 
 def run_simple_backtest(
@@ -28,8 +27,8 @@ def run_simple_backtest(
     initial_capital: float = INITIAL_CAPITAL,
     fee_rate: float = TRANSACTION_FEE_RATE,
     tax_rate: float = TAX_RATE,
-    buy_threshold: float = 0.015,   # Dự báo tăng > 1.5% thì MUA
-    sell_threshold: float = -0.015, # Dự báo giảm < -1.5% thì BÁN
+    buy_threshold: float = 0.015,  # Dự báo tăng > 1.5% thì MUA
+    sell_threshold: float = -0.015,  # Dự báo giảm < -1.5% thì BÁN
 ) -> BacktestMetrics:
     """
     Chạy mô phỏng giao dịch theo tín hiệu dự báo của mô hình AI:
@@ -43,7 +42,7 @@ def run_simple_backtest(
     winning_trades = 0
     losing_trades = 0
     last_buy_price = 0.0
-    equity_curve: List[float] = []
+    equity_curve: list[float] = []
 
     for i in range(len(prices) - 1):
         curr_price = float(prices[i])
