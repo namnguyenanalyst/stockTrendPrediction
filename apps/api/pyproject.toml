@@ -13,8 +13,19 @@ dependencies = [
     "uvicorn[standard]>=0.28.0",
     "pydantic>=2.6.0",
     "pydantic-settings>=2.2.0",
+    "vn-stock",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
 
 [tool.ruff]
 line-length = 99
 src = ["app"]
+
+[tool.uv.sources]
+vn-stock = { path = "../ml", editable = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

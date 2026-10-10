@@ -11,7 +11,7 @@ Quy chuẩn báo cáo: [docs/Cấu trúc báo cáo ĐATN.md](docs/Cấu trúc b�
 
 Hệ thống Agent vận hành theo mô hình phân tầng chặt chẽ giữa **Dự án (Project Scope)** và **Toàn cục (Global Scope)**:
 
-### 1.1. Các vai trò chuyên trách của Dự án (Project-scoped Agents - `.claude/agents/`)
+### 1.1. Các vai trò chuyên trách của Dự án (Project-scoped Agents - `.agents/rules/`)
 1. **Senior Quantitative Analyst (`quant-analyst`):**
    - Chịu trách nhiệm về logic tài chính, vi cấu trúc thị trường chứng khoán Việt Nam (HSX, HNX).
    - Kiểm thử chiến lược (Backtesting), mô phỏng trượt giá (Slippage), tính đúng phí giao dịch (0.15%) và thuế thu nhập chuyển nhượng (0.1%).
@@ -20,10 +20,17 @@ Hệ thống Agent vận hành theo mô hình phân tầng chặt chẽ giữa *
    - Chịu trách nhiệm về toàn bộ vòng đời ML sản xuất (End-to-end Production ML Lifecycle).
    - Tổ chức module theo chuẩn Cookiecutter Data Science v2 (CCDS v2) tại `apps/ml`.
    - Xây dựng pipeline dữ liệu tự động, trích xuất đặc trưng, huấn luyện mô hình (PyTorch LSTM/GRU, XGBoost), đánh giá và xuất artifact.
+3. **Senior Frontend Developer (`frontend-developer`):**
+   - Chịu trách nhiệm về tầng giao diện người dùng Web Dashboard tại `apps/web` (Next.js 15+, React 19, TypeScript).
+   - Xây dựng hệ thống UI tương tác cao: biểu đồ nến kỹ thuật, tín hiệu Mua/Bán thời gian thực, đường cong tài sản (Equity Curve), bảng thống kê chỉ số định lượng.
+   - Đảm bảo tính trải nghiệm (UX), thiết kế chuẩn responsive, khả năng truy cập (a11y) và tối ưu hóa hiệu năng render.
+4. **Academic Researcher (`academic-researcher`):**
+   - Chuyên gia tra cứu tài liệu học thuật (arXiv, Semantic Scholar, OpenAlex, Crossref), trích xuất phương pháp luận mô hình định lượng.
+   - Hỗ trợ xây dựng Chương 2 (Cơ sở lý thuyết), Chương 3 và tổng quan nghiên cứu thực nghiệm.
 
-### 1.2. Các vai trò kế thừa Toàn cục (Globally-inherited Agents - `~/.claude/agents/`)
-* **Academic Researcher (`academic-researcher`):** Chuyên gia tra cứu tài liệu học thuật (arXiv, Semantic Scholar, OpenAlex, Crossref), trích xuất phương pháp luận, hỗ trợ viết Chương 2 (Cơ sở lý thuyết) và tổng quan nghiên cứu.
+### 1.2. Các vai trò kế thừa Toàn cục (Globally-inherited Agents - `~/.gemini/config/rules/` & `~/.claude/agents/`)
 * **Senior Fullstack Developer (`fullstack-developer`):** Chuyên gia tích hợp toàn diện kiến trúc Monorepo (FastAPI, Next.js App Router, PostgreSQL 16, Docker Compose) phục vụ Phase 5.
+* **Academic Researcher (`academic-researcher`):** Vai trò nghiên cứu học thuật cấp toàn cục dùng chung cho các dự án.
 
 ### 1.3. Kho Kỹ năng chuyên sâu theo nhu cầu (On-Demand Skills - `.agents/skills/`)
 Agent tự động kích hoạt kỹ năng tương ứng khi thực hiện tác vụ liên quan:
@@ -37,6 +44,8 @@ Agent tự động kích hoạt kỹ năng tương ứng khi thực hiện tác 
 * **`postgresql` (Project - `.mcp.json`):** Kết nối CSDL `postgresql://postgres:postgres@localhost:5432/vn_stock`.
 * **`arxiv-mcp-server` (Global & Project):** Tra cứu paper khoa học, trích xuất abstract và metadata trực tiếp từ arXiv.
 * **`github` (Global - `mcp_config.json`):** Quản lý mã nguồn, tra cứu repository tham khảo qua GitHub Personal Access Token.
+* **`chrome-devtools-mcp` (Global - `mcp_config.json`):** Hỗ trợ kiểm thử trực quan giao diện frontend, chụp màn hình và đo kiểm hiệu năng rendering trên trình duyệt.
+* **`postman-mcp-server` (Global - `mcp_config.json`):** Hỗ trợ kiểm thử, đồng bộ và xác thực các endpoint REST API backend.
 
 ---
 
@@ -109,10 +118,10 @@ graph TD
 * So sánh chiến lược AI vs Chiến lược Mua & Nắm giữ (Buy & Hold).
 
 ### Phase 5: Đóng gói Hệ thống Full-stack & Hoàn thiện ĐATN (Tương ứng Chương 5)
-* Triển khai REST API với FastAPI (`apps/api`) phục vụ suy luận trực tuyến (`/predict`, `/backtest`).
-* Xây dựng Dashboard Web với Next.js & TypeScript (`apps/web`) trực quan hóa biểu đồ nến, tín hiệu Mua/Bán và đường cong tài sản (Equity Curve).
+* Triển khai REST API với FastAPI (`apps/api`) phục vụ suy luận trực tuyến (`/predict`, `/backtest`) (`fullstack-developer` điều phối).
+* Xây dựng Dashboard Web với Next.js & TypeScript (`apps/web`) trực quan hóa biểu đồ nến, tín hiệu Mua/Bán và đường cong tài sản (Equity Curve) (`frontend-developer` phụ trách UI/UX, tích hợp biểu đồ).
 * Đóng gói Docker Compose (`infra/docker-compose.yml`) điều phối PostgreSQL, API và Web.
-* Viết và chuẩn hóa tài liệu Báo cáo ĐATN bám sát 5 chương, 34 mục trong [docs/Cấu trúc báo cáo ĐATN.md](docs/Cấu trúc báo cáo ĐATN.md).
+* Viết và chuẩn hóa tài liệu Báo cáo ĐATN bám sát 5 chương, 34 mục trong [docs/Cấu trúc báo cáo ĐATN.md](docs/Cấu trúc báo cáo ĐATN.md) (kết hợp `academic-researcher` kiểm tra trích dẫn chuẩn IEEE).
 
 ---
 
