@@ -11,9 +11,15 @@
       }
     },
     "arxiv-mcp-server": {
-      "command": "uvx",
+      "command": "uv",
       "args": [
-        "arxiv-mcp-server"
+        "run",
+        "--quiet",
+        "--python",
+        "3.12",
+        "--with",
+        "arxiv-mcp-server",
+        "infra/mcp/arxiv_mcp_wrapper.py"
       ]
     }
   }
