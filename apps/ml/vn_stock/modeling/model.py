@@ -1,12 +1,13 @@
 import os
 
+os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 from typing import Any
 
-import lightgbm as lgb
 import torch
 from torch import nn
 import torch.nn.functional as F
+import lightgbm as lgb
 
 from vn_stock.config import (
     DEFAULT_LGB_PARAMS,

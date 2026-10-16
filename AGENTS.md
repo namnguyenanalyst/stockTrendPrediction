@@ -27,13 +27,17 @@ Hệ thống Agent vận hành theo mô hình phân tầng chặt chẽ giữa *
 4. **Academic Researcher (`academic-researcher`):**
    - Chuyên gia tra cứu tài liệu học thuật (arXiv, Semantic Scholar, OpenAlex, Crossref), trích xuất phương pháp luận mô hình định lượng.
    - Hỗ trợ xây dựng Chương 2 (Cơ sở lý thuyết), Chương 3 và tổng quan nghiên cứu thực nghiệm.
+5. **Senior Data Scientist (`data-scientist`):**
+   - Chịu trách nhiệm phân tích khám phá dữ liệu (EDA), phân tích phân phối, tương quan đặc trưng và phát hiện bất thường.
+   - Kiểm định giả thuyết thống kê, kiểm tra tính dừng (Stationarity), phân rã chuỗi thời gian (Trend, Seasonality) và giải thích mô hình (SHAP, Feature Importance).
 
 ### 1.2. Các vai trò kế thừa Toàn cục (Globally-inherited Agents - `~/.gemini/config/rules/` & `~/.claude/agents/`)
 * **Senior Fullstack Developer (`fullstack-developer`):** Chuyên gia tích hợp toàn diện kiến trúc Monorepo (FastAPI, Next.js App Router, PostgreSQL 16, Docker Compose) phục vụ Phase 5.
 * **Academic Researcher (`academic-researcher`):** Vai trò nghiên cứu học thuật cấp toàn cục dùng chung cho các dự án.
 
-### 1.3. Kho Kỹ năng chuyên sâu theo nhu cầu (On-Demand Skills - `.agents/skills/`)
+### 1.3. Kho Kỹ năng chuyên sâu theo nhu cầu (On-Demand Skills - `.agents/skills/` & Global)
 Agent tự động kích hoạt kỹ năng tương ứng khi thực hiện tác vụ liên quan:
+* **`clean-code` (Global - `~/.gemini/config/skills/`):** Bộ chuẩn mực viết code tinh gọn (KISS, DRY, SRP, YAGNI), hàm ngắn gọn (<20 dòng), đặt tên bộc lộ ý định, loại bỏ code thừa.
 * **`systematic-debugging`:** Quy trình chẩn đoán lỗi có hệ thống, tìm nguyên nhân gốc (root-cause tracing), tránh sửa code mò mẫm.
 * **`python-testing-patterns`:** Chuẩn mực kiểm thử tự động với PyTest, fixtures, mocks cho các pipeline trong `apps/ml/tests/`.
 * **`postgres-best-practices`:** Chuẩn tối ưu hóa CSDL PostgreSQL từ Supabase (index thời gian + ticker, pooling, batch insert dữ liệu OHLCV).

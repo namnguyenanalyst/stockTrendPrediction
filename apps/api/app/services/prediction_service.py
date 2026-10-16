@@ -38,6 +38,13 @@ def predict_stock_signal(
             detail=f"Mô hình '{model_type}' không hợp lệ. Hệ thống chỉ hỗ trợ 'lightgbm' hoặc 'lstm'.",
         )
 
+    if clean_sym not in settings.CORE_SYMBOLS:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Mã cổ phiếu '{clean_sym}' không nằm trong danh mục hỗ trợ ({', '.join(settings.CORE_SYMBOLS)}).",
+        )
+
+
     try:
         from vn_stock.modeling import predict_trend
 

@@ -129,3 +129,34 @@ def test_invalid_symbol_or_model():
     # Model không hỗ trợ
     res_model = client.get("/api/predict/signal?symbol=VIC&model_type=random_forest_xyz")
     assert res_model.status_code == 400
+
+
+def test_predict_signal_post():
+    """Kiểm tra endpoint POST /api/predict/signal."""
+    payload = {"symbol": "VIC", "model_type": "lightgbm"}
+    response = client.post("/api/predict/signal", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["symbol"] == "VIC"
+    assert "probabilities" in data
+
+
+def test_predict_batch_post():
+    """Kiểm tra endpoint POST /api/predict/batch."""
+    payload = {"model_type": "lightgbm"}
+    response = client.post("/api/predict/batch", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_symbols"] >= 5
+
+
+def test_invalid_symbol_backtest():
+    """Kiểm tra backtest với mã không thuộc core symbols trả về 400."""
+    payload = {
+        "symbol": "SSI",
+        "model_type": "lightgbm",
+        "initial_capital": 100_000_000.0,
+    }
+    response = client.post("/api/backtest/run", json=payload)
+    assert response.status_code == 400
+

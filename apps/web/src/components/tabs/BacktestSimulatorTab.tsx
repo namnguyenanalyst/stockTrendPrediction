@@ -102,11 +102,12 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
               className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-100 focus:border-emerald-500 focus:outline-none"
             >
               <option value="VIC">VIC (Vingroup)</option>
-              <option value="VHM">VHM (Vinhomes)</option>
-              <option value="VNM">VNM (Vinamilk)</option>
               <option value="HPG">HPG (Hòa Phát)</option>
-              <option value="SSI">SSI (Chứng khoán SSI)</option>
+              <option value="FPT">FPT (Công nghệ FPT)</option>
+              <option value="VNM">VNM (Vinamilk)</option>
+              <option value="MWG">MWG (Thế Giới Di Động)</option>
             </select>
+
           </div>
 
           {/* Vốn ban đầu */}

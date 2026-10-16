@@ -8,6 +8,7 @@ Bao gồm hệ thống đối chứng 3 tầng qua 3 cửa sổ Walk-Forward Exp
 
 import os
 
+os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 import argparse
 import copy
@@ -16,7 +17,6 @@ import logging
 from pathlib import Path
 from typing import Any
 
-import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from sklearn.dummy import DummyClassifier
@@ -27,9 +27,11 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
+from sklearn.utils.class_weight import compute_class_weight
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader, TensorDataset
+import lightgbm as lgb
 
 from vn_stock.config import (
     DEFAULT_EARLY_STOPPING_ROUNDS,
@@ -220,7 +222,11 @@ def train_lstm_window(
         dropout=dropout,
     ).to(device)
 
-    criterion = nn.CrossEntropyLoss()
+    # Tính toán trọng số lớp cân bằng chống hiện tượng dự báo sụp đổ về lớp đa số
+    classes = np.unique(y_tr_seq)
+    weights = compute_class_weight(class_weight="balanced", classes=classes, y=y_tr_seq)
+    class_weights = torch.tensor(weights, dtype=torch.float32).to(device)
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     best_val_loss = float("inf")

@@ -19,7 +19,8 @@ interface NavbarProps {
   onRefreshHealth: () => void;
 }
 
-const CORE_SYMBOLS = ["VIC", "VHM", "VNM", "HPG", "SSI"];
+const CORE_SYMBOLS = ["VIC", "HPG", "FPT", "VNM", "MWG"];
+
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,

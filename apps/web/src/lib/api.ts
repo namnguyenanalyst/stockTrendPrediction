@@ -36,7 +36,7 @@ async function fetchJson<T>(endpoint: string, options?: RequestInit): Promise<T>
 
     return (await res.json()) as T;
   } catch (error) {
-    console.error(`Fetch failed for ${endpoint}:`, error);
+    console.warn(`Fetch failed for ${endpoint}:`, error);
     throw error;
   }
 }
@@ -54,10 +54,10 @@ export async function getStockSymbols(): Promise<StockSymbolInfo[]> {
     // Fallback nếu API đang khởi động
     return [
       { symbol: "VIC", name: "Tập đoàn Vingroup", exchange: "HOSE", is_core: true },
-      { symbol: "VHM", name: "CTCP Vinhomes", exchange: "HOSE", is_core: true },
-      { symbol: "VNM", name: "CTCP Sữa Việt Nam", exchange: "HOSE", is_core: true },
       { symbol: "HPG", name: "CTCP Tập đoàn Hòa Phát", exchange: "HOSE", is_core: true },
-      { symbol: "SSI", name: "CTCP Chứng khoán SSI", exchange: "HOSE", is_core: true },
+      { symbol: "FPT", name: "CTCP FPT", exchange: "HOSE", is_core: true },
+      { symbol: "VNM", name: "CTCP Sữa Việt Nam", exchange: "HOSE", is_core: true },
+      { symbol: "MWG", name: "CTCP Đầu tư Thế Giới Di Động", exchange: "HOSE", is_core: true },
     ];
   }
 }
@@ -67,16 +67,20 @@ export async function getStockHistory(
   startDate = "2023-01-01"
 ): Promise<StockHistoryResponse> {
   return fetchJson<StockHistoryResponse>(
-    `/api/stocks/history?symbol=${symbol}&start_date=${startDate}`
+    `/api/stocks/history?symbol=${encodeURIComponent(symbol)}&start_date=${encodeURIComponent(startDate)}`
   );
 }
 
 export async function getStockIndicators(symbol: string): Promise<StockIndicatorsResponse> {
-  return fetchJson<StockIndicatorsResponse>(`/api/stocks/indicators?symbol=${symbol}`);
+  return fetchJson<StockIndicatorsResponse>(
+    `/api/stocks/indicators?symbol=${encodeURIComponent(symbol)}`
+  );
 }
 
 export async function getStockSummary(symbol: string): Promise<StockSummaryResponse> {
-  return fetchJson<StockSummaryResponse>(`/api/stocks/summary?symbol=${symbol}`);
+  return fetchJson<StockSummaryResponse>(
+    `/api/stocks/summary?symbol=${encodeURIComponent(symbol)}`
+  );
 }
 
 // 3. Dự báo xu hướng AI
@@ -84,20 +88,19 @@ export async function getPredictionSignal(
   symbol: string,
   modelType: "lightgbm" | "lstm" = "lightgbm"
 ): Promise<PredictionResponse> {
-  return fetchJson<PredictionResponse>("/api/predict/signal", {
-    method: "POST",
-    body: JSON.stringify({ symbol, model_type: modelType }),
-  });
+  return fetchJson<PredictionResponse>(
+    `/api/predict/signal?symbol=${encodeURIComponent(symbol)}&model_type=${encodeURIComponent(modelType)}`
+  );
 }
 
 export async function getBatchPrediction(
   modelType: "lightgbm" | "lstm" = "lightgbm"
 ): Promise<BatchPredictionResponse> {
-  return fetchJson<BatchPredictionResponse>("/api/predict/batch", {
-    method: "POST",
-    body: JSON.stringify({ model_type: modelType }),
-  });
+  return fetchJson<BatchPredictionResponse>(
+    `/api/predict/batch?model_type=${encodeURIComponent(modelType)}`
+  );
 }
+
 
 // 4. Giả lập Backtest
 export async function runBacktestSimulation(

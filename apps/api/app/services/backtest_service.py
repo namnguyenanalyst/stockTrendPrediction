@@ -43,6 +43,13 @@ def run_backtest_simulation(req: BacktestRequest) -> BacktestResponse:
             detail=f"Mô hình '{req.model_type}' không hợp lệ. Chỉ hỗ trợ 'lightgbm' hoặc 'lstm'.",
         )
 
+    if clean_sym not in settings.CORE_SYMBOLS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Mã '{clean_sym}' không nằm trong danh mục 5 mã kiểm thử ({', '.join(settings.CORE_SYMBOLS)}).",
+        )
+
+
     try:
         from vn_stock.backtest import backtest_symbol_oos
 
