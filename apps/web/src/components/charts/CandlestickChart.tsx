@@ -15,11 +15,13 @@ import { StockBar } from "@/lib/types";
 interface CandlestickChartProps {
   bars: StockBar[];
   height?: number;
+  onChartReady?: (chart: IChartApi | null) => void;
 }
 
 export const CandlestickChart: React.FC<CandlestickChartProps> = ({
   bars,
   height = 420,
+  onChartReady,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -70,6 +72,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
     });
 
     chartRef.current = chart;
+    onChartReady?.(chart);
 
     // Series 1: Candlestick (Giá OHLCV)
     const candleSeries = chart.addSeries(CandlestickSeries, {
@@ -125,10 +128,11 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
 
     return () => {
       window.removeEventListener("resize", handleResize);
+      onChartReady?.(null);
       chart.remove();
       chartRef.current = null;
     };
-  }, [height]);
+  }, [height, onChartReady]);
 
   // Cập nhật dữ liệu khi prop bars thay đổi
   useEffect(() => {

@@ -13,11 +13,13 @@ import { StockIndicatorBar } from "@/lib/types";
 interface RSIChartProps {
   indicators: StockIndicatorBar[];
   height?: number;
+  onChartReady?: (chart: IChartApi | null) => void;
 }
 
 export const RSIChart: React.FC<RSIChartProps> = ({
   indicators,
   height = 140,
+  onChartReady,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -53,6 +55,7 @@ export const RSIChart: React.FC<RSIChartProps> = ({
     });
 
     chartRef.current = chart;
+    onChartReady?.(chart);
 
     const rsiSeries = chart.addSeries(LineSeries, {
       color: "#818cf8", // Màu tím nhạt Indigo
@@ -106,10 +109,11 @@ export const RSIChart: React.FC<RSIChartProps> = ({
 
     return () => {
       window.removeEventListener("resize", handleResize);
+      onChartReady?.(null);
       chart.remove();
       chartRef.current = null;
     };
-  }, [height]);
+  }, [height, onChartReady]);
 
   useEffect(() => {
     if (!indicators || indicators.length === 0 || !rsiSeriesRef.current) return;

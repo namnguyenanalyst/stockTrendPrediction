@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -11,6 +11,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
+import { IChartApi } from "lightweight-charts";
 import { CandlestickChart } from "@/components/charts/CandlestickChart";
 import { RSIChart } from "@/components/charts/RSIChart";
 import {
@@ -37,24 +38,14 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
   loading,
 }) => {
   const [timeframe, setTimeframe] = useState<Timeframe>("6M");
+  const candleChartRef = useRef<IChartApi | null>(null);
+  const rsiChartRef = useRef<IChartApi | null>(null);
 
   // Lọc dữ liệu theo Timeframe được chọn
   const filteredBars = useMemo(() => {
     if (!bars || bars.length === 0) return [];
     if (timeframe === "ALL") return bars;
 
-    const daysMap: Record<Timeframe, number> = {
-      "1M": 30,
-      "3M": 90,
-      "6M": 180,
-      "1Y": 365,
-      ALL: 9999,
-    };
-    const days = daysMap[timeframe];
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - days);
-
-    // Fallback nếu dữ liệu lịch sử ít hơn ngày hiện tại, lấy N phiên gần nhất
     const countMap: Record<Timeframe, number> = {
       "1M": 22,
       "3M": 66,
@@ -65,6 +56,62 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
 
     return bars.slice(-countMap[timeframe]);
   }, [bars, timeframe]);
+
+  // Đồng bộ tập nến của RSI chính xác theo các phiên của Candlestick
+  const filteredIndicators = useMemo(() => {
+    if (!indicators || indicators.length === 0 || !filteredBars || filteredBars.length === 0) {
+      return [];
+    }
+    const validDates = new Set(filteredBars.map((b) => b.date));
+    return indicators.filter((ind) => validDates.has(ind.date));
+  }, [indicators, filteredBars]);
+
+  // Đồng bộ hóa tương tác Pan & Zoom (VisibleLogicalRange) giữa 2 biểu đồ
+  const syncTimeScales = useCallback(() => {
+    const c1 = candleChartRef.current;
+    const c2 = rsiChartRef.current;
+    if (!c1 || !c2) return;
+
+    let isSyncing = false;
+
+    c1.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+      if (isSyncing || !range || !rsiChartRef.current) return;
+      isSyncing = true;
+      try {
+        rsiChartRef.current.timeScale().setVisibleLogicalRange(range);
+      } catch (err) {
+        console.debug("Lỗi đồng bộ RSI timeScale:", err);
+      }
+      isSyncing = false;
+    });
+
+    c2.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+      if (isSyncing || !range || !candleChartRef.current) return;
+      isSyncing = true;
+      try {
+        candleChartRef.current.timeScale().setVisibleLogicalRange(range);
+      } catch (err) {
+        console.debug("Lỗi đồng bộ Candle timeScale:", err);
+      }
+      isSyncing = false;
+    });
+  }, []);
+
+  const handleCandleReady = useCallback(
+    (chart: IChartApi | null) => {
+      candleChartRef.current = chart;
+      syncTimeScales();
+    },
+    [syncTimeScales]
+  );
+
+  const handleRsiReady = useCallback(
+    (chart: IChartApi | null) => {
+      rsiChartRef.current = chart;
+      syncTimeScales();
+    },
+    [syncTimeScales]
+  );
 
   const latestInd =
     indicators && indicators.length > 0
@@ -147,8 +194,16 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
         </div>
       ) : (
         <>
-          <CandlestickChart bars={filteredBars} height={420} />
-          <RSIChart indicators={indicators} height={140} />
+          <CandlestickChart
+            bars={filteredBars}
+            height={420}
+            onChartReady={handleCandleReady}
+          />
+          <RSIChart
+            indicators={filteredIndicators}
+            height={140}
+            onChartReady={handleRsiReady}
+          />
         </>
       )}
 
