@@ -6,8 +6,6 @@ import {
   BrainCircuit,
   History,
   TrendingUp,
-  Wifi,
-  WifiOff,
 } from "lucide-react";
 
 interface NavbarProps {
@@ -15,20 +13,15 @@ interface NavbarProps {
   setActiveTab: (tab: "market" | "prediction" | "backtest") => void;
   selectedSymbol: string;
   setSelectedSymbol: (symbol: string) => void;
-  apiConnected: boolean;
-  onRefreshHealth: () => void;
 }
 
 const CORE_SYMBOLS = ["VIC", "HPG", "FPT", "VNM", "MWG"];
-
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   selectedSymbol,
   setSelectedSymbol,
-  apiConnected,
-  onRefreshHealth,
 }) => {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-800 bg-slate-950/80 backdrop-blur-md">
@@ -71,35 +64,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               {sym}
             </button>
           ))}
-        </div>
-
-        {/* API Health Indicator */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onRefreshHealth}
-            title={apiConnected ? "Backend API Online (FastAPI: 8000)" : "Mất kết nối API (Bấm để thử lại)"}
-            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-all ${
-              apiConnected
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-                : "border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
-            }`}
-          >
-            {apiConnected ? (
-              <>
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
-                </span>
-                <Wifi className="h-3.5 w-3.5" />
-                <span className="hidden md:inline">API Online</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-3.5 w-3.5" />
-                <span>API Offline</span>
-              </>
-            )}
-          </button>
         </div>
       </div>
 

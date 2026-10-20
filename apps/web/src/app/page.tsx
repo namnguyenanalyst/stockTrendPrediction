@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { AlertCircle, RefreshCw, Terminal } from "lucide-react";
-import { Navbar } from "@/components/Navbar";
+import { Terminal } from "lucide-react";
+import { Sidebar } from "@/components/Sidebar";
+import { TopHeader } from "@/components/TopHeader";
 import { AIPredictionTab } from "@/components/tabs/AIPredictionTab";
 import { BacktestSimulatorTab } from "@/components/tabs/BacktestSimulatorTab";
 import { MarketOverviewTab } from "@/components/tabs/MarketOverviewTab";
 import {
-  checkBackendHealth,
   getBatchPrediction,
   getPredictionSignal,
   getStockHistory,
@@ -31,7 +31,7 @@ export default function DashboardPage() {
   );
   const [selectedSymbol, setSelectedSymbol] = useState<string>("VIC");
   const [modelType, setModelType] = useState<"lightgbm" | "lstm">("lightgbm");
-  const [apiConnected, setApiConnected] = useState<boolean>(true);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
   // Dữ liệu Thị trường
   const [bars, setBars] = useState<StockBar[]>([]);
@@ -61,9 +61,8 @@ export default function DashboardPage() {
       setLoadingBacktest(true);
 
       try {
-        const [health, histRes, indRes, sumRes, singlePred, batchPred, btRes] =
+        const [histRes, indRes, sumRes, singlePred, batchPred, btRes] =
           await Promise.allSettled([
-            checkBackendHealth(),
             getStockHistory(selectedSymbol),
             getStockIndicators(selectedSymbol),
             getStockSummary(selectedSymbol),
@@ -77,8 +76,6 @@ export default function DashboardPage() {
           ]);
 
         if (ignore) return;
-
-        setApiConnected(health.status === "fulfilled");
 
         if (histRes.status === "fulfilled") {
           setBars(histRes.value.bars);
@@ -116,23 +113,12 @@ export default function DashboardPage() {
     };
   }, [selectedSymbol, modelType]);
 
-  // Kiểm tra sức khỏe Backend thủ công khi bấm nút Thử lại
-  const handleCheckHealth = async () => {
-    try {
-      await checkBackendHealth();
-      setApiConnected(true);
-    } catch {
-      setApiConnected(false);
-    }
-  };
-
   // Chạy Backtest tùy biến theo form
   const handleRunBacktest = async (params: BacktestRequest) => {
     setLoadingBacktest(true);
     try {
       const res = await runBacktestSimulation(params);
       setBacktestResult(res);
-      setApiConnected(true);
     } catch (err) {
       console.warn("Lỗi chạy kiểm thử Backtest:", err);
     } finally {
@@ -141,87 +127,78 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
-      {/* Navbar Điều hướng & Trạng thái */}
-      <Navbar
+    <div className="flex min-h-screen bg-slate-950 text-slate-100">
+      {/* Thanh điều hướng Dọc (Vertical Collapsible Sidebar) */}
+      <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        isCollapsed={isCollapsed}
+        setIsCollapsed={setIsCollapsed}
         selectedSymbol={selectedSymbol}
         setSelectedSymbol={setSelectedSymbol}
-        apiConnected={apiConnected}
-        onRefreshHealth={handleCheckHealth}
       />
 
-      {/* Cảnh báo kết nối Backend nếu Offline */}
-      {!apiConnected && (
-        <div className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-xs text-amber-300">
-          <div className="mx-auto flex max-w-7xl items-center justify-between">
+      {/* Khung nội dung chính */}
+      <div className="flex flex-1 flex-col min-w-0 overflow-x-hidden">
+        {/* Thanh Header Trên cùng */}
+        <TopHeader
+          activeTab={activeTab}
+          selectedSymbol={selectedSymbol}
+          setSelectedSymbol={setSelectedSymbol}
+          isCollapsed={isCollapsed}
+          setIsCollapsed={setIsCollapsed}
+        />
+
+        {/* Nội dung Màn hình chính theo Active Tab */}
+        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6">
+          {activeTab === "market" && (
+            <MarketOverviewTab
+              symbol={selectedSymbol}
+              bars={bars}
+              indicators={indicators}
+              summary={summary}
+              loading={loadingMarket}
+            />
+          )}
+
+          {activeTab === "prediction" && (
+            <AIPredictionTab
+              selectedSymbol={selectedSymbol}
+              onSelectSymbol={setSelectedSymbol}
+              prediction={prediction}
+              batchPrediction={batchPrediction}
+              modelType={modelType}
+              onChangeModelType={setModelType}
+              loading={loadingPrediction}
+            />
+          )}
+
+          {activeTab === "backtest" && (
+            <BacktestSimulatorTab
+              selectedSymbol={selectedSymbol}
+              onSelectSymbol={setSelectedSymbol}
+              backtestResult={backtestResult}
+              onRunBacktest={handleRunBacktest}
+              loading={loadingBacktest}
+            />
+          )}
+        </main>
+
+        {/* Chân trang ĐATN chuẩn mực */}
+        <footer className="border-t border-slate-800/80 bg-slate-950 py-4 text-xs text-slate-500">
+          <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 sm:flex-row sm:px-6">
             <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
+              <Terminal className="h-3.5 w-3.5 text-emerald-500" />
               <span>
-                Máy chủ FastAPI Backend (<code className="font-mono">http://localhost:8000</code>) đang ngoại tuyến. Vui lòng chạy lệnh <code className="rounded bg-slate-800 px-1 py-0.5 font-mono text-emerald-400">uv run python app/main.py</code> tại thư mục <code className="font-mono">apps/api</code> để kích hoạt dữ liệu thời gian thực.
+                Đồ án Tốt nghiệp: <strong>Dự báo Xu hướng & Đánh giá Chiến lược Đầu tư</strong>
               </span>
             </div>
-            <button
-              onClick={handleCheckHealth}
-              className="flex items-center gap-1 rounded bg-amber-500/20 px-2 py-0.5 font-semibold text-amber-200 hover:bg-amber-500/30 transition-all"
-            >
-              <RefreshCw className="h-3 w-3" />
-              <span>Thử lại</span>
-            </button>
+            <div>
+              Trường Đại học Mỏ - Địa chất • Khoa Công nghệ Thông tin • Chuyên ngành Tin học Kinh tế
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Nội dung Màn hình chính theo Active Tab */}
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6">
-        {activeTab === "market" && (
-          <MarketOverviewTab
-            symbol={selectedSymbol}
-            bars={bars}
-            indicators={indicators}
-            summary={summary}
-            loading={loadingMarket}
-          />
-        )}
-
-        {activeTab === "prediction" && (
-          <AIPredictionTab
-            selectedSymbol={selectedSymbol}
-            onSelectSymbol={setSelectedSymbol}
-            prediction={prediction}
-            batchPrediction={batchPrediction}
-            modelType={modelType}
-            onChangeModelType={setModelType}
-            loading={loadingPrediction}
-          />
-        )}
-
-        {activeTab === "backtest" && (
-          <BacktestSimulatorTab
-            selectedSymbol={selectedSymbol}
-            onSelectSymbol={setSelectedSymbol}
-            backtestResult={backtestResult}
-            onRunBacktest={handleRunBacktest}
-            loading={loadingBacktest}
-          />
-        )}
-      </main>
-
-      {/* Chân trang ĐATN chuẩn mực */}
-      <footer className="border-t border-slate-800/80 bg-slate-950 py-4 text-xs text-slate-500">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 sm:flex-row sm:px-6">
-          <div className="flex items-center gap-2">
-            <Terminal className="h-3.5 w-3.5 text-emerald-500" />
-            <span>
-              Đồ án Tốt nghiệp: <strong>Dự báo Xu hướng & Đánh giá Chiến lược Đầu tư</strong>
-            </span>
-          </div>
-          <div>
-            Trường Đại học Mỏ - Địa chất • Khoa Công nghệ Thông tin • Chuyên ngành Tin học Kinh tế
-          </div>
-        </div>
-      </footer>
+        </footer>
+      </div>
     </div>
   );
 }
