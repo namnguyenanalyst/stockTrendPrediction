@@ -37,25 +37,30 @@ from vn_stock.features import ALL_FEATURE_COLS, FEATURE_COLS, compute_features_p
 def load_prediction_artifacts(
     model_type: str = "lstm",
     models_dir: Path = MODELS_DIR,
+    horizon: int = 3,
     hidden_size: int = DEFAULT_LSTM_HIDDEN_SIZE,
     num_layers: int = DEFAULT_LSTM_NUM_LAYERS,
 ) -> tuple[Any, Any]:
     """
     Nạp mô hình đã huấn luyện (LSTM hoặc LightGBM) và Scaler chuẩn hóa từ thư mục models/.
+    Ưu tiên các artifact production T+horizon, sau đó fallback về artifact mặc định.
 
     Args:
         model_type: Loại mô hình ('lstm' hoặc 'lightgbm').
         models_dir: Thư mục chứa artifact.
+        horizon: Chân trời dự báo (mặc định 3 phiên).
         hidden_size: Số nơ-ron lớp ẩn của LSTM.
         num_layers: Số lớp xếp chồng của LSTM.
 
     Returns:
         tuple[model, scaler]
     """
-    scaler_path = models_dir / "scaler_window3.pkl"
+    scaler_path = models_dir / f"production_scaler_t{horizon}.pkl"
+    if not scaler_path.exists():
+        scaler_path = models_dir / "scaler_window3.pkl"
     if not scaler_path.exists():
         raise FileNotFoundError(
-            f"Chưa tìm thấy scaler tại {scaler_path}. Hãy chạy huấn luyện trước bằng `make train` hoặc python -m vn_stock.modeling.train."
+            f"Chưa tìm thấy scaler tại {models_dir}. Hãy chạy huấn luyện trước bằng `uv run python -m vn_stock.modeling.train --production`."
         )
 
     with open(scaler_path, "rb") as f:
@@ -66,10 +71,12 @@ def load_prediction_artifacts(
 
         from vn_stock.modeling.model import GlobalLSTMClassifier
 
-        model_path = models_dir / "global_lstm_classifier.pth"
+        model_path = models_dir / f"production_lstm_t{horizon}.pth"
+        if not model_path.exists():
+            model_path = models_dir / "global_lstm_classifier.pth"
         if not model_path.exists():
             raise FileNotFoundError(
-                f"Chưa tìm thấy checkpoint LSTM tại {model_path}. Hãy chạy huấn luyện trước!"
+                f"Chưa tìm thấy checkpoint LSTM tại {models_dir}. Hãy chạy huấn luyện trước!"
             )
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = GlobalLSTMClassifier(
@@ -84,16 +91,24 @@ def load_prediction_artifacts(
     elif model_type.lower() in ("lightgbm", "lgb"):
         import lightgbm as lgb
 
-        lgb_txt_path = models_dir / "lightgbm_classifier.txt"
-        lgb_pkl_path = models_dir / "lightgbm_classifier.pkl"
-        if lgb_txt_path.exists():
-            model = lgb.Booster(model_file=str(lgb_txt_path))
-        elif lgb_pkl_path.exists():
-            with open(lgb_pkl_path, "rb") as f:
+        prod_txt = models_dir / f"production_lgb_t{horizon}.txt"
+        prod_pkl = models_dir / f"production_lgb_t{horizon}.pkl"
+        def_txt = models_dir / "lightgbm_classifier.txt"
+        def_pkl = models_dir / "lightgbm_classifier.pkl"
+
+        if prod_txt.exists():
+            model = lgb.Booster(model_file=str(prod_txt))
+        elif prod_pkl.exists():
+            with open(prod_pkl, "rb") as f:
+                model = pickle.load(f)
+        elif def_txt.exists():
+            model = lgb.Booster(model_file=str(def_txt))
+        elif def_pkl.exists():
+            with open(def_pkl, "rb") as f:
                 model = pickle.load(f)
         else:
             raise FileNotFoundError(
-                f"Chưa tìm thấy model LightGBM tại {lgb_txt_path}. Hãy chạy huấn luyện trước!"
+                f"Chưa tìm thấy model LightGBM tại {models_dir}. Hãy chạy huấn luyện trước!"
             )
         return model, scaler
 
@@ -206,6 +221,7 @@ def predict_trend(
     model, scaler = load_prediction_artifacts(
         model_type=model_type,
         models_dir=models_dir,
+        horizon=horizon_days,
         hidden_size=hidden_size,
         num_layers=num_layers,
     )
@@ -246,11 +262,12 @@ def predict_trend(
         CLASS_NAMES[2]: round(float(probs[2]), 4),
     }
 
-    # Xây dựng Quỹ đạo dự phóng 3 phiên (Multi-step Trend Trajectory T+1 -> T+3 theo chuẩn FireAnt & vi cấu trúc T+2)
+    # Xây dựng Quỹ đạo dự phóng 3 phiên (Multi-step Trend Trajectory T+1 -> T+3 theo vi cấu trúc T+2.5 Việt Nam)
+    # Xác suất phản ánh trực tiếp phân phối sinh lời 3 phiên do mô hình học được, loại bỏ các hệ số suy giảm giả định
     p_down, p_hold, p_up = float(probs[0]), float(probs[1]), float(probs[2])
     trajectory = []
 
-    # Phiên T+1: Mở vị thế tại giá Open
+    # Phiên T+1: Khớp lệnh mở vị thế tại giá mở cửa (Open)
     pred_1 = int(np.argmax([p_down, p_hold, p_up]))
     trajectory.append({
         "day_offset": 1,
@@ -263,53 +280,58 @@ def predict_trend(
             CLASS_NAMES[1]: round(p_hold, 4),
             CLASS_NAMES[2]: round(p_up, 4),
         },
-        "note": "Khớp lệnh mở vị thế tại giá mở cửa (Open) kèm trượt giá 0.05%.",
+        "note": "Khớp lệnh mở vị thế tại giá mở cửa (Open) kèm trượt giá 0.05% nếu có tín hiệu MUA.",
     })
 
-    # Phiên T+2: Nắm giữ & chờ cổ phiếu về tài khoản (vị thế được bảo lưu)
-    p_up_2 = p_up * 0.92 + 0.08 * (1.0 / 3.0)
-    p_down_2 = p_down * 0.92 + 0.08 * (1.0 / 3.0)
-    p_hold_2 = max(0.0, 1.0 - p_up_2 - p_down_2)
-    pred_2 = int(np.argmax([p_down_2, p_hold_2, p_up_2]))
+    # Phiên T+2: Nắm giữ & chờ cổ phiếu về tài khoản (vị thế được bảo lưu theo quy chế VSDC)
     trajectory.append({
         "day_offset": 2,
         "day_name": "T+2",
-        "predicted_trend": CLASS_NAMES[pred_2],
+        "predicted_trend": CLASS_NAMES[pred_1],
         "signal": "NẮM GIỮ (HOLD)",
-        "confidence": round(float(max(p_down_2, p_hold_2, p_up_2)), 4),
+        "confidence": round(float(max(p_down, p_hold, p_up)), 4),
         "probabilities": {
-            CLASS_NAMES[0]: round(p_down_2, 4),
-            CLASS_NAMES[1]: round(p_hold_2, 4),
-            CLASS_NAMES[2]: round(p_up_2, 4),
+            CLASS_NAMES[0]: round(p_down, 4),
+            CLASS_NAMES[1]: round(p_hold, 4),
+            CLASS_NAMES[2]: round(p_up, 4),
         },
-        "note": "Cổ phiếu đang về tài khoản theo chu kỳ thanh toán T+2 (khóa vị thế bán theo luật sàn).",
+        "note": "Cổ phiếu đang về tài khoản theo chu kỳ thanh toán T+2 (khóa vị thế bán theo quy chế VSDC).",
     })
 
-    # Phiên T+3: Cổ phiếu khả dụng trong tài khoản
-    p_up_3 = p_up * 0.85 + 0.15 * (1.0 / 3.0)
-    p_down_3 = p_down * 0.85 + 0.15 * (1.0 / 3.0)
-    p_hold_3 = max(0.0, 1.0 - p_up_3 - p_down_3)
-    pred_3 = int(np.argmax([p_down_3, p_hold_3, p_up_3]))
+    # Phiên T+3: Cổ phiếu khả dụng trong tài khoản - Đạt tới chân trời dự phóng đích
     trajectory.append({
         "day_offset": 3,
         "day_name": "T+3",
-        "predicted_trend": CLASS_NAMES[pred_3],
-        "signal": SIGNAL_RECOMMENDATIONS[pred_3],
-        "confidence": round(float(max(p_down_3, p_hold_3, p_up_3)), 4),
+        "predicted_trend": CLASS_NAMES[pred_label],
+        "signal": SIGNAL_RECOMMENDATIONS[pred_label],
+        "confidence": round(float(max(p_down, p_hold, p_up)), 4),
         "probabilities": {
-            CLASS_NAMES[0]: round(p_down_3, 4),
-            CLASS_NAMES[1]: round(p_hold_3, 4),
-            CLASS_NAMES[2]: round(p_up_3, 4),
+            CLASS_NAMES[0]: round(p_down, 4),
+            CLASS_NAMES[1]: round(p_hold, 4),
+            CLASS_NAMES[2]: round(p_up, 4),
         },
-        "note": "Cổ phiếu khả dụng. Sẵn sàng hiện thực hóa lợi nhuận hoặc quản trị rủi ro.",
+        "note": "Cổ phiếu khả dụng. Sẵn sàng hiện thực hóa lợi nhuận hoặc quản trị rủi ro theo xu hướng chu kỳ.",
     })
 
     if pred_label == 2:
         guidance = "Khuyến nghị MUA: Dự báo chu kỳ T+3 duy trì xu hướng TĂNG. Lập kế hoạch mở vị thế tại Open T+1 và chốt lời tại T+3 sau khi trừ 0.4% thuế phí."
     elif pred_label == 0:
-        guidance = "Cảnh báo GIẢM: Rủi ro điều chỉnh trong chu kỳ nắm giữ. Không mở vị thế mua mới; ưu tiên bảo toàn vốn."
+        guidance = "Cảnh báo GIẢM: Rủi ro điều chỉnh trong chu kỳ nắm giữ T+3. Không mở vị thế mua mới; ưu tiên bảo toàn vốn."
     else:
-        guidance = "Thị trường ĐI NGANG: Xu hướng tích lũy hẹp. Khuyến nghị giữ tiền mặt và quan sát điểm bứt phá."
+        guidance = "Thị trường ĐI NGANG: Xu hướng tích lũy trong chu kỳ T+3. Khuyến nghị giữ tiền mặt và quan sát điểm bứt phá."
+
+    training_info_file = models_dir / f"production_training_info_t{horizon_days}.json"
+    if not training_info_file.exists():
+        training_info_file = models_dir / "production_training_info.json"
+    training_info = None
+    if training_info_file.exists():
+        try:
+            import json
+
+            with open(training_info_file, "r", encoding="utf-8") as f:
+                training_info = json.load(f)
+        except Exception:
+            pass
 
     return {
         "symbol": clean_sym,
@@ -326,6 +348,7 @@ def predict_trend(
         "is_live_synced": is_live_synced,
         "trajectory": trajectory,
         "summary_guidance": guidance,
+        "training_info": training_info,
     }
 
 

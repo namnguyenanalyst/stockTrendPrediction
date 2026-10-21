@@ -15,7 +15,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { syncLivePrediction } from "@/lib/api";
+import { retrainProductionModel, syncLivePrediction } from "@/lib/api";
 import { BatchPredictionResponse, PredictionResponse } from "@/lib/types";
 import {
   FinancialDetailModal,
@@ -44,6 +44,8 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   const [showInfo, setShowInfo] = useState(false);
   const [localPrediction, setLocalPrediction] = useState<PredictionResponse | null>(null);
   const [isSyncingLive, setIsSyncingLive] = useState(false);
+  const [isRetraining, setIsRetraining] = useState(false);
+  const [retrainMsg, setRetrainMsg] = useState<string | null>(null);
   const [detailModalItem, setDetailModalItem] = useState<FinancialItemContext | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
@@ -79,6 +81,34 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
     }
   };
 
+  // Handler huấn luyện lại mô hình thực chiến T+3
+  const handleRetrain = async () => {
+    try {
+      setIsRetraining(true);
+      setRetrainMsg(null);
+      const res = await retrainProductionModel(3, 0.02, 40);
+      const lgbF1 =
+        res.lightgbm_metrics?.macro_f1 != null
+          ? (res.lightgbm_metrics.macro_f1 * 100).toFixed(1)
+          : "0.0";
+      const lstmF1 =
+        res.lstm_metrics?.macro_f1 != null
+          ? (res.lstm_metrics.macro_f1 * 100).toFixed(1)
+          : "0.0";
+      setRetrainMsg(
+        `Huấn luyện thành công! Nến chốt: ${res.latest_market_date} | LGB Macro F1: ${lgbF1}% | LSTM Macro F1: ${lstmF1}%`
+      );
+      const updated = await syncLivePrediction(selectedSymbol, modelType);
+      setLocalPrediction(updated);
+    } catch (err: unknown) {
+      console.error("Lỗi khi huấn luyện lại:", err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setRetrainMsg(`Lỗi huấn luyện: ${errMsg}`);
+    } finally {
+      setIsRetraining(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* 1. Header & Bộ điều phối Mô hình Học máy & Live Feed */}
@@ -102,8 +132,22 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           </div>
         </div>
 
-        {/* Nút hành động Live Sync & Chuyển đổi Model */}
+        {/* Nút hành động Live Sync, Retrain & Chuyển đổi Model */}
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {/* Nút Huấn luyện lại mô hình Thực chiến T+3 */}
+          <button
+            onClick={handleRetrain}
+            disabled={isRetraining || loading}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all shadow-sm ${isRetraining
+                ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
+                : "border-indigo-500/40 bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-500/30"
+              }`}
+            title="Tự động nạp nến mới nhất tới phiên T-1/T và huấn luyện lại LightGBM & LSTM"
+          >
+            <Sparkles className={`h-3.5 w-3.5 ${isRetraining ? "animate-spin" : ""}`} />
+            <span>{isRetraining ? "Đang huấn luyện T+3..." : "Huấn luyện lại T+3"}</span>
+          </button>
+
           {/* Nút Đồng bộ Live SSI */}
           <button
             onClick={handleSyncLive}
@@ -153,6 +197,39 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               <span>LSTM Network</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Banner thông báo Huấn luyện / Thông tin dữ liệu thực chiến */}
+      {retrainMsg && (
+        <div className="flex items-center justify-between rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3 text-xs text-indigo-300">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+            <span>{retrainMsg}</span>
+          </div>
+          <button
+            onClick={() => setRetrainMsg(null)}
+            className="text-indigo-400 hover:text-indigo-200 text-xs ml-2"
+          >
+            Đóng
+          </button>
+        </div>
+      )}
+
+      {/* Thông tin Dữ liệu Huấn luyện & Chân trời Dự phóng */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/70 px-4 py-2 text-xs text-slate-400">
+        <div className="flex items-center gap-2">
+          <span className="flex h-2 w-2 rounded-full bg-emerald-400" />
+          <span>
+            Dữ liệu căn cứ: <strong className="text-slate-200">Phiên {activePred?.data_as_of_date || activePred?.date || "gần nhất"}</strong>
+          </span>
+          <span className="text-slate-600">•</span>
+          <span>
+            Kỳ hạn: <strong className="text-purple-300">3 phiên tiếp theo (T+1 → T+3)</strong>
+          </span>
+        </div>
+        <div className="text-[11px] text-slate-500">
+          Học trực tiếp trên 100% dữ liệu lịch sử tích lũy đến T/T-1 • Ràng buộc T+2.5 VSDC
         </div>
       </div>
 

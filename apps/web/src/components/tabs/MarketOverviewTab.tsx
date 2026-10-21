@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -44,6 +44,8 @@ interface MarketOverviewTabProps {
 
 type Timeframe = "1M" | "3M" | "6M" | "1Y" | "ALL";
 type ViewMode = "split" | "board" | "chart";
+
+const DEFAULT_RIBBON_SYMBOLS = ["VN30", "VNINDEX", "HNX30", "VN30F1M"];
 
 // Component Sparkline mini cho từng dòng của bảng giá
 const TableSparkline: React.FC<{ data: number[]; isUp: boolean }> = ({ data, isUp }) => {
@@ -92,20 +94,25 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
   onGoToPrediction,
 }) => {
   // Trạng thái Băng chuyền chỉ số (Ribbon)
-  const [activeRibbonSymbols, setActiveRibbonSymbols] = useState<string[]>(() => {
-    if (typeof window !== "undefined") {
+  const [activeRibbonSymbols, setActiveRibbonSymbols] = useState<string[]>(DEFAULT_RIBBON_SYMBOLS);
+
+  // Đọc cấu hình ribbon từ localStorage sau khi component mount để tránh Next.js Hydration Mismatch
+  useEffect(() => {
+    const timer = setTimeout(() => {
       try {
         const saved = localStorage.getItem("active_ribbon_symbols");
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
+            setActiveRibbonSymbols(parsed);
           }
         }
-      } catch {}
-    }
-    return ["VN30", "VNINDEX", "HNX30", "VN30F1M"];
-  });
+      } catch {
+        // Bỏ qua lỗi truy cập localStorage
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
   const [isRibbonCollapsed, setIsRibbonCollapsed] = useState<boolean>(false);
   const [isManageModalOpen, setIsManageModalOpen] = useState<boolean>(false);
 

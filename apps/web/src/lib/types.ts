@@ -130,6 +130,30 @@ export interface DayForecast {
   note?: string;
 }
 
+export interface ModelMetricsSummary {
+  accuracy?: number;
+  macro_f1?: number;
+  weighted_f1?: number;
+  precision_macro?: number;
+  recall_macro?: number;
+  [key: string]: unknown;
+}
+
+export interface RetrainResponse {
+  status: string;
+  timestamp: string;
+  horizon: string;
+  horizon_days: number;
+  threshold: number;
+  val_buffer_days: number;
+  latest_market_date: string;
+  train_samples: number;
+  val_samples: number;
+  total_samples: number;
+  lightgbm_metrics?: ModelMetricsSummary;
+  lstm_metrics?: ModelMetricsSummary;
+}
+
 export interface PredictionResponse {
   symbol: string;
   date: string;
@@ -150,6 +174,16 @@ export interface PredictionResponse {
   is_live_synced?: boolean;
   trajectory?: DayForecast[];
   summary_guidance?: string;
+  training_info?: {
+    latest_market_date?: string;
+    horizon?: string;
+    threshold?: number;
+    train_samples?: number;
+    val_samples?: number;
+    lightgbm_metrics?: ModelMetricsSummary;
+    lstm_metrics?: ModelMetricsSummary;
+    timestamp?: string;
+  };
 }
 
 export interface BatchPredictionResponse {

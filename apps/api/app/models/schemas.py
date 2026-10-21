@@ -181,6 +181,9 @@ class PredictionResponse(BaseModel):
         default_factory=list, description="Quỹ đạo dự phóng 3 phiên T+1, T+2, T+3"
     )
     summary_guidance: str = Field(default="", description="Khuyến nghị hành động thực chiến")
+    training_info: dict | None = Field(
+        default=None, description="Thông tin metadata của mô hình thực chiến đã huấn luyện"
+    )
 
 
 class LiveSyncRequest(BaseModel):

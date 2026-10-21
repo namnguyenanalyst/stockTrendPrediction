@@ -10,6 +10,7 @@ import {
   BatchPredictionResponse,
   MarketBoardResponse,
   PredictionResponse,
+  RetrainResponse,
   StockHistoryResponse,
   StockIndicatorsResponse,
   StockSummaryResponse,
@@ -121,6 +122,22 @@ export async function syncLivePrediction(
     body: JSON.stringify({ symbol, model_type: modelType }),
   });
 }
+
+export async function retrainProductionModel(
+  horizon = 3,
+  threshold = 0.02,
+  valBufferDays = 40
+): Promise<RetrainResponse> {
+  return fetchJson<RetrainResponse>("/api/predict/retrain", {
+    method: "POST",
+    body: JSON.stringify({
+      horizon,
+      threshold,
+      val_buffer_days: valBufferDays,
+    }),
+  });
+}
+
 
 
 // 4. Giả lập Backtest

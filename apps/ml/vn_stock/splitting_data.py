@@ -477,3 +477,107 @@ def prepare_all_windows(
         prepared_windows.append(prepared_win)
 
     return prepared_windows
+
+
+def create_multi_day_labels(
+    df: pd.DataFrame,
+    horizon: int = 3,
+    threshold: float = 0.02,
+    close_col: str = "Close",
+    symbol_col: str = "Symbol",
+    date_col: str = "Date",
+) -> pd.DataFrame:
+    """
+    Gán nhãn xu hướng đa phiên (Multi-day Trend Labeling) cho bài toán thực tế:
+    - Return_{t+horizon} = (Close_{t+horizon} - Close_t) / Close_t
+    - Label = 2 (TĂNG) nếu Return >= +threshold (+2.0%)
+    - Label = 0 (GIẢM) nếu Return <= -threshold (-2.0%)
+    - Label = 1 (ĐI NGANG) nếu -threshold < Return < +threshold
+    - Loại bỏ đúng horizon dòng cuối cùng của từng mã vì chưa diễn ra các phiên tương lai để biết nhãn.
+    """
+    if close_col not in df.columns:
+        raise ValueError(f"DataFrame phải chứa cột giá đóng cửa '{close_col}'.")
+    if symbol_col not in df.columns or date_col not in df.columns:
+        raise ValueError(f"DataFrame phải chứa cột '{symbol_col}' và '{date_col}'.")
+
+    dfs = []
+    for _, grp in df.groupby(symbol_col):
+        g = grp.sort_values(date_col).copy()
+        next_close = g[close_col].shift(-horizon)
+        next_return = (next_close - g[close_col]) / g[close_col]
+
+        conditions = [
+            next_return <= -threshold,
+            (next_return > -threshold) & (next_return < threshold),
+            next_return >= threshold,
+        ]
+        g["Label"] = np.select(conditions, [0, 1, 2], default=np.nan)
+        g["Target_Return"] = next_return
+        g = g.dropna(subset=["Label"]).reset_index(drop=True)
+        g["Label"] = g["Label"].astype(int)
+        dfs.append(g)
+
+    if not dfs:
+        return pd.DataFrame(columns=list(df.columns) + ["Label", "Target_Return"])
+
+    res = pd.concat(dfs, ignore_index=True)
+    return res.sort_values([date_col, symbol_col]).reset_index(drop=True)
+
+
+def prepare_production_training_data(
+    df: pd.DataFrame,
+    val_buffer_days: int = 40,
+    feature_cols: list[str] = FEATURE_COLS,
+    seq_length: int = DEFAULT_SEQ_LENGTH,
+    date_col: str = "Date",
+    symbol_col: str = "Symbol",
+) -> dict[str, Any]:
+    """
+    Chuẩn bị dữ liệu huấn luyện thực chiến (Production Retraining):
+    - Sử dụng TOÀN BỘ dữ liệu lịch sử tích lũy từ STUDY_START_DATE đến phiên gần nhất có nhãn.
+    - Dành val_buffer_days phiên gần nhất (mặc định 40 phiên ~ 2 tháng) làm Validation Buffer
+      để phục vụ Early Stopping chống quá khớp (overfitting).
+    - Toàn bộ dữ liệu trước đó (hơn 95% lịch sử) làm Train.
+    - StandardScaler chỉ fit trên tập Train, sau đó transform cho cả Train và Val.
+    - Trích xuất đuôi warm-up (seq_length - 1 phiên) từ Train cho Val để bảo toàn 100% mẫu cho PyTorch LSTM.
+    """
+    unique_dates = np.sort(df[date_col].unique())
+    n_dates = len(unique_dates)
+
+    if n_dates <= val_buffer_days:
+        raise ValueError(
+            f"Tổng số ngày ({n_dates}) không đủ để tạo validation buffer {val_buffer_days} ngày."
+        )
+
+    t_end_idx = n_dates - val_buffer_days
+    train_dates = unique_dates[:t_end_idx]
+    val_dates = unique_dates[t_end_idx:]
+
+    train_df = df[df[date_col].isin(train_dates)].copy()
+    val_df = df[df[date_col].isin(val_dates)].copy()
+
+    train_s, val_s, _, scaler = scale_window(
+        train_df=train_df,
+        val_df=val_df,
+        test_df=pd.DataFrame(columns=train_df.columns),
+        feature_cols=feature_cols,
+    )
+
+    val_warmup = get_warmup_tail(
+        prev_split_df=train_s,
+        seq_length=seq_length,
+        symbol_col=symbol_col,
+        date_col=date_col,
+    )
+
+    return {
+        "train": train_s,
+        "val": val_s,
+        "val_warmup": val_warmup,
+        "scaler": scaler,
+        "train_end_date": pd.Timestamp(train_dates[-1]),
+        "val_end_date": pd.Timestamp(val_dates[-1]),
+        "total_training_days": n_dates,
+        "val_buffer_days": val_buffer_days,
+    }
+

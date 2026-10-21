@@ -69,6 +69,7 @@ def predict_stock_signal(
             is_live_synced=res.get("is_live_synced", False),
             trajectory=res.get("trajectory", []),
             summary_guidance=res.get("summary_guidance", ""),
+            training_info=res.get("training_info"),
         )
     except FileNotFoundError as fnf_err:
         logger.error("Không tìm thấy model artifact: %s", fnf_err)
@@ -106,9 +107,16 @@ def sync_live_and_predict(
         )
 
     try:
+        from vn_stock.data_ingestion import fetch_stock_data
         from vn_stock.modeling import predict_trend
 
-        # Thực hiện suy luận với cờ đánh dấu is_live_synced=True
+        # 1. Kích hoạt đồng bộ nến mới nhất tới T hoặc T-1 qua data_ingestion
+        try:
+            fetch_stock_data(clean_sym)
+        except Exception as sync_err:
+            logger.warning("Không thể kéo SSI trực tiếp cho %s, sử dụng dữ liệu cục bộ: %s", clean_sym, sync_err)
+
+        # 2. Thực hiện suy luận với cờ đánh dấu is_live_synced=True
         res = predict_trend(
             symbol=clean_sym,
             model_type=model_clean,
@@ -131,12 +139,43 @@ def sync_live_and_predict(
             is_live_synced=True,
             trajectory=res.get("trajectory", []),
             summary_guidance=res.get("summary_guidance", ""),
+            training_info=res.get("training_info"),
         )
     except Exception as err:
         logger.exception("Lỗi đồng bộ live cho %s", clean_sym)
         raise HTTPException(
             status_code=500,
             detail=f"Lỗi khi đồng bộ dữ liệu live: {err!s}",
+        )
+
+
+def retrain_production_system(
+    horizon: int = 3,
+    threshold: float = 0.02,
+    val_buffer_days: int = 40,
+) -> dict:
+    """
+    Kích hoạt quy trình huấn luyện lại mô hình thực chiến T+horizon:
+    - Thu thập dữ liệu nến mới nhất tới phiên T-1 (hoặc T sau 15:00)
+    - Tự động huấn luyện lại LightGBM và LSTM trên 100% dữ liệu lịch sử
+    - Cập nhật artifacts models/
+    """
+    try:
+        from vn_stock.modeling.train import train_production_model
+
+        summary = train_production_model(
+            horizon=horizon,
+            threshold=threshold,
+            val_buffer_days=val_buffer_days,
+            save_artifacts=True,
+            models_dir=settings.MODELS_DIR,
+        )
+        return summary
+    except Exception as err:
+        logger.exception("Lỗi khi huấn luyện lại mô hình thực chiến")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Lỗi khi huấn luyện lại mô hình thực chiến: {err!s}",
         )
 
 

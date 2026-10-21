@@ -106,3 +106,26 @@ async def predict_live_get(
         model_type=model_type,
     )
 
+
+class RetrainRequest(BaseModel):
+    horizon: int = Field(default=3, description="Chân trời dự báo (mặc định 3 phiên T+3)")
+    threshold: float = Field(default=0.02, description="Ngưỡng biến động giá (mặc định 2.0%)")
+    val_buffer_days: int = Field(default=40, description="Số phiên đệm validation Early Stopping")
+
+
+@router.post(
+    "/retrain",
+    summary="Huấn luyện lại mô hình thực chiến T+3 (POST)",
+    description="Tự động thu thập dữ liệu tới phiên T-1 (hoặc T sau 15:00) và huấn luyện lại LightGBM + PyTorch LSTM trên toàn bộ dữ liệu tích lũy.",
+)
+async def retrain_model_endpoint(
+    request: RetrainRequest = RetrainRequest(),
+) -> dict:
+    """Endpoint kích hoạt huấn luyện lại mô hình sản xuất."""
+    return prediction_service.retrain_production_system(
+        horizon=request.horizon,
+        threshold=request.threshold,
+        val_buffer_days=request.val_buffer_days,
+    )
+
+
