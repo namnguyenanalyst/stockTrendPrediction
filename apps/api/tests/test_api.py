@@ -160,3 +160,28 @@ def test_invalid_symbol_backtest():
     response = client.post("/api/backtest/run", json=payload)
     assert response.status_code == 400
 
+
+def test_predict_live_endpoints():
+    """Kiểm tra endpoint /api/predict/live (GET & POST) với trajectory 3 phiên."""
+    # Test GET
+    res_get = client.get("/api/predict/live?symbol=VIC&model_type=lightgbm")
+    assert res_get.status_code == 200
+    data_get = res_get.json()
+    assert data_get["symbol"] == "VIC"
+    assert data_get["horizon"] == "T+3"
+    assert data_get["horizon_days"] == 3
+    assert data_get["is_live_synced"] is True
+    assert "trajectory" in data_get
+    assert len(data_get["trajectory"]) == 3
+    assert data_get["trajectory"][0]["day_name"] == "T+1"
+    assert data_get["trajectory"][1]["day_name"] == "T+2"
+    assert data_get["trajectory"][2]["day_name"] == "T+3"
+
+    # Test POST
+    payload = {"symbol": "VIC", "model_type": "lightgbm"}
+    res_post = client.post("/api/predict/live", json=payload)
+    assert res_post.status_code == 200
+    data_post = res_post.json()
+    assert data_post["is_live_synced"] is True
+    assert len(data_post["trajectory"]) == 3
+

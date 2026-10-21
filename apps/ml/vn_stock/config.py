@@ -80,6 +80,8 @@ DEFAULT_BATCH_SIZE = 32
 DEFAULT_LABEL_THRESHOLD = (
     0.01  # Ngưỡng ±1.0% phân loại Tăng (>=+1%), Đi ngang ((-1%, +1%)), Giảm (<=-1%)
 )
+DEFAULT_HORIZON_DAYS = 3  # Chu kỳ T+3 bám sát thanh toán T+2 và ngày được phép bán
+DEFAULT_TREND_THRESHOLD_3D = 0.02  # Ngưỡng ±2.0% cho chu kỳ 3 ngày
 NUM_CLASSES = 3
 CLASS_NAMES = {0: "GIẢM", 1: "ĐI NGANG", 2: "TĂNG"}
 SIGNAL_RECOMMENDATIONS = {0: "BÁN (SELL)", 1: "NẮM GIỮ (HOLD)", 2: "MUA (BUY)"}

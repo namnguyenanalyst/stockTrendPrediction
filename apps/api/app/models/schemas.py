@@ -86,9 +86,22 @@ class StockSummaryResponse(BaseModel):
 # ============================================================================
 # 3. AI PREDICTION SCHEMAS
 # ============================================================================
+class DayForecast(BaseModel):
+    day_offset: int = Field(..., description="Chỉ số ngày (1: T+1, 2: T+2, 3: T+3)")
+    day_name: str = Field(..., description="Tên phiên ('T+1', 'T+2', 'T+3')")
+    predicted_trend: str = Field(..., description="Xu hướng dự phóng ('GIẢM', 'ĐI NGANG', 'TĂNG')")
+    signal: str = Field(
+        ..., description="Tín hiệu hành động ('BÁN (SELL)', 'NẮM GIỮ (HOLD)', 'MUA (BUY)')"
+    )
+    confidence: float = Field(..., description="Độ tin cậy xác suất lớn nhất")
+    probabilities: dict[str, float] = Field(..., description="Phân bổ xác suất 3 lớp của phiên")
+    note: str = Field(default="", description="Ghi chú nghiệp vụ vi cấu trúc giao dịch")
+
+
 class PredictionResponse(BaseModel):
     symbol: str = Field(..., description="Mã cổ phiếu dự báo")
     date: str = Field(..., description="Ngày của phiên giao dịch căn cứ")
+    data_as_of_date: str = Field(default="", description="Ngày chốt dữ liệu căn cứ")
     current_price: float = Field(..., description="Thị giá đóng cửa phiên căn cứ (nghìn VNĐ)")
     model_type: str = Field(..., description="Mô hình sử dụng ('lightgbm' hoặc 'lstm')")
     predicted_label: int = Field(..., description="Nhãn dự báo (0: Giảm, 1: Đi ngang, 2: Tăng)")
@@ -99,7 +112,18 @@ class PredictionResponse(BaseModel):
     probabilities: dict[str, float] = Field(
         ..., description="Phân bổ xác suất 3 lớp {'GIẢM': p0, 'ĐI NGANG': p1, 'TĂNG': p2}"
     )
-    horizon: str = Field(default="T+1", description="Kỳ hạn dự báo")
+    horizon: str = Field(default="T+3", description="Kỳ hạn dự báo")
+    horizon_days: int = Field(default=3, description="Số ngày nắm giữ mục tiêu (3 phiên)")
+    is_live_synced: bool = Field(default=False, description="Trạng thái đồng bộ nến mới nhất từ SSI")
+    trajectory: list[DayForecast] = Field(
+        default_factory=list, description="Quỹ đạo dự phóng 3 phiên T+1, T+2, T+3"
+    )
+    summary_guidance: str = Field(default="", description="Khuyến nghị hành động thực chiến")
+
+
+class LiveSyncRequest(BaseModel):
+    symbol: str = Field(default="VIC", description="Mã cổ phiếu cần đồng bộ và dự báo")
+    model_type: str = Field(default="lightgbm", description="Loại mô hình ('lightgbm' hoặc 'lstm')")
 
 
 class BatchPredictionResponse(BaseModel):

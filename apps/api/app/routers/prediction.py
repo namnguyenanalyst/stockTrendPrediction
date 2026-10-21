@@ -4,7 +4,7 @@ from fastapi import APIRouter, Query
 
 from pydantic import BaseModel, Field
 
-from app.models.schemas import BatchPredictionResponse, PredictionResponse
+from app.models.schemas import BatchPredictionResponse, LiveSyncRequest, PredictionResponse
 from app.services import prediction_service
 
 router = APIRouter(prefix="/predict", tags=["AI Prediction"])
@@ -74,4 +74,35 @@ async def predict_batch_post(
 ) -> BatchPredictionResponse:
     """Endpoint dự báo danh mục 5 mã trọng tâm qua POST."""
     return prediction_service.predict_batch_signals(model_type=request.model_type)
+
+
+@router.post(
+    "/live",
+    response_model=PredictionResponse,
+    summary="Đồng bộ dữ liệu phiên gần nhất và dự báo Live chu kỳ T+3 (POST)",
+    description="Kết nối dữ liệu mới nhất (Near-realtime) và xuất tín hiệu khuyến nghị cho chu kỳ T+3 cùng Quỹ đạo 3 phiên.",
+)
+async def predict_live_post(request: LiveSyncRequest) -> PredictionResponse:
+    """Endpoint đồng bộ và suy luận trực tuyến nhận body JSON."""
+    return prediction_service.sync_live_and_predict(
+        symbol=request.symbol,
+        model_type=request.model_type,
+    )
+
+
+@router.get(
+    "/live",
+    response_model=PredictionResponse,
+    summary="Đồng bộ dữ liệu phiên gần nhất và dự báo Live chu kỳ T+3 (GET)",
+    description="Kết nối dữ liệu mới nhất (Near-realtime) và xuất tín hiệu khuyến nghị cho chu kỳ T+3 cùng Quỹ đạo 3 phiên qua GET query.",
+)
+async def predict_live_get(
+    symbol: str = Query("VIC", description="Mã cổ phiếu cần dự báo (ví dụ: VIC, HPG, FPT)"),
+    model_type: str = Query("lightgbm", description="Loại mô hình AI ('lightgbm' hoặc 'lstm')"),
+) -> PredictionResponse:
+    """Endpoint đồng bộ và suy luận trực tuyến qua GET."""
+    return prediction_service.sync_live_and_predict(
+        symbol=symbol,
+        model_type=model_type,
+    )
 
