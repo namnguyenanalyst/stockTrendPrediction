@@ -8,6 +8,7 @@ import {
   BacktestResponse,
   BacktestSummaryResponse,
   BatchPredictionResponse,
+  MarketBoardResponse,
   PredictionResponse,
   StockHistoryResponse,
   StockIndicatorsResponse,
@@ -64,16 +65,22 @@ export async function getStockSymbols(): Promise<StockSymbolInfo[]> {
 
 export async function getStockHistory(
   symbol: string,
-  startDate = "2023-01-01"
+  startDate?: string,
+  limit = 1500
 ): Promise<StockHistoryResponse> {
-  return fetchJson<StockHistoryResponse>(
-    `/api/stocks/history?symbol=${encodeURIComponent(symbol)}&start_date=${encodeURIComponent(startDate)}`
-  );
+  const params = new URLSearchParams();
+  params.set("symbol", symbol);
+  if (startDate) params.set("start_date", startDate);
+  if (limit) params.set("limit", limit.toString());
+  return fetchJson<StockHistoryResponse>(`/api/stocks/history?${params.toString()}`);
 }
 
-export async function getStockIndicators(symbol: string): Promise<StockIndicatorsResponse> {
+export async function getStockIndicators(
+  symbol: string,
+  limit = 1500
+): Promise<StockIndicatorsResponse> {
   return fetchJson<StockIndicatorsResponse>(
-    `/api/stocks/indicators?symbol=${encodeURIComponent(symbol)}`
+    `/api/stocks/indicators?symbol=${encodeURIComponent(symbol)}&limit=${limit}`
   );
 }
 
@@ -81,6 +88,10 @@ export async function getStockSummary(symbol: string): Promise<StockSummaryRespo
   return fetchJson<StockSummaryResponse>(
     `/api/stocks/summary?symbol=${encodeURIComponent(symbol)}`
   );
+}
+
+export async function getMarketBoard(): Promise<MarketBoardResponse> {
+  return fetchJson<MarketBoardResponse>("/api/stocks/board");
 }
 
 // 3. Dự báo xu hướng AI

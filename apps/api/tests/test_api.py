@@ -69,6 +69,19 @@ def test_stocks_summary():
     assert "rsi_14" in data
 
 
+def test_stocks_board():
+    """Kiểm tra endpoint /api/stocks/board."""
+    response = client.get("/api/stocks/board")
+    assert response.status_code == 200
+    data = response.json()
+    assert "indices" in data
+    assert len(data["indices"]) >= 3
+    assert "stocks" in data
+    assert len(data["stocks"]) >= 5
+    assert "breadth" in data
+    assert "ai_market_insight" in data
+
+
 def test_predict_signal_lightgbm():
     """Kiểm tra endpoint /api/predict/signal với mô hình LightGBM."""
     response = client.get("/api/predict/signal?symbol=VIC&model_type=lightgbm")

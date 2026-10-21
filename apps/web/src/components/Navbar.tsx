@@ -46,25 +46,27 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Quick Symbol Switcher */}
-        <div className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/90 p-1">
-          <span className="hidden px-2 text-xs font-medium text-slate-400 md:inline">
-            Mã CP:
-          </span>
-          {CORE_SYMBOLS.map((sym) => (
-            <button
-              key={sym}
-              onClick={() => setSelectedSymbol(sym)}
-              className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
-                selectedSymbol === sym
-                  ? "bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/40"
-                  : "text-slate-300 hover:bg-slate-800 hover:text-slate-100"
-              }`}
-            >
-              {sym}
-            </button>
-          ))}
-        </div>
+        {/* Quick Symbol Switcher (Chỉ hiển thị khi không ở Tab 1) */}
+        {activeTab !== "market" && (
+          <div className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/90 p-1">
+            <span className="hidden px-2 text-xs font-medium text-slate-400 md:inline">
+              Mã CP:
+            </span>
+            {CORE_SYMBOLS.map((sym) => (
+              <button
+                key={sym}
+                onClick={() => setSelectedSymbol(sym)}
+                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                  selectedSymbol === sym
+                    ? "bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/40"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-slate-100"
+                }`}
+              >
+                {sym}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Navigation Tabs */}
@@ -79,7 +81,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <BarChart3 className="h-4 w-4" />
-            <span>Thị trường & Kỹ thuật</span>
+            <span>Thị trường & Bảng giá</span>
           </button>
 
           <button
@@ -91,7 +93,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <BrainCircuit className="h-4 w-4" />
-            <span>Tín hiệu AI & Mô hình</span>
+            <span>Tín hiệu dự báo xu hướng</span>
           </button>
 
           <button
@@ -103,7 +105,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <History className="h-4 w-4" />
-            <span>Giả lập Backtest T+2</span>
+            <span>Kiểm thử chiến lược</span>
           </button>
         </nav>
       </div>

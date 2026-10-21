@@ -20,23 +20,23 @@ export interface SidebarProps {
 const NAV_ITEMS = [
   {
     id: "market" as const,
-    label: "Thị trường & Kỹ thuật",
-    shortLabel: "Thị trường",
-    description: "Nến OHLCV & RSI (14)",
+    label: "Thị trường & Bảng giá",
+    shortLabel: "Bảng giá",
+    description: "Bối cảnh thị trường & phân tích kỹ thuật",
     icon: BarChart3,
   },
   {
     id: "prediction" as const,
-    label: "Tín hiệu AI & Mô hình",
-    shortLabel: "Dự báo AI",
-    description: "LightGBM & PyTorch LSTM",
+    label: "Tín hiệu dự báo xu hướng",
+    shortLabel: "Dự báo",
+    description: "Tín hiệu xu hướng từ mô hình AI",
     icon: BrainCircuit,
   },
   {
     id: "backtest" as const,
-    label: "Giả lập Backtest T+2",
-    shortLabel: "Backtest",
-    description: "Kiểm định & Quản trị Rủi ro",
+    label: "Kiểm thử chiến lược",
+    shortLabel: "Kiểm thử",
+    description: "Giả lập T+2 & Quản trị Rủi ro",
     icon: History,
   },
 ];

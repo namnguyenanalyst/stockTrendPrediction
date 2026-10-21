@@ -29,7 +29,7 @@ STUDY_START_DATE = "2023-04-03"
 DEFAULT_SYMBOL = "VIC"
 DEFAULT_SYMBOLS = ["VIC", "HPG", "FPT", "VNM", "MWG"]
 DEFAULT_START_DATE = FETCH_START_DATE
-DEFAULT_END_DATE = "2026-09-11"
+DEFAULT_END_DATE = "2026-10-21"
 DEFAULT_SEQ_LENGTH = 20
 
 # Bảng mã hóa cố định định danh cổ phiếu (Symbol -> Code) đảm bảo tính nhất quán tuyệt đối giữa Train và Inference

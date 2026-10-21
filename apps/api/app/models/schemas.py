@@ -83,6 +83,68 @@ class StockSummaryResponse(BaseModel):
     sma_50_dev: float = Field(..., description="Độ lệch so với SMA 50 (%)")
 
 
+class IndexOverview(BaseModel):
+    name: str = Field(..., description="Tên chỉ số")
+    symbol: str = Field(..., description="Mã chỉ số (VNINDEX, VN30...)")
+    value: float = Field(..., description="Điểm số hiện tại")
+    change: float = Field(..., description="Điểm tăng/giảm")
+    change_pct: float = Field(..., description="Tỷ lệ tăng/giảm (%)")
+    volume_str: str = Field(..., description="Khối lượng giao dịch định dạng chuỗi")
+    value_str: str = Field(..., description="Giá trị giao dịch định dạng chuỗi")
+    advancing: int = Field(default=0, description="Số mã tăng")
+    ceiling: int = Field(default=0, description="Số mã trần")
+    unchanged: int = Field(default=0, description="Số mã tham chiếu")
+    declining: int = Field(default=0, description="Số mã giảm")
+    floor: int = Field(default=0, description="Số mã sàn")
+    sparkline: list[float] = Field(default_factory=list, description="Chuỗi giá trị thu nhỏ vẽ biểu đồ")
+
+
+class StockBoardItem(BaseModel):
+    symbol: str = Field(..., description="Mã cổ phiếu")
+    name: str = Field(..., description="Tên công ty niêm yết")
+    exchange: str = Field(default="HOSE", description="Sàn giao dịch")
+    sector: str = Field(default="Đa ngành", description="Nhóm ngành kinh tế")
+    close: float = Field(..., description="Giá khớp gần nhất (nghìn VNĐ)")
+    change: float = Field(..., description="Thay đổi giá so với tham chiếu")
+    change_pct: float = Field(..., description="Tỷ lệ thay đổi giá (%)")
+    volume: int = Field(..., description="Khối lượng giao dịch khớp lệnh")
+    ceiling: float = Field(..., description="Giá trần")
+    floor: float = Field(..., description="Giá sàn")
+    reference: float = Field(..., description="Giá tham chiếu")
+    sparkline: list[float] = Field(default_factory=list, description="Chuỗi nến 10 phiên gần nhất")
+    buy_ratio: int = Field(default=50, description="Tỷ lệ áp lực Mua chủ động (%)")
+    sell_ratio: int = Field(default=50, description="Tỷ lệ áp lực Bán chủ động (%)")
+    rsi_14: float = Field(default=50.0, description="Chỉ số RSI 14")
+    sma_20_dev: float = Field(default=0.0, description="Độ lệch SMA 20 (%)")
+    ai_bias: str = Field(default="ĐI NGANG", description="Xu hướng AI dự phóng ('TĂNG', 'GIẢM'...)")
+
+
+class MarketBreadth(BaseModel):
+    ceiling: int = Field(default=0, description="Số mã giá trần")
+    advancing: int = Field(default=0, description="Số mã tăng giá")
+    unchanged: int = Field(default=0, description="Số mã tham chiếu")
+    declining: int = Field(default=0, description="Số mã giảm giá")
+    floor: int = Field(default=0, description="Số mã giá sàn")
+
+
+class MarketBoardResponse(BaseModel):
+    updated_at: str = Field(..., description="Thời điểm cập nhật")
+    indices: list[IndexOverview] = Field(..., description="Các chỉ số thị trường")
+    breadth: MarketBreadth = Field(..., description="Độ rộng thị trường")
+    stocks: list[StockBoardItem] = Field(..., description="Danh sách cổ phiếu trên bảng giá")
+    ai_market_insight: str = Field(..., description="Nhận định thị trường từ Trợ lý AI")
+    top_gainers: list[StockBoardItem] = Field(default_factory=list, description="Top cổ phiếu tăng mạnh nhất")
+    top_losers: list[StockBoardItem] = Field(default_factory=list, description="Top cổ phiếu giảm mạnh nhất")
+    top_search: list[StockBoardItem] = Field(
+        default_factory=list,
+        description="Top 10 cổ phiếu được quan tâm / tìm kiếm nhiều nhất dựa trên dữ liệu thanh khoản & biến động",
+    )
+    top_volume: list[StockBoardItem] = Field(
+        default_factory=list,
+        description="Top 10 cổ phiếu có khối lượng giao dịch (KLGD) lớn nhất phiên",
+    )
+
+
 # ============================================================================
 # 3. AI PREDICTION SCHEMAS
 # ============================================================================

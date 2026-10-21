@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Query
 
 from app.models.schemas import (
+    MarketBoardResponse,
     StockHistoryResponse,
     StockIndicatorsResponse,
     StockSummaryResponse,
@@ -34,7 +35,7 @@ async def get_history(
     symbol: str = Query("VIC", description="Mã cổ phiếu (ví dụ: VIC, HPG, FPT)"),
     start_date: str | None = Query(None, description="Ngày bắt đầu (YYYY-MM-DD)"),
     end_date: str | None = Query(None, description="Ngày kết thúc (YYYY-MM-DD)"),
-    limit: int = Query(100, ge=1, le=2000, description="Số phiên nến tối đa cần lấy"),
+    limit: int = Query(1500, ge=1, le=5000, description="Số phiên nến tối đa cần lấy"),
 ) -> StockHistoryResponse:
     """Endpoint truy vấn chuỗi nến OHLCV."""
     return stock_service.get_stock_history(
@@ -53,7 +54,7 @@ async def get_history(
 )
 async def get_indicators(
     symbol: str = Query("VIC", description="Mã cổ phiếu"),
-    limit: int = Query(100, ge=1, le=2000, description="Số phiên tối đa"),
+    limit: int = Query(1500, ge=1, le=5000, description="Số phiên tối đa"),
 ) -> StockIndicatorsResponse:
     """Endpoint truy vấn bộ 13 chỉ báo kỹ thuật."""
     return stock_service.get_stock_indicators(symbol=symbol, limit=limit)
@@ -70,3 +71,14 @@ async def get_summary(
 ) -> StockSummaryResponse:
     """Endpoint tóm tắt thông tin phiên gần nhất."""
     return stock_service.get_stock_summary(symbol=symbol)
+
+
+@router.get(
+    "/board",
+    response_model=MarketBoardResponse,
+    summary="Bảng giá điện tử thông minh và tổng quan thị trường",
+    description="Trả về dữ liệu bảng giá phong cách Terminal DNSE: các chỉ số thị trường (VNINDEX, VN30...), độ rộng thị trường, danh sách cổ phiếu cùng biểu đồ sparkline, tỷ lệ mua/bán chủ động và nhận định AI.",
+)
+async def get_market_board() -> MarketBoardResponse:
+    """Endpoint truy vấn bảng giá thị trường toàn diện."""
+    return stock_service.get_market_board_data()

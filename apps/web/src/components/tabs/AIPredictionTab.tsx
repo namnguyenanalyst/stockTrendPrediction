@@ -11,13 +11,16 @@ import {
   Minus,
   Radio,
   RefreshCw,
-  ShieldAlert,
   Sparkles,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
 import { syncLivePrediction } from "@/lib/api";
 import { BatchPredictionResponse, PredictionResponse } from "@/lib/types";
+import {
+  FinancialDetailModal,
+  FinancialItemContext,
+} from "@/components/market/FinancialDetailModal";
 
 interface AIPredictionTabProps {
   selectedSymbol: string;
@@ -41,6 +44,8 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   const [showInfo, setShowInfo] = useState(false);
   const [localPrediction, setLocalPrediction] = useState<PredictionResponse | null>(null);
   const [isSyncingLive, setIsSyncingLive] = useState(false);
+  const [detailModalItem, setDetailModalItem] = useState<FinancialItemContext | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   // Hiển thị localPrediction nếu vừa đồng bộ Live, ngược lại hiển thị prediction từ props
   const activePred = localPrediction && localPrediction.symbol === selectedSymbol
@@ -565,10 +570,19 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                     </td>
                     <td className="px-3 py-3 text-right">
                       <button
-                        onClick={() => onSelectSymbol(pred.symbol)}
+                        onClick={() => {
+                          onSelectSymbol(pred.symbol);
+                          setDetailModalItem({
+                            symbol: pred.symbol,
+                            currentValue: pred.current_price,
+                            isIndex: false,
+                          });
+                          setIsDetailModalOpen(true);
+                        }}
                         className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:border-emerald-500 hover:bg-emerald-500 hover:text-slate-950 transition-all"
+                        title={`Soi nến và phân tích kỹ thuật ${pred.symbol}`}
                       >
-                        <span>Chi tiết</span>
+                        <span>Soi nến</span>
                         <ChevronRight className="h-3 w-3" />
                       </button>
                     </td>
@@ -579,6 +593,13 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Modal chi tiết kỹ thuật chuẩn hóa */}
+      <FinancialDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        item={detailModalItem}
+      />
     </div>
   );
 };

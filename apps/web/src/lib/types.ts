@@ -59,6 +59,62 @@ export interface StockSummaryResponse {
   sma_50_dev: number;
 }
 
+export interface IndexOverview {
+  name: string;
+  symbol: string;
+  value: number;
+  change: number;
+  change_pct: number;
+  volume_str: string;
+  value_str: string;
+  advancing: number;
+  ceiling: number;
+  unchanged: number;
+  declining: number;
+  floor: number;
+  sparkline: number[];
+}
+
+export interface StockBoardItem {
+  symbol: string;
+  name: string;
+  exchange: string;
+  sector: string;
+  close: number;
+  change: number;
+  change_pct: number;
+  volume: number;
+  ceiling: number;
+  floor: number;
+  reference: number;
+  sparkline: number[];
+  buy_ratio: number;
+  sell_ratio: number;
+  rsi_14: number;
+  sma_20_dev: number;
+  ai_bias: string;
+}
+
+export interface MarketBreadth {
+  ceiling: number;
+  advancing: number;
+  unchanged: number;
+  declining: number;
+  floor: number;
+}
+
+export interface MarketBoardResponse {
+  updated_at: string;
+  indices: IndexOverview[];
+  breadth: MarketBreadth;
+  stocks: StockBoardItem[];
+  ai_market_insight: string;
+  top_gainers: StockBoardItem[];
+  top_losers: StockBoardItem[];
+  top_search?: StockBoardItem[];
+  top_volume?: StockBoardItem[];
+}
+
 export interface DayForecast {
   day_offset: number; // 1, 2, 3
   day_name: string; // "T+1", "T+2", "T+3"

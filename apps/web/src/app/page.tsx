@@ -9,6 +9,7 @@ import { BacktestSimulatorTab } from "@/components/tabs/BacktestSimulatorTab";
 import { MarketOverviewTab } from "@/components/tabs/MarketOverviewTab";
 import {
   getBatchPrediction,
+  getMarketBoard,
   getPredictionSignal,
   getStockHistory,
   getStockIndicators,
@@ -19,6 +20,7 @@ import {
   BacktestRequest,
   BacktestResponse,
   BatchPredictionResponse,
+  MarketBoardResponse,
   PredictionResponse,
   StockBar,
   StockIndicatorBar,
@@ -37,6 +39,7 @@ export default function DashboardPage() {
   const [bars, setBars] = useState<StockBar[]>([]);
   const [indicators, setIndicators] = useState<StockIndicatorBar[]>([]);
   const [summary, setSummary] = useState<StockSummaryResponse | null>(null);
+  const [marketBoard, setMarketBoard] = useState<MarketBoardResponse | null>(null);
   const [loadingMarket, setLoadingMarket] = useState<boolean>(true);
 
   // Dữ liệu Dự báo AI
@@ -61,8 +64,9 @@ export default function DashboardPage() {
       setLoadingBacktest(true);
 
       try {
-        const [histRes, indRes, sumRes, singlePred, batchPred, btRes] =
+        const [boardRes, histRes, indRes, sumRes, singlePred, batchPred, btRes] =
           await Promise.allSettled([
+            getMarketBoard(),
             getStockHistory(selectedSymbol),
             getStockIndicators(selectedSymbol),
             getStockSummary(selectedSymbol),
@@ -77,6 +81,9 @@ export default function DashboardPage() {
 
         if (ignore) return;
 
+        if (boardRes.status === "fulfilled") {
+          setMarketBoard(boardRes.value);
+        }
         if (histRes.status === "fulfilled") {
           setBars(histRes.value.bars);
         }
@@ -113,6 +120,20 @@ export default function DashboardPage() {
     };
   }, [selectedSymbol, modelType]);
 
+  // Tự động cập nhật bảng giá và các chỉ số thị trường định kỳ mỗi 10 giây
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      try {
+        const board = await getMarketBoard();
+        setMarketBoard(board);
+      } catch (err) {
+        console.debug("Lỗi cập nhật bảng giá tự động:", err);
+      }
+    }, 10_000);
+
+    return () => clearInterval(timer);
+  }, []);
+
   // Chạy Backtest tùy biến theo form
   const handleRunBacktest = async (params: BacktestRequest) => {
     setLoadingBacktest(true);
@@ -146,14 +167,17 @@ export default function DashboardPage() {
         />
 
         {/* Nội dung Màn hình chính theo Active Tab */}
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6">
+        <main className="mx-auto w-full max-w-7xl flex-1 px-3 py-4 sm:px-6">
           {activeTab === "market" && (
             <MarketOverviewTab
               symbol={selectedSymbol}
+              onSelectSymbol={setSelectedSymbol}
               bars={bars}
               indicators={indicators}
               summary={summary}
+              marketBoard={marketBoard}
               loading={loadingMarket}
+              onGoToPrediction={() => setActiveTab("prediction")}
             />
           )}
 
