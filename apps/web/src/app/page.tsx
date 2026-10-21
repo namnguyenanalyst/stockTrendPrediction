@@ -134,8 +134,6 @@ export default function DashboardPage() {
         setActiveTab={setActiveTab}
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
-        selectedSymbol={selectedSymbol}
-        setSelectedSymbol={setSelectedSymbol}
       />
 
       {/* Khung nội dung chính */}
@@ -145,8 +143,6 @@ export default function DashboardPage() {
           activeTab={activeTab}
           selectedSymbol={selectedSymbol}
           setSelectedSymbol={setSelectedSymbol}
-          isCollapsed={isCollapsed}
-          setIsCollapsed={setIsCollapsed}
         />
 
         {/* Nội dung Màn hình chính theo Active Tab */}

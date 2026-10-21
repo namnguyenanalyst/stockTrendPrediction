@@ -101,6 +101,16 @@ export async function getBatchPrediction(
   );
 }
 
+export async function syncLivePrediction(
+  symbol: string,
+  modelType: "lightgbm" | "lstm" = "lightgbm"
+): Promise<PredictionResponse> {
+  return fetchJson<PredictionResponse>("/api/predict/live", {
+    method: "POST",
+    body: JSON.stringify({ symbol, model_type: modelType }),
+  });
+}
+
 
 // 4. Giả lập Backtest
 export async function runBacktestSimulation(

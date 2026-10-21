@@ -59,9 +59,25 @@ export interface StockSummaryResponse {
   sma_50_dev: number;
 }
 
+export interface DayForecast {
+  day_offset: number; // 1, 2, 3
+  day_name: string; // "T+1", "T+2", "T+3"
+  predicted_trend: "GIẢM" | "ĐI NGANG" | "TĂNG";
+  signal: string; // "BÁN (SELL)" | "NẮM GIỮ (HOLD)" | "MUA (BUY)"
+  confidence: number;
+  probabilities: {
+    GIẢM: number;
+    "ĐI NGANG": number;
+    TĂNG: number;
+    [key: string]: number;
+  };
+  note?: string;
+}
+
 export interface PredictionResponse {
   symbol: string;
   date: string;
+  data_as_of_date?: string;
   current_price: number;
   model_type: "lightgbm" | "lstm";
   predicted_label: number; // 0: Giảm, 1: Đi ngang, 2: Tăng
@@ -74,6 +90,10 @@ export interface PredictionResponse {
     [key: string]: number;
   };
   horizon: string;
+  horizon_days?: number;
+  is_live_synced?: boolean;
+  trajectory?: DayForecast[];
+  summary_guidance?: string;
 }
 
 export interface BatchPredictionResponse {

@@ -65,10 +65,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-100 sm:text-xl">
-                Phòng Giả lập Chiến lược & Quản trị Rủi ro (T+2)
+                Phòng Giả lập Chiến lược & Quản trị Rủi ro (T+2 / T+3)
               </h2>
               <p className="text-xs text-slate-400">
-                Mô phỏng khớp lệnh thực tế sàn HOSE: Khớp tại Open T+1, nắm giữ tối thiểu T+2, trừ đủ thuế phí
+                Mô phỏng khớp lệnh thực tế sàn HOSE: Khớp tại Open T+1, lưu ký T+2, khả dụng bán T+3, trừ đủ thuế phí 0.40%
               </p>
             </div>
           </div>
@@ -84,7 +84,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
               Lô chẵn: <strong>100 CP</strong>
             </span>
             <span className="rounded bg-emerald-500/10 px-2.5 py-1 text-emerald-400 border border-emerald-500/30">
-              Chu kỳ: <strong>T+2</strong>
+              Chu kỳ: <strong>T+2 / T+3</strong>
             </span>
           </div>
         </div>

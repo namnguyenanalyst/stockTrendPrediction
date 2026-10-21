@@ -5,7 +5,6 @@ import {
   BarChart3,
   BrainCircuit,
   History,
-  Menu,
   Sparkles,
 } from "lucide-react";
 
@@ -13,8 +12,6 @@ interface TopHeaderProps {
   activeTab: "market" | "prediction" | "backtest";
   selectedSymbol: string;
   setSelectedSymbol: (symbol: string) => void;
-  isCollapsed: boolean;
-  setIsCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 const CORE_SYMBOLS = ["VIC", "HPG", "FPT", "VNM", "MWG"];
@@ -41,8 +38,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   activeTab,
   selectedSymbol,
   setSelectedSymbol,
-  isCollapsed,
-  setIsCollapsed,
 }) => {
   const currentTabInfo = TAB_TITLES[activeTab];
   const Icon = currentTabInfo.icon;
@@ -50,18 +45,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   return (
     <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/80 backdrop-blur-md">
       <div className="mx-auto flex w-full items-center justify-between px-4 py-3 sm:px-6">
-        {/* Bên Trái: Nút xổ Menu nếu đang thu gọn + Tiêu đề Tab hiện tại */}
+        {/* Bên Trái: Tiêu đề Tab hiện tại */}
         <div className="flex items-center gap-3">
-          {isCollapsed && (
-            <button
-              onClick={() => setIsCollapsed(false)}
-              title="Mở rộng thanh điều hướng"
-              aria-label="Mở rộng thanh điều hướng"
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700 hover:bg-slate-800 hover:text-emerald-400 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
-            >
-              <Menu className="h-4 w-4" />
-            </button>
-          )}
 
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
