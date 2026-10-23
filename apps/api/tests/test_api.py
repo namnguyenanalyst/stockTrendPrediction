@@ -238,3 +238,51 @@ def test_predict_live_endpoints():
     assert data_post["is_live_synced"] is True
     assert len(data_post["trajectory"]) == 3
 
+
+def test_stocks_sectors():
+    """Kiểm tra endpoint GET /api/stocks/sectors."""
+    res = client.get("/api/stocks/sectors")
+    assert res.status_code == 200
+    data = res.json()
+    assert isinstance(data, list)
+    assert len(data) > 0
+    assert "sector" in data[0]
+    assert "symbols" in data[0]
+
+
+def test_backtest_run_advanced_validation():
+    """Kiểm tra ràng buộc dải ngày <= 1 năm của POST /api/backtest/run-advanced."""
+    # Test dải ngày > 365 ngày -> Lỗi 400
+    invalid_payload = {
+        "scope_type": "stock",
+        "symbol": "VIC",
+        "start_date": "2023-01-01",
+        "end_date": "2025-01-01",  # 2 năm > 365 ngày
+        "initial_capital": 100_000_000,
+        "model_type": "lightgbm",
+    }
+    res_err = client.post("/api/backtest/run-advanced", json=invalid_payload)
+    assert res_err.status_code == 400
+    assert "Khoảng thời gian chọn không quá 1 năm" in res_err.json()["detail"]
+
+    # Test dải ngày hợp lệ (6 tháng)
+    valid_payload = {
+        "scope_type": "portfolio",
+        "portfolio_symbols": ["VIC", "HPG"],
+        "start_date": "2024-01-01",
+        "end_date": "2024-06-30",
+        "initial_capital": 100_000_000,
+        "model_type": "lightgbm",
+        "buy_conditions": {"use_ma": True},
+        "sell_conditions": {"take_profit_pct": 0.15, "stop_loss_pct": 0.07},
+    }
+    res_ok = client.post("/api/backtest/run-advanced", json=valid_payload)
+    assert res_ok.status_code == 200
+    d = res_ok.json()
+    assert d["scope_type"] == "portfolio"
+    assert "aggregate_metrics" in d
+    assert "portfolio_equity_curve" in d
+    assert "symbols_breakdown" in d
+    assert len(d["symbols_breakdown"]) >= 1
+
+

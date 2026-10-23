@@ -1,5 +1,3 @@
-"""Service thực thi mô phỏng kiểm thử chiến lược đầu tư (Backtest Simulator) cho API."""
-
 import logging
 import os
 import sys
@@ -8,14 +6,24 @@ os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 import pandas as pd
 from app.core.config import settings
 from app.models.schemas import (
+    AdvancedBacktestRequest,
+    BacktestConditionFilter,
     BacktestMetricsSchema,
     BacktestRequest,
     BacktestResponse,
+    BacktestScopeType,
     BacktestSummaryItem,
     BacktestSummaryResponse,
     EquityCurvePoint,
+    PortfolioBacktestResponse,
+    RecentSignalItem,
+    RecentSignalsResponse,
+    StrategyPresetItem,
+    StrategyPresetsResponse,
+    SymbolBreakdownItem,
     TradeLogItem,
 )
+from app.services import stock_service
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
@@ -64,6 +72,9 @@ def run_backtest_simulation(req: BacktestRequest) -> BacktestResponse:
             models_dir=settings.MODELS_DIR,
             initial_capital=req.initial_capital,
             slippage_rate=req.slippage_rate,
+            take_profit_pct=req.take_profit_pct,
+            stop_loss_pct=req.stop_loss_pct,
+            trailing_stop_pct=req.trailing_stop_pct,
         )
 
         m = res.metrics
@@ -203,3 +214,145 @@ def get_backtest_summary(model_type: str = "lightgbm") -> BacktestSummaryRespons
             status_code=500,
             detail=f"Lỗi khi tổng hợp kết quả Backtest: {err!s}",
         )
+
+
+def get_presets_service() -> StrategyPresetsResponse:
+    """Trả về danh mục 8 chiến thuật mẫu chuẩn DNSE."""
+    try:
+        from vn_stock.backtest import get_strategy_presets
+
+        raw_presets = get_strategy_presets()
+        items = [StrategyPresetItem(**p) for p in raw_presets]
+        return StrategyPresetsResponse(presets=items)
+    except Exception as err:
+        logger.exception("Lỗi lấy danh sách chiến thuật mẫu")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Không thể tải danh sách chiến thuật mẫu: {err!s}",
+        )
+
+
+def get_recent_signals_service() -> RecentSignalsResponse:
+    """Trả về danh sách tín hiệu mới near-realtime chuẩn DNSE."""
+    try:
+        from vn_stock.backtest import get_recent_strategy_signals
+
+        raw_signals = get_recent_strategy_signals()
+        items = [RecentSignalItem(**s) for s in raw_signals]
+        return RecentSignalsResponse(signals=items)
+    except Exception as err:
+        logger.exception("Lỗi lấy danh sách tín hiệu mới")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Không thể tải danh sách tín hiệu mới: {err!s}",
+        )
+
+
+def run_advanced_backtest(req: AdvancedBacktestRequest) -> PortfolioBacktestResponse:
+    """
+    Thực thi kiểm thử chiến lược đầu tư toàn diện theo chuẩn DNSE:
+    - Hỗ trợ 4 phạm vi: Rổ chỉ số (VN30, VN100), Cổ phiếu đơn lẻ, Ngành nghề, Danh mục tự chọn.
+    - Ràng buộc khoảng thời gian chọn không quá 1 năm (tối đa 365 ngày).
+    - Áp dụng các điều kiện Mua / Bán chi tiết kết hợp quản trị rủi ro Stop Loss, Take Profit, Trailing Stop.
+    """
+    start_dt = pd.to_datetime(req.start_date)
+    end_dt = pd.to_datetime(req.end_date)
+
+    if start_dt > end_dt:
+        raise HTTPException(
+            status_code=400,
+            detail="Ngày bắt đầu không được lớn hơn ngày kết thúc.",
+        )
+
+    diff_days = (end_dt - start_dt).days
+    if diff_days > 365:
+        raise HTTPException(
+            status_code=400,
+            detail="Khoảng thời gian chọn không quá 1 năm (tối đa 365 ngày).",
+        )
+
+    # 1. Phân giải danh sách mã cổ phiếu cần kiểm thử
+    target_symbols: list[str] = []
+    scope_target = ""
+
+    if req.scope_type == BacktestScopeType.STOCK:
+        clean_s = req.symbol.strip().upper()
+        target_symbols = [clean_s]
+        scope_target = clean_s
+    elif req.scope_type == BacktestScopeType.INDEX:
+        idx = req.index_name or "VN30"
+        target_symbols = stock_service.get_index_constituents(idx)
+        scope_target = f"Rổ chỉ số {idx.upper()}"
+    elif req.scope_type == BacktestScopeType.SECTOR:
+        sec_name = req.sector_name or "Ngân hàng"
+        sectors = stock_service.get_available_sectors()
+        matched = [s for s in sectors if s["sector"].lower() == sec_name.lower()]
+        if matched:
+            target_symbols = matched[0]["symbols"]
+        else:
+            target_symbols = [
+                s.symbol for s in stock_service.get_available_symbols()
+                if s.sector.lower() == sec_name.lower()
+            ]
+        if not target_symbols:
+            target_symbols = ["VCB", "BID", "CTG", "TCB", "MBB"]
+        scope_target = f"Ngành {sec_name}"
+    elif req.scope_type == BacktestScopeType.PORTFOLIO:
+        if req.portfolio_symbols and len(req.portfolio_symbols) > 0:
+            target_symbols = [s.strip().upper() for s in req.portfolio_symbols if s.strip()]
+        else:
+            target_symbols = ["VIC", "HPG", "FPT"]
+        scope_target = f"Danh mục ({len(target_symbols)} mã)"
+
+    # 2. Chuẩn bị metadata và gọi engine
+    try:
+        from vn_stock.backtest import run_portfolio_backtest
+
+        available_symbols = stock_service.get_available_symbols()
+        metadata = {
+            s.symbol: {"name": s.name, "sector": s.sector}
+            for s in available_symbols
+        }
+
+        buy_dict = req.buy_conditions.model_dump()
+        sell_dict = req.sell_conditions.model_dump()
+
+        res = run_portfolio_backtest(
+            symbols=target_symbols,
+            start_date=req.start_date,
+            end_date=req.end_date,
+            initial_capital=req.initial_capital,
+            model_type=req.model_type,
+            buy_rules=buy_dict,
+            sell_rules=sell_dict,
+            slippage_rate=req.slippage_rate,
+            take_profit_pct=req.sell_conditions.take_profit_pct,
+            stop_loss_pct=req.sell_conditions.stop_loss_pct,
+            trailing_stop_pct=req.sell_conditions.trailing_stop_pct,
+            symbol_metadata=metadata,
+        )
+
+        return PortfolioBacktestResponse(
+            scope_type=req.scope_type.value,
+            scope_target=scope_target,
+            start_date=req.start_date,
+            end_date=req.end_date,
+            symbols_count=len(res["symbols_breakdown"]),
+            aggregate_metrics=BacktestMetricsSchema(**res["aggregate_metrics"]),
+            portfolio_equity_curve=[
+                EquityCurvePoint(**pt) for pt in res["portfolio_equity_curve"]
+            ],
+            symbols_breakdown=[
+                SymbolBreakdownItem(**item) for item in res["symbols_breakdown"]
+            ],
+            individual_results=res.get("individual_results", {}),
+        )
+    except HTTPException:
+        raise
+    except Exception as err:
+        logger.exception("Lỗi chạy kiểm thử danh mục")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Lỗi khi thực thi kiểm thử chiến lược: {err!s}",
+        )
+

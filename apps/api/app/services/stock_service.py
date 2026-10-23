@@ -1,5 +1,6 @@
 from datetime import datetime
 import logging
+from typing import Any
 
 import pandas as pd
 from app.core.config import settings
@@ -92,9 +93,39 @@ def get_available_symbols() -> list[StockSymbolInfo]:
             name=info["name"],
             exchange=info["exchange"],
             is_core=info["is_core"],
+            sector=info.get("sector", "Đa ngành"),
         )
         for sym, info in symbols_dict.items()
     ]
+
+
+def get_available_sectors() -> list[dict[str, Any]]:
+    """Lấy danh sách các nhóm ngành và danh sách mã thuộc nhóm ngành."""
+    symbols = get_available_symbols()
+    sector_map: dict[str, list[str]] = {}
+    for s in symbols:
+        sector_map.setdefault(s.sector, []).append(s.symbol)
+    return [
+        {"sector": sec, "symbols": syms, "count": len(syms)}
+        for sec, syms in sorted(sector_map.items())
+    ]
+
+
+def get_index_constituents(index_name: str = "VN30") -> list[str]:
+    """Lấy danh sách mã thành phần của rổ chỉ số (VN30, VN100, VNINDEX)."""
+    clean_idx = index_name.upper()
+    try:
+        from vn_stock.config import VN30_SYMBOLS
+        vn30_list = list(VN30_SYMBOLS)
+    except Exception:
+        vn30_list = ["VIC", "HPG", "FPT", "VNM", "MWG", "TCB", "VCB", "MBB", "ACB", "VPB"]
+
+    if clean_idx in ["VN30", "VNINDEX"]:
+        return vn30_list
+    elif clean_idx == "VN100":
+        return [s.symbol for s in get_available_symbols()]
+    return vn30_list
+
 
 
 def load_stock_dataframe(symbol: str, allow_remote_fetch: bool = True) -> pd.DataFrame:

@@ -1,4 +1,4 @@
-"""Router quản lý các endpoint dữ liệu cổ phiếu và chỉ báo kỹ thuật."""
+from typing import Any
 
 from fastapi import APIRouter, Query
 
@@ -23,6 +23,17 @@ router = APIRouter(prefix="/stocks", tags=["Stocks Data"])
 async def list_symbols() -> list[StockSymbolInfo]:
     """Endpoint trả về danh sách các mã cổ phiếu hợp lệ."""
     return stock_service.get_available_symbols()
+
+
+@router.get(
+    "/sectors",
+    summary="Lấy danh sách các nhóm ngành và mã cổ phiếu",
+    description="Trả về danh sách nhóm ngành kèm các mã cổ phiếu thành phần phục vụ kiểm thử theo ngành.",
+)
+async def list_sectors() -> list[dict[str, Any]]:
+    """Endpoint lấy danh sách nhóm ngành và các mã thành phần."""
+    return stock_service.get_available_sectors()
+
 
 
 @router.get(

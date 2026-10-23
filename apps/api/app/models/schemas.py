@@ -7,6 +7,7 @@ Bao gồm:
 4. Kiểm thử chiến lược: BacktestRequest, BacktestMetricsSchema, EquityCurvePoint, TradeLogItem, BacktestResponse, BacktestSummaryResponse
 """
 
+from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -32,6 +33,7 @@ class StockSymbolInfo(BaseModel):
     is_core: bool = Field(
         default=False, description="Có thuộc 5 mã trọng tâm nghiên cứu hay không"
     )
+    sector: str = Field(default="Đa ngành", description="Nhóm ngành nghề")
 
 
 class StockBar(BaseModel):
@@ -221,6 +223,18 @@ class BacktestRequest(BaseModel):
     sell_prob_threshold: float = Field(
         default=0.40, description="Ngưỡng xác suất kích hoạt lệnh Bán"
     )
+    take_profit_pct: float | None = Field(
+        default=None, description="Tỷ lệ chốt lời Take Profit (ví dụ: 0.10 cho 10%)"
+    )
+    stop_loss_pct: float | None = Field(
+        default=None, description="Tỷ lệ cắt lỗ Stop Loss (ví dụ: 0.07 cho 7%)"
+    )
+    trailing_stop_pct: float | None = Field(
+        default=None, description="Tỷ lệ Trailing Stop bảo toàn lãi từ đỉnh (ví dụ: 0.05 cho 5%)"
+    )
+    preset_id: str | None = Field(
+        default=None, description="Mã định danh chiến thuật mẫu nếu áp dụng từ preset"
+    )
 
 
 class BacktestMetricsSchema(BaseModel):
@@ -306,3 +320,120 @@ class BacktestSummaryItem(BaseModel):
 class BacktestSummaryResponse(BaseModel):
     model_type: str = Field(..., description="Loại mô hình AI")
     summary: list[BacktestSummaryItem] = Field(..., description="Bảng tổng hợp đối chứng các mã")
+
+
+class StrategyPresetItem(BaseModel):
+    id: str = Field(..., description="Mã định danh chiến thuật mẫu")
+    name: str = Field(..., description="Tên chiến thuật mẫu")
+    category: str = Field(..., description="Trường phái đầu tư")
+    description: str = Field(..., description="Mô tả chiến thuật")
+    target_symbols: list[str] = Field(..., description="Danh sách cổ phiếu khuyến nghị")
+    default_symbol: str = Field(..., description="Mã cổ phiếu mặc định")
+    conditions_summary: str = Field(..., description="Tóm tắt bộ điều kiện")
+    win_rate_pct: float = Field(..., description="Tỷ lệ thắng mẫu (%)")
+    cumulative_pnl_pct: float = Field(..., description="Lãi/lỗ lũy kế mẫu (%)")
+    risk_reward_ratio: str = Field(..., description="Tỷ lệ Rủi ro / Lợi nhuận")
+    copy_count: int = Field(..., description="Số lượt sao chép")
+    take_profit_pct: float = Field(..., description="Mức chốt lời mặc định")
+    stop_loss_pct: float = Field(..., description="Mức cắt lỗ mặc định")
+    trailing_stop_pct: float = Field(..., description="Mức trailing stop mặc định")
+    model_type: str = Field(..., description="Mô hình AI mặc định")
+    timeframe: str = Field(default="1 ngày (Daily)", description="Khung thời gian nến")
+
+
+class StrategyPresetsResponse(BaseModel):
+    presets: list[StrategyPresetItem] = Field(..., description="Danh sách 8 chiến thuật mẫu chuẩn DNSE")
+
+
+class RecentSignalItem(BaseModel):
+    signal_id: str = Field(..., description="Mã tín hiệu")
+    symbol: str = Field(..., description="Mã cổ phiếu")
+    action: str = Field(..., description="Hành động ('BUY', 'SELL', 'HOLD')")
+    strategy_name: str = Field(..., description="Tên chiến thuật phát sinh")
+    price: float = Field(..., description="Mức giá khuyến nghị (VNĐ)")
+    target_price: float = Field(..., description="Giá mục tiêu (VNĐ)")
+    stop_price: float = Field(..., description="Giá cắt lỗ (VNĐ)")
+    confidence: float = Field(..., description="Độ tin cậy của AI (%)")
+    timestamp: str = Field(..., description="Thời điểm phát sinh")
+    status: str = Field(..., description="Trạng thái tín hiệu ('MỚI', 'CHỐT LÃI', 'ĐÃ KHỚP T+1')")
+
+
+class RecentSignalsResponse(BaseModel):
+    signals: list[RecentSignalItem] = Field(..., description="Danh sách tín hiệu thời gian thực")
+
+
+# ============================================================================
+# 5. ADVANCED MULTI-SYMBOL & PORTFOLIO BACKTESTING SCHEMAS (DNSE BENCHMARK)
+# ============================================================================
+class BacktestScopeType(str, Enum):
+    STOCK = "stock"          # Cổ phiếu đơn lẻ
+    INDEX = "index"          # Rổ chỉ số (VN30, VN100, VNINDEX)
+    SECTOR = "sector"        # Ngành nghề
+    PORTFOLIO = "portfolio"  # Danh mục tùy chọn nhiều mã
+
+
+class BacktestConditionFilter(BaseModel):
+    market_condition: str | None = Field(default="all", description="Điều kiện VN-Index ('all', 'uptrend', 'sideways', 'downtrend')")
+    use_ma: bool = Field(default=False, description="Điều kiện MA (Close > SMA20)")
+    ma_type: str = Field(default="SMA20", description="Loại đường MA")
+    use_ema: bool = Field(default=False, description="Điều kiện EMA (EMA12 > EMA26)")
+    use_macd: bool = Field(default=False, description="Điều kiện MACD (MACD > Signal)")
+    use_rsi: bool = Field(default=False, description="Điều kiện RSI")
+    rsi_threshold: float = Field(default=45.0, description="Ngưỡng RSI mua (<=)")
+    rsi_sell_threshold: float = Field(default=70.0, description="Ngưỡng RSI bán (>=)")
+    use_bb: bool = Field(default=False, description="Điều kiện chạm dải dưới Bollinger Bands")
+    use_volume_spike: bool = Field(default=False, description="Khối lượng đột biến > 1.2x SMA20 Volume")
+    use_price_increase: bool = Field(default=False, description="Giá T0 > T-1")
+    max_pe: float | None = Field(default=None, description="P/E tối đa")
+    max_pb: float | None = Field(default=None, description="P/B tối đa")
+    min_roe: float | None = Field(default=None, description="ROE tối thiểu (%)")
+    foreign_net_buy: bool = Field(default=False, description="Khối ngoại mua ròng")
+    foreign_net_sell: bool = Field(default=False, description="Khối ngoại bán ròng")
+    prop_net_buy: bool = Field(default=False, description="Tự doanh mua ròng")
+    take_profit_pct: float | None = Field(default=None, description="Chốt lời (%)")
+    stop_loss_pct: float | None = Field(default=None, description="Cắt lỗ (%)")
+    trailing_stop_pct: float | None = Field(default=None, description="Trailing Stop (%)")
+
+
+class AdvancedBacktestRequest(BaseModel):
+    scope_type: BacktestScopeType = Field(default=BacktestScopeType.STOCK, description="Phạm vi kiểm thử")
+    symbol: str = Field(default="VIC", description="Mã cổ phiếu đơn lẻ nếu scope_type == 'stock'")
+    index_name: str | None = Field(default="VN30", description="Tên rổ chỉ số nếu scope_type == 'index'")
+    sector_name: str | None = Field(default=None, description="Tên nhóm ngành nếu scope_type == 'sector'")
+    portfolio_symbols: list[str] | None = Field(default=None, description="Danh sách mã cổ phiếu nếu scope_type == 'portfolio'")
+    start_date: str = Field(..., description="Ngày bắt đầu (YYYY-MM-DD)")
+    end_date: str = Field(..., description="Ngày kết thúc (YYYY-MM-DD, cách start_date không quá 365 ngày)")
+    initial_capital: float = Field(default=100_000_000.0, description="Vốn khởi điểm danh mục (VNĐ)")
+    model_type: str = Field(default="lightgbm", description="Mô hình AI ('lightgbm' hoặc 'lstm')")
+    slippage_rate: float = Field(default=0.0005, description="Tỷ lệ trượt giá (0.05%)")
+    buy_conditions: BacktestConditionFilter = Field(default_factory=BacktestConditionFilter, description="Bộ điều kiện Mua")
+    sell_conditions: BacktestConditionFilter = Field(default_factory=BacktestConditionFilter, description="Bộ điều kiện Bán")
+
+
+class SymbolBreakdownItem(BaseModel):
+    symbol: str = Field(..., description="Mã cổ phiếu")
+    name: str = Field(..., description="Tên công ty")
+    sector: str = Field(..., description="Nhóm ngành")
+    roi_pct: float = Field(..., description="Tỷ suất sinh lời ROI (%)")
+    bh_roi_pct: float = Field(..., description="Buy & Hold ROI (%)")
+    excess_pct: float = Field(..., description="Alpha vượt trội (%)")
+    sharpe: float = Field(..., description="Tỷ số Sharpe")
+    sortino: float = Field(..., description="Tỷ số Sortino")
+    mdd_pct: float = Field(..., description="Mức sụt giảm tối đa MDD (%)")
+    win_rate_pct: float = Field(..., description="Tỷ lệ thắng (%)")
+    profit_factor: float = Field(..., description="Profit Factor")
+    trades: int = Field(..., description="Tổng số lệnh")
+    costs: float = Field(..., description="Tổng chi phí giao dịch (VNĐ)")
+
+
+class PortfolioBacktestResponse(BaseModel):
+    scope_type: str = Field(..., description="Phạm vi đã kiểm thử ('stock', 'index', 'sector', 'portfolio')")
+    scope_target: str = Field(..., description="Mục tiêu kiểm thử (tên mã, tên rổ, tên ngành)")
+    start_date: str = Field(..., description="Ngày bắt đầu")
+    end_date: str = Field(..., description="Ngày kết thúc")
+    symbols_count: int = Field(..., description="Số lượng mã trong danh mục kiểm thử")
+    aggregate_metrics: BacktestMetricsSchema = Field(..., description="Chỉ số hiệu quả tổng hợp toàn danh mục")
+    portfolio_equity_curve: list[EquityCurvePoint] = Field(..., description="Đường cong tài sản danh mục")
+    symbols_breakdown: list[SymbolBreakdownItem] = Field(..., description="Bảng phân tích chi tiết từng mã thành phần")
+    individual_results: dict[str, Any] = Field(default_factory=dict, description="Kết quả chi tiết từng mã (trades, equity) phục vụ đào sâu (drill-down)")
+
