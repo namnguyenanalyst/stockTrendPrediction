@@ -8,6 +8,7 @@ export interface StockSymbolInfo {
   name: string;
   exchange: string;
   is_core: boolean;
+  sector?: string;
 }
 
 export interface StockBar {
@@ -219,6 +220,10 @@ export interface BacktestRequest {
   execution_price?: "open" | "close";
   buy_prob_threshold?: number;
   sell_prob_threshold?: number;
+  take_profit_pct?: number | null;
+  stop_loss_pct?: number | null;
+  trailing_stop_pct?: number | null;
+  preset_id?: string | null;
 }
 
 export interface BacktestMetricsSchema {
@@ -299,3 +304,122 @@ export interface BacktestSummaryResponse {
   model_type: string;
   summary: BacktestSummaryItem[];
 }
+
+export interface StrategyPresetItem {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  target_symbols: string[];
+  default_symbol: string;
+  conditions_summary: string;
+  win_rate_pct: number;
+  cumulative_pnl_pct: number;
+  risk_reward_ratio: string;
+  copy_count: number;
+  take_profit_pct: number;
+  stop_loss_pct: number;
+  trailing_stop_pct: number;
+  model_type: "lightgbm" | "lstm";
+  timeframe: string;
+}
+
+export interface StrategyPresetsResponse {
+  presets: StrategyPresetItem[];
+}
+
+export interface RecentSignalItem {
+  signal_id: string;
+  symbol: string;
+  action: "BUY" | "SELL" | "HOLD";
+  strategy_name: string;
+  price: number;
+  target_price: number;
+  stop_price: number;
+  confidence: number;
+  timestamp: string;
+  status: string;
+}
+
+export interface RecentSignalsResponse {
+  signals: RecentSignalItem[];
+}
+
+export type BacktestScopeType = "stock" | "index" | "sector" | "portfolio";
+
+export interface BacktestConditionFilter {
+  market_condition?: "all" | "uptrend" | "sideways" | "downtrend";
+  use_ma?: boolean;
+  ma_type?: string;
+  use_ema?: boolean;
+  use_macd?: boolean;
+  use_rsi?: boolean;
+  rsi_threshold?: number;
+  rsi_sell_threshold?: number;
+  use_bb?: boolean;
+  use_volume_spike?: boolean;
+  use_price_increase?: boolean;
+  max_pe?: number | null;
+  max_pb?: number | null;
+  min_roe?: number | null;
+  foreign_net_buy?: boolean;
+  foreign_net_sell?: boolean;
+  prop_net_buy?: boolean;
+  take_profit_pct?: number | null;
+  stop_loss_pct?: number | null;
+  trailing_stop_pct?: number | null;
+}
+
+export interface AdvancedBacktestRequest {
+  scope_type: BacktestScopeType;
+  symbol?: string;
+  index_name?: string;
+  sector_name?: string;
+  portfolio_symbols?: string[];
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
+  model_type: "lightgbm" | "lstm";
+  slippage_rate?: number;
+  buy_conditions?: BacktestConditionFilter;
+  sell_conditions?: BacktestConditionFilter;
+}
+
+export interface SymbolBreakdownItem {
+  symbol: string;
+  name: string;
+  sector: string;
+  roi_pct: number;
+  bh_roi_pct: number;
+  excess_pct: number;
+  sharpe: number;
+  sortino: number;
+  mdd_pct: number;
+  win_rate_pct: number;
+  profit_factor: number;
+  trades: number;
+  costs: number;
+}
+
+export interface PortfolioBacktestResponse {
+  scope_type: BacktestScopeType;
+  scope_target: string;
+  start_date: string;
+  end_date: string;
+  symbols_count: number;
+  aggregate_metrics: BacktestMetricsSchema;
+  portfolio_equity_curve: EquityCurvePoint[];
+  symbols_breakdown: SymbolBreakdownItem[];
+  individual_results?: Record<string, {
+    metrics: BacktestMetricsSchema;
+    equity_curve: EquityCurvePoint[];
+    trades: TradeLogItem[];
+  }>;
+}
+
+export interface SectorItem {
+  sector: string;
+  symbols: string[];
+  count: number;
+}
+

@@ -4,18 +4,23 @@
  */
 
 import {
+  AdvancedBacktestRequest,
   BacktestRequest,
   BacktestResponse,
   BacktestSummaryResponse,
   BatchPredictionResponse,
   MarketBoardResponse,
   MarketSyncStatusResponse,
+  PortfolioBacktestResponse,
   PredictionResponse,
+  RecentSignalsResponse,
   RetrainResponse,
+  SectorItem,
   StockHistoryResponse,
   StockIndicatorsResponse,
   StockSummaryResponse,
   StockSymbolInfo,
+  StrategyPresetsResponse,
 } from "./types";
 
 const API_BASE_URL =
@@ -178,3 +183,37 @@ export async function getBacktestSummary(
     `/api/backtest/summary?model_type=${modelType}`
   );
 }
+
+export async function getStrategyPresets(): Promise<StrategyPresetsResponse> {
+  return fetchJson<StrategyPresetsResponse>("/api/backtest/presets");
+}
+
+export async function getRecentStrategySignals(): Promise<RecentSignalsResponse> {
+  return fetchJson<RecentSignalsResponse>("/api/backtest/signals/recent");
+}
+
+export async function getStockSectors(): Promise<SectorItem[]> {
+  try {
+    return await fetchJson<SectorItem[]>("/api/stocks/sectors");
+  } catch {
+    return [
+      { sector: "Ngân hàng", symbols: ["VCB", "BID", "CTG", "TCB", "MBB", "ACB", "VPB", "SHB", "STB", "TPB", "VIB"], count: 11 },
+      { sector: "Bất động sản", symbols: ["VIC", "VHM", "VRE", "BCM"], count: 4 },
+      { sector: "Thép & Vật liệu", symbols: ["HPG"], count: 1 },
+      { sector: "Bán lẻ", symbols: ["MWG"], count: 1 },
+      { sector: "Công nghệ thông tin", symbols: ["FPT"], count: 1 },
+      { sector: "Hàng tiêu dùng", symbols: ["VNM", "MSN", "SAB"], count: 3 },
+      { sector: "Dịch vụ tài chính", symbols: ["SSI"], count: 1 },
+    ];
+  }
+}
+
+export async function runAdvancedBacktest(
+  request: AdvancedBacktestRequest
+): Promise<PortfolioBacktestResponse> {
+  return fetchJson<PortfolioBacktestResponse>("/api/backtest/run-advanced", {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
+}
+
