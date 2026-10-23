@@ -1,17 +1,19 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Activity,
   Brain,
   CheckCircle2,
   ChevronRight,
+  Clock,
   Cpu,
   HelpCircle,
+  History,
   Minus,
   Radio,
-  RefreshCw,
   Sparkles,
+  Trash2,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
@@ -22,11 +24,26 @@ import {
   FinancialItemContext,
 } from "@/components/market/FinancialDetailModal";
 
+export interface PredictionHistoryItem {
+  id: string;
+  timestamp: string;
+  symbol: string;
+  model_type: "lightgbm" | "lstm";
+  data_date: string;
+  current_price: number;
+  signal: string;
+  prob_up: number;
+  prob_hold: number;
+  prob_down: number;
+  confidence: number;
+  horizon: string;
+}
+
 interface AIPredictionTabProps {
   selectedSymbol: string;
   onSelectSymbol: (symbol: string) => void;
   prediction: PredictionResponse | null;
-  batchPrediction: BatchPredictionResponse | null;
+  batchPrediction?: BatchPredictionResponse | null;
   modelType: "lightgbm" | "lstm";
   onChangeModelType: (model: "lightgbm" | "lstm") => void;
   loading: boolean;
@@ -36,23 +53,98 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   selectedSymbol,
   onSelectSymbol,
   prediction,
-  batchPrediction,
   modelType,
   onChangeModelType,
   loading,
 }) => {
   const [showInfo, setShowInfo] = useState(false);
   const [localPrediction, setLocalPrediction] = useState<PredictionResponse | null>(null);
-  const [isSyncingLive, setIsSyncingLive] = useState(false);
   const [isRetraining, setIsRetraining] = useState(false);
   const [retrainMsg, setRetrainMsg] = useState<string | null>(null);
   const [detailModalItem, setDetailModalItem] = useState<FinancialItemContext | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [history, setHistory] = useState<PredictionHistoryItem[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const stored = localStorage.getItem("vn_stock_prediction_history");
+      return stored ? JSON.parse(stored) : [];
+    } catch (err) {
+      console.warn("Không thể tải lịch sử dự báo từ localStorage:", err);
+      return [];
+    }
+  });
 
   // Hiển thị localPrediction nếu vừa đồng bộ Live, ngược lại hiển thị prediction từ props
   const activePred = localPrediction && localPrediction.symbol === selectedSymbol
     ? localPrediction
     : prediction;
+
+  // Tự động ghi vết dự báo vào lịch sử khi người dùng chọn cổ phiếu hoặc đổi mô hình
+  useEffect(() => {
+    if (!activePred || loading) return;
+
+    const timer = setTimeout(() => {
+      setHistory((prev) => {
+        const last = prev[0];
+        const dataDate = activePred.data_as_of_date || activePred.date;
+        // Tránh ghi lặp nếu vừa ghi cùng mã, cùng mô hình và cùng phiên căn cứ
+        if (
+          last &&
+          last.symbol === activePred.symbol &&
+          last.model_type === activePred.model_type &&
+          last.data_date === dataDate
+        ) {
+          return prev;
+        }
+
+        const pUp = activePred.probabilities?.["TĂNG"] ?? 0;
+        const pHold = activePred.probabilities?.["ĐI NGANG"] ?? 0;
+        const pDown = activePred.probabilities?.["GIẢM"] ?? 0;
+        const conf = Math.max(pUp, pHold, pDown);
+
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")} ${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
+
+        const newItem: PredictionHistoryItem = {
+          id: `${Date.now()}_${activePred.symbol}`,
+          timestamp: timeStr,
+          symbol: activePred.symbol,
+          model_type: (activePred.model_type as "lightgbm" | "lstm") || modelType,
+          data_date: dataDate,
+          current_price: activePred.current_price,
+          signal: activePred.signal,
+          prob_up: pUp,
+          prob_hold: pHold,
+          prob_down: pDown,
+          confidence: conf,
+          horizon: activePred.horizon || "T+3",
+        };
+
+        const updated = [newItem, ...prev].slice(0, 50); // Giới hạn 50 bản ghi gần nhất
+        try {
+          localStorage.setItem("vn_stock_prediction_history", JSON.stringify(updated));
+        } catch (err) {
+          console.warn("Không thể lưu lịch sử vào localStorage:", err);
+        }
+        return updated;
+      });
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [
+    activePred,
+    loading,
+    modelType,
+  ]);
+
+  const handleClearHistory = () => {
+    setHistory([]);
+    try {
+      localStorage.removeItem("vn_stock_prediction_history");
+    } catch (err) {
+      console.warn("Không thể xóa lịch sử từ localStorage:", err);
+    }
+  };
 
   // Tính toán xác suất
   const probUp = activePred?.probabilities?.["TĂNG"] ?? 0;
@@ -68,18 +160,6 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   const isBuy = signal.includes("MUA") || signal.includes("BUY");
   const isSell = signal.includes("BÁN") || signal.includes("SELL");
 
-  // Handler đồng bộ Live từ SSI
-  const handleSyncLive = async () => {
-    try {
-      setIsSyncingLive(true);
-      const res = await syncLivePrediction(selectedSymbol, modelType);
-      setLocalPrediction(res);
-    } catch (err) {
-      console.error("Lỗi đồng bộ live:", err);
-    } finally {
-      setIsSyncingLive(false);
-    }
-  };
 
   // Handler huấn luyện lại mô hình thực chiến T+3
   const handleRetrain = async () => {
@@ -122,13 +202,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               <h2 className="text-lg font-bold text-slate-100 sm:text-xl">
                 Trung tâm Tín hiệu AI & Mô hình Định lượng
               </h2>
-              <span className="rounded bg-purple-500/10 px-2 py-0.5 text-xs font-semibold text-purple-300 border border-purple-500/30">
-                Chu kỳ T+3 Thực chiến
-              </span>
             </div>
-            <p className="text-xs text-slate-400">
-              Khắc phục rủi ro giam vốn T+2 • Dự báo quỹ đạo đa phiên (FireAnt) • Triển khai Live (DNSE)
-            </p>
           </div>
         </div>
 
@@ -139,8 +213,8 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
             onClick={handleRetrain}
             disabled={isRetraining || loading}
             className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all shadow-sm ${isRetraining
-                ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
-                : "border-indigo-500/40 bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-500/30"
+              ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
+              : "border-indigo-500/40 bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-500/30"
               }`}
             title="Tự động nạp nến mới nhất tới phiên T-1/T và huấn luyện lại LightGBM & LSTM"
           >
@@ -148,25 +222,6 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
             <span>{isRetraining ? "Đang huấn luyện T+3..." : "Huấn luyện lại T+3"}</span>
           </button>
 
-          {/* Nút Đồng bộ Live SSI */}
-          <button
-            onClick={handleSyncLive}
-            disabled={isSyncingLive || loading}
-            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all shadow-sm ${activePred?.is_live_synced
-                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                : "border-purple-500/40 bg-purple-600 text-white hover:bg-purple-500 shadow-purple-500/30"
-              }`}
-            title="Đồng bộ nến mới nhất từ cổng SSI FastConnect và suy luận thời gian thực"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isSyncingLive ? "animate-spin" : ""}`} />
-            <span>
-              {isSyncingLive
-                ? "Đang đồng bộ SSI..."
-                : activePred?.is_live_synced
-                  ? "Đã đồng bộ Live"
-                  : "Triển khai Live (SSI)"}
-            </span>
-          </button>
 
           {/* Bộ chọn Mô hình */}
           <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 p-1">
@@ -176,8 +231,8 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 onChangeModelType("lightgbm");
               }}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${modelType === "lightgbm"
-                  ? "bg-purple-600 text-white shadow-sm shadow-purple-500/40"
-                  : "text-slate-400 hover:text-slate-200"
+                ? "bg-purple-600 text-white shadow-sm shadow-purple-500/40"
+                : "text-slate-400 hover:text-slate-200"
                 }`}
             >
               <Cpu className="h-3.5 w-3.5" />
@@ -189,8 +244,8 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 onChangeModelType("lstm");
               }}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${modelType === "lstm"
-                  ? "bg-purple-600 text-white shadow-sm shadow-purple-500/40"
-                  : "text-slate-400 hover:text-slate-200"
+                ? "bg-purple-600 text-white shadow-sm shadow-purple-500/40"
+                : "text-slate-400 hover:text-slate-200"
                 }`}
             >
               <Brain className="h-3.5 w-3.5" />
@@ -230,11 +285,8 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           )}
           <span className="text-slate-600">•</span>
           <span>
-            Kỳ hạn: <strong className="text-purple-300">3 phiên tiếp theo (T+1 → T+3)</strong>
+            Kỳ hạn: <strong className="text-purple-300">3 phiên tiếp theo</strong>
           </span>
-        </div>
-        <div className="text-[11px] text-slate-500">
-          Học trực tiếp trên 100% dữ liệu lịch sử tích lũy đến T/T-1 • Ràng buộc T+2.5 VSDC
         </div>
       </div>
 
@@ -269,18 +321,18 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               <div className="my-6">
                 <div
                   className={`flex items-center gap-3 rounded-2xl border p-4 ${isBuy
-                      ? "border-emerald-500/40 bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-300"
-                      : isSell
-                        ? "border-rose-500/40 bg-gradient-to-r from-rose-500/20 to-pink-500/10 text-rose-300"
-                        : "border-amber-500/40 bg-gradient-to-r from-amber-500/20 to-yellow-500/10 text-amber-300"
+                    ? "border-emerald-500/40 bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-300"
+                    : isSell
+                      ? "border-rose-500/40 bg-gradient-to-r from-rose-500/20 to-pink-500/10 text-rose-300"
+                      : "border-amber-500/40 bg-gradient-to-r from-amber-500/20 to-yellow-500/10 text-amber-300"
                     }`}
                 >
                   <div
                     className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${isBuy
-                        ? "bg-emerald-500 text-slate-950"
-                        : isSell
-                          ? "bg-rose-500 text-slate-950"
-                          : "bg-amber-400 text-slate-950"
+                      ? "bg-emerald-500 text-slate-950"
+                      : isSell
+                        ? "bg-rose-500 text-slate-950"
+                        : "bg-amber-400 text-slate-950"
                       }`}
                   >
                     {isBuy ? (
@@ -330,14 +382,6 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 </div>
               </div>
             )}
-          </div>
-
-          <div className="rounded-lg bg-slate-950/80 p-3 text-[11px] text-slate-400 border border-slate-800/60">
-            <div className="flex items-center gap-1.5 font-semibold text-slate-300 mb-1">
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-              <span>Chu kỳ nắm giữ & Vi cấu trúc T+2</span>
-            </div>
-            Dự báo bao trọn thời gian lưu ký T+2 và điểm bán khả dụng T+3. Lệnh Mua chỉ phát sinh khi xác suất vượt ngưỡng an toàn sau khi trừ đủ 0.40% thuế phí.
           </div>
         </div>
 
@@ -441,13 +485,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
             <h3 className="text-sm font-bold text-slate-100 sm:text-base">
               Quỹ đạo Dự phóng Xu hướng 3 Phiên T+1 → T+3 (Trend Trajectory)
             </h3>
-            <span className="rounded bg-purple-500/10 px-2 py-0.5 text-[11px] font-semibold text-purple-300 border border-purple-500/20">
-              FireAnt Model
-            </span>
           </div>
-          <span className="text-xs text-slate-400">
-            Mô phỏng đường đi xu hướng bám sát chu kỳ nắm giữ tối thiểu của thị trường cơ sở Việt Nam
-          </span>
         </div>
 
         {/* 3 Thẻ Bước trong Quỹ đạo */}
@@ -462,10 +500,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 <div
                   key={step.day_name}
                   className={`relative flex flex-col justify-between rounded-xl border p-4 transition-all ${isStepBuy
-                      ? "border-emerald-500/30 bg-emerald-950/20"
-                      : isStepSell
-                        ? "border-rose-500/30 bg-rose-950/20"
-                        : "border-amber-500/30 bg-amber-950/20"
+                    ? "border-emerald-500/30 bg-emerald-950/20"
+                    : isStepSell
+                      ? "border-rose-500/30 bg-rose-950/20"
+                      : "border-amber-500/30 bg-amber-950/20"
                     }`}
                 >
                   <div>
@@ -505,10 +543,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                         )}
                         <span
                           className={`text-sm font-black ${isStepBuy
-                              ? "text-emerald-400"
-                              : isStepSell
-                                ? "text-rose-400"
-                                : "text-amber-400"
+                            ? "text-emerald-400"
+                            : isStepSell
+                              ? "text-rose-400"
+                              : "text-amber-400"
                             }`}
                         >
                           {step.predicted_trend}
@@ -569,27 +607,45 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
         )}
       </div>
 
-      {/* 3. Bảng Quét Tín hiệu Danh mục 5 Cổ phiếu Trọng tâm (Batch Screener) */}
+      {/* 3. Bảng Nhật ký Lịch sử Dự báo & Tín hiệu Mô hình */}
       <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur-sm">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-sm font-bold text-slate-100 sm:text-base">
-              Bảng quét Radar Tín hiệu Toàn bộ Danh mục 5 Mã Cốt lõi
-            </h3>
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-purple-400" />
+              <h3 className="text-sm font-bold text-slate-100 sm:text-base">
+                Nhật ký Lịch sử Dự báo & Phân tích Mô hình
+              </h3>
+            </div>
             <p className="text-[11px] text-slate-400">
-              Tổng hợp dự báo tự động cho các mã cổ phiếu nghiên cứu trong ĐATN
+              Tự động lưu vết các lần chọn cổ phiếu, thời điểm phân tích và khuyến nghị của mô hình AI
             </p>
           </div>
-          <span className="rounded bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-300">
-            5 / 5 Mã HOSE
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rounded bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-300">
+              {history.length} bản ghi
+            </span>
+            {history.length > 0 && (
+              <button
+                onClick={handleClearHistory}
+                className="flex items-center gap-1 rounded border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-300 hover:bg-rose-500/20 hover:text-rose-200 transition-all"
+                title="Xóa toàn bộ lịch sử dự báo đã lưu"
+              >
+                <Trash2 className="h-3 w-3" />
+                <span>Xóa lịch sử</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="border-b border-slate-800 bg-slate-950 text-slate-400">
               <tr>
+                <th className="px-3 py-2.5 font-semibold">Thời điểm</th>
                 <th className="px-3 py-2.5 font-semibold">Mã CP</th>
+                <th className="px-3 py-2.5 font-semibold">Mô hình</th>
+                <th className="px-3 py-2.5 font-semibold">Nến căn cứ</th>
                 <th className="px-3 py-2.5 font-semibold">Thị giá</th>
                 <th className="px-3 py-2.5 font-semibold">Tín hiệu Khuyến nghị</th>
                 <th className="px-3 py-2.5 font-semibold">Xác suất Tăng</th>
@@ -599,83 +655,138 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {batchPrediction?.predictions.map((pred) => {
-                const isItemBuy = pred.signal.includes("MUA") || pred.signal.includes("BUY");
-                const isItemSell = pred.signal.includes("BÁN") || pred.signal.includes("SELL");
-                const itemProbUp = pred.probabilities?.["TĂNG"] ?? 0;
-                const itemProbDown = pred.probabilities?.["GIẢM"] ?? 0;
-                const itemConfidence = (
-                  Math.max(
-                    itemProbUp,
-                    pred.probabilities?.["ĐI NGANG"] ?? 0,
-                    itemProbDown
-                  ) * 100
-                ).toFixed(1);
+              {history.length > 0 ? (
+                history.map((item) => {
+                  const isItemBuy = item.signal.includes("MUA") || item.signal.includes("BUY");
+                  const isItemSell = item.signal.includes("BÁN") || item.signal.includes("SELL");
 
-                return (
-                  <tr
-                    key={pred.symbol}
-                    className={`transition-colors hover:bg-slate-800/40 ${selectedSymbol === pred.symbol ? "bg-slate-800/30" : ""
+                  return (
+                    <tr
+                      key={item.id}
+                      className={`transition-colors hover:bg-slate-800/40 ${
+                        selectedSymbol === item.symbol && modelType === item.model_type
+                          ? "bg-slate-800/30"
+                          : ""
                       }`}
-                  >
-                    <td className="px-3 py-3 font-bold text-slate-100">
-                      <div className="flex items-center gap-1.5">
-                        <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                        <span>{pred.symbol}</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 font-semibold text-slate-200">
-                      {(pred.current_price * 1000).toLocaleString("vi-VN")} đ
-                    </td>
-                    <td className="px-3 py-3">
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold ${isItemBuy
-                            ? "bg-emerald-500/10 text-emerald-400"
-                            : isItemSell
-                              ? "bg-rose-500/10 text-rose-400"
-                              : "bg-amber-500/10 text-amber-400"
+                    >
+                      <td className="px-3 py-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3 w-3 text-slate-500" />
+                          <span>{item.timestamp}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 font-bold text-slate-100 whitespace-nowrap">
+                        <button
+                          onClick={() => {
+                            onSelectSymbol(item.symbol);
+                            onChangeModelType(item.model_type);
+                          }}
+                          className="flex items-center gap-1.5 text-left hover:text-emerald-400 transition-colors"
+                          title={`Xem lại dự báo mã ${item.symbol} với ${item.model_type.toUpperCase()}`}
+                        >
+                          <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                          <span className="font-mono">{item.symbol}</span>
+                        </button>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold border ${
+                            item.model_type === "lightgbm"
+                              ? "border-purple-500/30 bg-purple-500/10 text-purple-300"
+                              : "border-sky-500/30 bg-sky-500/10 text-sky-300"
                           }`}
-                      >
-                        {isItemBuy ? (
-                          <TrendingUp className="h-3 w-3" />
-                        ) : isItemSell ? (
-                          <TrendingDown className="h-3 w-3" />
-                        ) : (
-                          <Minus className="h-3 w-3" />
-                        )}
-                        {pred.signal}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 font-medium text-emerald-400">
-                      {(itemProbUp * 100).toFixed(1)}%
-                    </td>
-                    <td className="px-3 py-3 font-medium text-rose-400">
-                      {(itemProbDown * 100).toFixed(1)}%
-                    </td>
-                    <td className="px-3 py-3 font-semibold text-purple-400">
-                      {itemConfidence}%
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <button
-                        onClick={() => {
-                          onSelectSymbol(pred.symbol);
-                          setDetailModalItem({
-                            symbol: pred.symbol,
-                            currentValue: pred.current_price,
-                            isIndex: false,
-                          });
-                          setIsDetailModalOpen(true);
-                        }}
-                        className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:border-emerald-500 hover:bg-emerald-500 hover:text-slate-950 transition-all"
-                        title={`Soi nến và phân tích kỹ thuật ${pred.symbol}`}
-                      >
-                        <span>Soi nến</span>
-                        <ChevronRight className="h-3 w-3" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+                        >
+                          {item.model_type === "lightgbm" ? (
+                            <Cpu className="h-2.5 w-2.5" />
+                          ) : (
+                            <Brain className="h-2.5 w-2.5" />
+                          )}
+                          {item.model_type.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 font-mono text-slate-300 whitespace-nowrap">
+                        {item.data_date}
+                      </td>
+                      <td className="px-3 py-3 font-semibold text-slate-200 whitespace-nowrap">
+                        {(item.current_price * 1000).toLocaleString("vi-VN")} đ
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold ${
+                            isItemBuy
+                              ? "bg-emerald-500/10 text-emerald-400"
+                              : isItemSell
+                                ? "bg-rose-500/10 text-rose-400"
+                                : "bg-amber-500/10 text-amber-400"
+                          }`}
+                        >
+                          {isItemBuy ? (
+                            <TrendingUp className="h-3 w-3" />
+                          ) : isItemSell ? (
+                            <TrendingDown className="h-3 w-3" />
+                          ) : (
+                            <Minus className="h-3 w-3" />
+                          )}
+                          {item.signal}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 font-medium text-emerald-400 whitespace-nowrap">
+                        {(item.prob_up * 100).toFixed(1)}%
+                      </td>
+                      <td className="px-3 py-3 font-medium text-rose-400 whitespace-nowrap">
+                        {(item.prob_down * 100).toFixed(1)}%
+                      </td>
+                      <td className="px-3 py-3 font-semibold text-purple-400 whitespace-nowrap">
+                        {(item.confidence * 100).toFixed(1)}%
+                      </td>
+                      <td className="px-3 py-3 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1.5">
+                          <button
+                            onClick={() => {
+                              onSelectSymbol(item.symbol);
+                              onChangeModelType(item.model_type);
+                            }}
+                            className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-[11px] font-semibold text-slate-200 hover:border-purple-500 hover:bg-purple-600 hover:text-white transition-all"
+                            title={`Nạp lại dự báo mã ${item.symbol}`}
+                          >
+                            <span>Xem lại</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              onSelectSymbol(item.symbol);
+                              setDetailModalItem({
+                                symbol: item.symbol,
+                                currentValue: item.current_price,
+                                isIndex: false,
+                              });
+                              setIsDetailModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:border-emerald-500 hover:bg-emerald-500 hover:text-slate-950 transition-all"
+                            title={`Soi nến và phân tích kỹ thuật ${item.symbol}`}
+                          >
+                            <span>Soi nến</span>
+                            <ChevronRight className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={10} className="px-3 py-8 text-center text-slate-500">
+                    <div className="flex flex-col items-center justify-center gap-1.5">
+                      <Clock className="h-5 w-5 text-slate-600" />
+                      <p className="text-xs font-medium text-slate-400">
+                        Chưa có lịch sử phân tích
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Mỗi khi bạn chọn một mã cổ phiếu hoặc thay đổi mô hình, kết quả dự báo sẽ tự động được ghi lại tại đây.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

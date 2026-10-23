@@ -213,9 +213,6 @@ export default function DashboardPage() {
                 Đồ án Tốt nghiệp: <strong>Dự báo Xu hướng & Đánh giá Chiến lược Đầu tư</strong>
               </span>
             </div>
-            <div>
-              Trường Đại học Mỏ - Địa chất • Khoa Công nghệ Thông tin • Chuyên ngành Tin học Kinh tế
-            </div>
           </div>
         </footer>
       </div>
