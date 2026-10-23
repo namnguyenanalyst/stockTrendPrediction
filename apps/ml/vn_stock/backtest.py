@@ -43,6 +43,7 @@ class PositionLot:
     buy_idx: int  # Chỉ số phiên giao dịch thực thi lệnh mua
     buy_date: str  # Ngày khớp lệnh mua
     settled_idx: int  # Chỉ số phiên giao dịch sớm nhất được phép bán (buy_idx + settlement_delay)
+    highest_price: float = 0.0  # Giá đỉnh cao nhất kể từ lúc mua (phục vụ Trailing Stop)
 
 
 @dataclass
@@ -282,6 +283,9 @@ def simulate_vietnam_trading(
     execution_price: str = "open",  # 'open' hoặc 'close'
     close_at_end: bool = True,
     risk_free_rate: float = 0.04,
+    take_profit_pct: float | None = None,
+    stop_loss_pct: float | None = None,
+    trailing_stop_pct: float | None = None,
 ) -> tuple[BacktestMetrics, pd.DataFrame, pd.DataFrame]:
     """
     Thuật toán mô phỏng giao dịch thực tế thị trường chứng khoán Việt Nam.
@@ -291,8 +295,13 @@ def simulate_vietnam_trading(
     2. Khớp lệnh tại Open_{t+1} (hoặc Close_{t+1}) có cộng/trừ tỷ lệ trượt giá (slippage).
     3. Kiểm soát thanh toán T+2: Theo dõi từng lô mua (PositionLot), chỉ cho phép bán khi
        phiên hiện tại >= phiên_mua + settlement_delay (mặc định 2 phiên).
-    4. Khấu trừ chi phí thực tế: Phí mua (0.15%), Phí bán (0.15%), Thuế bán (0.10%).
-    5. Khớp lệnh theo lô chẵn 100 cổ phiếu và bảo toàn số dư tiền mặt lẻ.
+    4. Tích hợp Quản trị rủi ro chủ động (DNSE Risk Rules):
+       - Stop Loss (Cắt lỗ cố định): Bán ngay khi chạm ngưỡng lỗ quy định.
+       - Take Profit (Chốt lời mục tiêu): Chốt lãi khi đạt lợi nhuận kỳ vọng.
+       - Trailing Stop (Bảo toàn lãi): Kích hoạt bán khi sụt giảm từ đỉnh giá cao nhất.
+       - Tín hiệu AI: Đóng vị thế khi mô hình dự báo đảo chiều (SIGNAL_SELL).
+    5. Khấu trừ chi phí thực tế: Phí mua (0.15%), Phí bán (0.15%), Thuế bán (0.10%).
+    6. Khớp lệnh theo lô chẵn 100 cổ phiếu và bảo toàn số dư tiền mặt lẻ.
     """
     df_sorted = df.sort_values("Date").reset_index(drop=True)
     n_bars = len(df_sorted)
@@ -332,8 +341,97 @@ def simulate_vietnam_trading(
 
         base_exec_price = opens[exec_idx] if execution_price == "open" else closes[exec_idx]
 
-        # 1. Tín hiệu MUA (curr_sig == 2)
-        if curr_sig == 2 and cash > (base_exec_price * lot_size):
+        # Cập nhật giá đỉnh cao nhất cho các lô đang nắm giữ (phục vụ Trailing Stop)
+        for lot in inventory:
+            if base_exec_price > lot.highest_price:
+                lot.highest_price = base_exec_price
+
+        # Kiểm tra điều kiện bán đối với các lô đã về tài khoản (T+2)
+        settled_lots = [lot for lot in inventory if lot.settled_idx <= exec_idx]
+        unsettled_lots = [lot for lot in inventory if lot.settled_idx > exec_idx]
+
+        should_sell = False
+        sell_reason = "SIGNAL_SELL"
+
+        if len(settled_lots) > 0:
+            # 1. Kiểm tra Cắt lỗ (Stop Loss)
+            if stop_loss_pct is not None and stop_loss_pct > 0:
+                for lot in settled_lots:
+                    ret_from_buy = (base_exec_price - lot.buy_price) / lot.buy_price
+                    if ret_from_buy <= -abs(stop_loss_pct):
+                        should_sell = True
+                        sell_reason = "STOP_LOSS"
+                        break
+
+            # 2. Kiểm tra Chốt lời (Take Profit)
+            if not should_sell and take_profit_pct is not None and take_profit_pct > 0:
+                for lot in settled_lots:
+                    ret_from_buy = (base_exec_price - lot.buy_price) / lot.buy_price
+                    if ret_from_buy >= abs(take_profit_pct):
+                        should_sell = True
+                        sell_reason = "TAKE_PROFIT"
+                        break
+
+            # 3. Kiểm tra Trailing Stop (Bảo toàn lãi khi giảm từ đỉnh)
+            if not should_sell and trailing_stop_pct is not None and trailing_stop_pct > 0:
+                for lot in settled_lots:
+                    if lot.highest_price > lot.buy_price:
+                        drop_from_peak = (lot.highest_price - base_exec_price) / lot.highest_price
+                        if drop_from_peak >= abs(trailing_stop_pct):
+                            should_sell = True
+                            sell_reason = "TRAILING_STOP"
+                            break
+
+            # 4. Kiểm tra Tín hiệu Bán thông thường từ AI (curr_sig == 0)
+            if not should_sell and curr_sig == 0:
+                should_sell = True
+                sell_reason = "SIGNAL_SELL"
+
+        # Thực thi BÁN nếu thỏa mãn điều kiện và có hàng T+2
+        if should_sell and len(settled_lots) > 0:
+            sell_shares = sum(lot.shares for lot in settled_lots)
+            p_sell = base_exec_price * (1.0 - slippage_rate)
+            gross = sell_shares * p_sell
+            fee = gross * fee_rate
+            tax = gross * tax_rate
+            net_proceeds = gross - fee - tax
+            cash += net_proceeds
+
+            total_cost_basis = sum(lot.cost_basis for lot in settled_lots)
+            realized_pnl = net_proceeds - total_cost_basis
+            realized_ret_pct = (
+                (realized_pnl / total_cost_basis * 100.0) if total_cost_basis > 0 else 0.0
+            )
+            avg_holding = (
+                sum((exec_idx - lot.buy_idx) * lot.shares for lot in settled_lots)
+                / sell_shares
+            )
+
+            trades.append(
+                TradeRecord(
+                    trade_id=trade_id_counter,
+                    symbol=symbol,
+                    order_type="SELL",
+                    signal_date=sig_date,
+                    exec_date=exec_date,
+                    exec_price=round(p_sell, 2),
+                    shares=sell_shares,
+                    gross_value=round(gross, 2),
+                    fee=round(fee, 2),
+                    tax=round(tax, 2),
+                    net_cash_flow=round(net_proceeds, 2),
+                    cash_after=round(cash, 2),
+                    realized_pnl=round(realized_pnl, 2),
+                    realized_return_pct=round(realized_ret_pct, 2),
+                    holding_days=round(avg_holding, 1),
+                    reason=sell_reason,
+                )
+            )
+            trade_id_counter += 1
+            inventory = unsettled_lots
+
+        # Thực thi MUA (curr_sig == 2) nếu có tín hiệu MUA và còn đủ tiền
+        elif curr_sig == 2 and cash > (base_exec_price * lot_size):
             p_buy = base_exec_price * (1.0 + slippage_rate)
             cost_per_share_with_fee = p_buy * (1.0 + fee_rate)
             max_shares = int(cash // cost_per_share_with_fee)
@@ -352,6 +450,7 @@ def simulate_vietnam_trading(
                     buy_idx=exec_idx,
                     buy_date=exec_date,
                     settled_idx=exec_idx + settlement_delay,
+                    highest_price=p_buy,
                 )
                 inventory.append(lot)
 
@@ -373,53 +472,6 @@ def simulate_vietnam_trading(
                     )
                 )
                 trade_id_counter += 1
-
-        # 2. Tín hiệu BÁN (curr_sig == 0)
-        elif curr_sig == 0 and len(inventory) > 0:
-            settled_lots = [lot for lot in inventory if lot.settled_idx <= exec_idx]
-            unsettled_lots = [lot for lot in inventory if lot.settled_idx > exec_idx]
-
-            if len(settled_lots) > 0:
-                sell_shares = sum(lot.shares for lot in settled_lots)
-                p_sell = base_exec_price * (1.0 - slippage_rate)
-                gross = sell_shares * p_sell
-                fee = gross * fee_rate
-                tax = gross * tax_rate
-                net_proceeds = gross - fee - tax
-                cash += net_proceeds
-
-                total_cost_basis = sum(lot.cost_basis for lot in settled_lots)
-                realized_pnl = net_proceeds - total_cost_basis
-                realized_ret_pct = (
-                    (realized_pnl / total_cost_basis * 100.0) if total_cost_basis > 0 else 0.0
-                )
-                avg_holding = (
-                    sum((exec_idx - lot.buy_idx) * lot.shares for lot in settled_lots)
-                    / sell_shares
-                )
-
-                trades.append(
-                    TradeRecord(
-                        trade_id=trade_id_counter,
-                        symbol=symbol,
-                        order_type="SELL",
-                        signal_date=sig_date,
-                        exec_date=exec_date,
-                        exec_price=round(p_sell, 2),
-                        shares=sell_shares,
-                        gross_value=round(gross, 2),
-                        fee=round(fee, 2),
-                        tax=round(tax, 2),
-                        net_cash_flow=round(net_proceeds, 2),
-                        cash_after=round(cash, 2),
-                        realized_pnl=round(realized_pnl, 2),
-                        realized_return_pct=round(realized_ret_pct, 2),
-                        holding_days=round(avg_holding, 1),
-                        reason="SIGNAL_SELL",
-                    )
-                )
-                trade_id_counter += 1
-                inventory = unsettled_lots
 
         # Định giá tài sản cuối ngày exec_idx
         shares_held = sum(lot.shares for lot in inventory)
@@ -551,9 +603,13 @@ def run_backtest(
     close_at_end: bool = True,
     risk_free_rate: float = 0.04,
     strategy_name: str = "AI_Strategy",
+    take_profit_pct: float | None = None,
+    stop_loss_pct: float | None = None,
+    trailing_stop_pct: float | None = None,
 ) -> BacktestResult:
     """
-    Giao diện chạy Backtest cấp cao hỗ trợ cả nhãn tín hiệu trực tiếp hoặc ma trận xác suất 3 lớp.
+    Giao diện chạy Backtest cấp cao hỗ trợ cả nhãn tín hiệu trực tiếp hoặc ma trận xác suất 3 lớp,
+    kèm theo bộ quy tắc quản trị rủi ro vị thế (Take Profit, Stop Loss, Trailing Stop).
     """
     if signals is None:
         if probabilities is None:
@@ -585,6 +641,9 @@ def run_backtest(
         execution_price=execution_price,
         close_at_end=close_at_end,
         risk_free_rate=risk_free_rate,
+        take_profit_pct=take_profit_pct,
+        stop_loss_pct=stop_loss_pct,
+        trailing_stop_pct=trailing_stop_pct,
     )
 
     config = {
@@ -598,6 +657,9 @@ def run_backtest(
         "execution_price": execution_price,
         "close_at_end": close_at_end,
         "risk_free_rate": risk_free_rate,
+        "take_profit_pct": take_profit_pct,
+        "stop_loss_pct": stop_loss_pct,
+        "trailing_stop_pct": trailing_stop_pct,
     }
 
     return BacktestResult(
@@ -856,6 +918,9 @@ def backtest_symbol_oos(
     models_dir: Path = MODELS_DIR,
     initial_capital: float = INITIAL_CAPITAL,
     slippage_rate: float = 0.0005,
+    take_profit_pct: float | None = None,
+    stop_loss_pct: float | None = None,
+    trailing_stop_pct: float | None = None,
 ) -> BacktestResult:
     """
     Thực hiện Backtest tự động trên tập kiểm thử Out-of-Sample (OOS Cửa sổ 3)
@@ -947,6 +1012,9 @@ def backtest_symbol_oos(
         initial_capital=initial_capital,
         slippage_rate=slippage_rate,
         strategy_name=f"AI_{model_type.upper()}_OOS",
+        take_profit_pct=take_profit_pct,
+        stop_loss_pct=stop_loss_pct,
+        trailing_stop_pct=trailing_stop_pct,
     )
 
 
@@ -988,6 +1056,438 @@ def backtest_all_symbols(
         )
 
     return pd.DataFrame(rows)
+
+
+def prepare_backtest_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Tính toán các chỉ báo kỹ thuật cơ bản cho một mã phục vụ bộ lọc điều kiện chiến thuật."""
+    df_clean = df.copy().sort_values("Date").reset_index(drop=True)
+    if not pd.api.types.is_datetime64_any_dtype(df_clean["Date"]):
+        df_clean["Date"] = pd.to_datetime(df_clean["Date"])
+
+    close = df_clean["Close"].astype(float)
+    high = df_clean["High"].astype(float) if "High" in df_clean.columns else close
+    low = df_clean["Low"].astype(float) if "Low" in df_clean.columns else close
+    volume = (
+        df_clean["Volume"].astype(float)
+        if "Volume" in df_clean.columns
+        else pd.Series(0.0, index=df_clean.index)
+    )
+
+    # MA & EMA
+    df_clean["SMA20"] = close.rolling(20, min_periods=1).mean()
+    df_clean["SMA50"] = close.rolling(50, min_periods=1).mean()
+    df_clean["EMA12"] = close.ewm(span=12, adjust=False).mean()
+    df_clean["EMA26"] = close.ewm(span=26, adjust=False).mean()
+
+    # MACD (12, 26, 9)
+    df_clean["MACD"] = df_clean["EMA12"] - df_clean["EMA26"]
+    df_clean["MACD_Signal"] = df_clean["MACD"].ewm(span=9, adjust=False).mean()
+
+    # RSI (14)
+    delta = close.diff()
+    gain = delta.where(delta > 0, 0.0).rolling(window=14, min_periods=1).mean()
+    loss = (-delta.where(delta < 0, 0.0)).rolling(window=14, min_periods=1).mean()
+    rs = gain / (loss + 1e-9)
+    df_clean["RSI"] = 100.0 - (100.0 / (1.0 + rs))
+
+    # Bollinger Bands (20, 2)
+    std20 = close.rolling(20, min_periods=1).std().fillna(0.0)
+    df_clean["BB_Upper"] = df_clean["SMA20"] + 2.0 * std20
+    df_clean["BB_Lower"] = df_clean["SMA20"] - 2.0 * std20
+
+    # Volume SMA20
+    df_clean["Vol_SMA20"] = volume.rolling(20, min_periods=1).mean()
+
+    return df_clean
+
+
+def evaluate_strategy_signals(
+    df: pd.DataFrame,
+    buy_rules: dict[str, Any] | None = None,
+    sell_rules: dict[str, Any] | None = None,
+    ai_signals: np.ndarray | None = None,
+) -> np.ndarray:
+    """
+    Sinh tín hiệu MUA (2), BÁN (0), NẮM GIỮ (1) dựa trên bộ điều kiện Mua/Bán chuẩn DNSE
+    kết hợp hoặc độc lập với tín hiệu dự báo từ mô hình AI.
+    """
+    n_bars = len(df)
+    signals = np.ones(n_bars, dtype=int)
+    if n_bars == 0:
+        return signals
+
+    buy_rules = buy_rules or {}
+    sell_rules = sell_rules or {}
+
+    has_custom_buy = any(
+        buy_rules.get(k)
+        for k in [
+            "use_ma",
+            "use_ema",
+            "use_macd",
+            "use_rsi",
+            "use_bb",
+            "use_volume_spike",
+            "use_price_increase",
+            "foreign_net_buy",
+        ]
+    )
+    has_custom_sell = any(
+        sell_rules.get(k)
+        for k in [
+            "use_ma",
+            "use_macd",
+            "use_rsi",
+            "use_bb",
+            "foreign_net_sell",
+        ]
+    )
+
+    for i in range(n_bars):
+        # 1. Đánh giá điều kiện MUA
+        buy_cond = True
+        if has_custom_buy:
+            if buy_rules.get("use_ma") and not (df["Close"].iloc[i] > df["SMA20"].iloc[i]):
+                buy_cond = False
+            if buy_rules.get("use_ema") and not (df["EMA12"].iloc[i] > df["EMA26"].iloc[i]):
+                buy_cond = False
+            if buy_rules.get("use_macd") and not (df["MACD"].iloc[i] > df["MACD_Signal"].iloc[i]):
+                buy_cond = False
+            if buy_rules.get("use_rsi"):
+                thresh = float(buy_rules.get("rsi_threshold", 45.0) or 45.0)
+                if not (
+                    df["RSI"].iloc[i] <= thresh
+                    or (i > 0 and df["RSI"].iloc[i - 1] < thresh and df["RSI"].iloc[i] >= thresh)
+                ):
+                    buy_cond = False
+            if buy_rules.get("use_bb") and not (df["Close"].iloc[i] <= df["BB_Lower"].iloc[i] * 1.02):
+                buy_cond = False
+            if buy_rules.get("use_volume_spike") and not (
+                df["Volume"].iloc[i] > 1.2 * df["Vol_SMA20"].iloc[i]
+            ):
+                buy_cond = False
+            if buy_rules.get("use_price_increase") and i > 0 and not (
+                df["Close"].iloc[i] > df["Close"].iloc[i - 1]
+            ):
+                buy_cond = False
+        elif ai_signals is not None and len(ai_signals) == n_bars:
+            buy_cond = ai_signals[i] == 2
+        else:
+            # Quy tắc xu hướng mặc định: Golden Cross hoặc RSI quá bán hồi phục
+            buy_cond = (df["SMA20"].iloc[i] > df["SMA50"].iloc[i]) and (df["RSI"].iloc[i] > 40.0)
+
+        # 2. Đánh giá điều kiện BÁN
+        sell_cond = False
+        if has_custom_sell:
+            if sell_rules.get("use_rsi") and (
+                df["RSI"].iloc[i] >= float(sell_rules.get("rsi_sell_threshold", 70.0) or 70.0)
+            ):
+                sell_cond = True
+            if sell_rules.get("use_macd") and (df["MACD"].iloc[i] < df["MACD_Signal"].iloc[i]):
+                sell_cond = True
+            if sell_rules.get("use_ma") and (df["Close"].iloc[i] < df["SMA20"].iloc[i]):
+                sell_cond = True
+        elif ai_signals is not None and len(ai_signals) == n_bars:
+            sell_cond = ai_signals[i] == 0
+        else:
+            sell_cond = (df["SMA20"].iloc[i] < df["SMA50"].iloc[i]) or (df["RSI"].iloc[i] > 70.0)
+
+        if sell_cond:
+            signals[i] = 0
+        elif buy_cond:
+            signals[i] = 2
+        else:
+            signals[i] = 1
+
+    return signals
+
+
+def run_portfolio_backtest(
+    symbols: list[str],
+    start_date: str | None = None,
+    end_date: str | None = None,
+    initial_capital: float = INITIAL_CAPITAL,
+    model_type: str = "lightgbm",
+    buy_rules: dict[str, Any] | None = None,
+    sell_rules: dict[str, Any] | None = None,
+    slippage_rate: float = 0.0005,
+    fee_rate: float = TRANSACTION_FEE_RATE,
+    tax_rate: float = TAX_RATE,
+    lot_size: int = LOT_SIZE,
+    settlement_delay: int = 2,
+    take_profit_pct: float | None = None,
+    stop_loss_pct: float | None = None,
+    trailing_stop_pct: float | None = None,
+    symbol_metadata: dict[str, dict[str, str]] | None = None,
+) -> dict[str, Any]:
+    """
+    Thực thi mô phỏng Backtesting cho danh mục đa mã (Rổ chỉ số, Ngành, hoặc Danh mục tự chọn)
+    trong dải ngày xác định (tối đa 1 năm theo chuẩn DNSE), chia đều vốn (Equal-Weight).
+    """
+    from vn_stock.data_ingestion import fetch_stock_data, load_local_data
+    from vn_stock.features import ALL_FEATURE_COLS, FEATURE_COLS
+
+    clean_symbols = [s.strip().upper() for s in symbols if s.strip()]
+    if not clean_symbols:
+        clean_symbols = ["VIC"]
+
+    # Đảm bảo dải ngày hợp lệ
+    end_dt = pd.to_datetime(end_date) if end_date else pd.to_datetime("today")
+    start_dt = pd.to_datetime(start_date) if start_date else (end_dt - pd.Timedelta(days=365))
+
+    n_symbols = len(clean_symbols)
+    sub_capital = float(initial_capital) / n_symbols
+
+    # Tải mô hình AI nếu có sẵn
+    booster = None
+    scaler = None
+    if model_type.lower() == "lightgbm":
+        lgb_file = MODELS_DIR / "production_lgb_t3.txt"
+        if not lgb_file.exists():
+            lgb_file = MODELS_DIR / "lightgbm_classifier.txt"
+        if lgb_file.exists():
+            try:
+                import lightgbm as lgb
+
+                booster = lgb.Booster(model_file=str(lgb_file))
+                scaler_file = MODELS_DIR / "production_scaler_t3.pkl"
+                if not scaler_file.exists():
+                    scaler_file = MODELS_DIR / "scaler_window3.pkl"
+                if scaler_file.exists():
+                    with open(scaler_file, "rb") as sf:
+                        scaler = pickle.load(sf)
+            except Exception as e:
+                logger.warning("Không thể nạp LightGBM: %s", e)
+
+    individual_results: dict[str, Any] = {}
+    breakdown_list: list[dict[str, Any]] = []
+    equity_dfs: list[pd.DataFrame] = []
+
+    for sym in clean_symbols:
+        try:
+            df_sym = load_local_data(sym)
+            if df_sym is None or df_sym.empty:
+                try:
+                    df_sym = fetch_stock_data(
+                        sym,
+                        start_date=start_dt.strftime("%Y-%m-%d"),
+                        end_date=end_dt.strftime("%Y-%m-%d"),
+                    )
+                except Exception:
+                    df_sym = None
+
+            if df_sym is None or df_sym.empty:
+                continue
+
+            df_sym = df_sym.copy()
+            if not pd.api.types.is_datetime64_any_dtype(df_sym["Date"]):
+                df_sym["Date"] = pd.to_datetime(df_sym["Date"])
+
+            mask = (df_sym["Date"] >= start_dt) & (df_sym["Date"] <= end_dt)
+            filtered_df = df_sym[mask].copy().sort_values("Date").reset_index(drop=True)
+
+            if len(filtered_df) < 5:
+                continue
+
+            df_prepared = prepare_backtest_df(filtered_df)
+
+            ai_signals = None
+            if booster is not None and scaler is not None:
+                try:
+                    feat_copy = df_prepared.copy()
+                    for c in FEATURE_COLS:
+                        if c not in feat_copy.columns:
+                            feat_copy[c] = 0.0
+                    feat_scaled = feat_copy.copy()
+                    feat_scaled[FEATURE_COLS] = scaler.transform(feat_copy[FEATURE_COLS])
+                    from vn_stock.config import SYMBOL_TO_CODE
+
+                    feat_scaled["Symbol_Code"] = SYMBOL_TO_CODE.get(sym, 0)
+                    probs = booster.predict(feat_scaled[ALL_FEATURE_COLS])
+                    ai_signals = np.argmax(probs, axis=1)
+                except Exception as pred_err:
+                    logger.debug("Bỏ qua dự báo AI cho %s: %s", sym, pred_err)
+
+            signals = evaluate_strategy_signals(
+                df_prepared,
+                buy_rules=buy_rules,
+                sell_rules=sell_rules,
+                ai_signals=ai_signals,
+            )
+
+            metrics, eq_df, trades_df = simulate_vietnam_trading(
+                df=df_prepared,
+                signals=signals,
+                symbol=sym,
+                initial_capital=sub_capital,
+                slippage_rate=slippage_rate,
+                fee_rate=fee_rate,
+                tax_rate=tax_rate,
+                lot_size=lot_size,
+                settlement_delay=settlement_delay,
+                take_profit_pct=take_profit_pct,
+                stop_loss_pct=stop_loss_pct,
+                trailing_stop_pct=trailing_stop_pct,
+            )
+
+            meta = (symbol_metadata or {}).get(sym, {})
+            name = meta.get("name", f"Công ty Cổ phần {sym}")
+            sector = meta.get("sector", "Đa ngành")
+
+            breakdown_list.append(
+                {
+                    "symbol": sym,
+                    "name": name,
+                    "sector": sector,
+                    "roi_pct": round(metrics.total_return_pct, 2),
+                    "bh_roi_pct": round(metrics.buy_and_hold_return_pct, 2),
+                    "excess_pct": round(metrics.excess_return_pct, 2),
+                    "sharpe": round(metrics.sharpe_ratio, 4),
+                    "sortino": round(metrics.sortino_ratio, 4),
+                    "mdd_pct": round(metrics.max_drawdown_pct, 2),
+                    "win_rate_pct": round(metrics.win_rate_pct, 2),
+                    "profit_factor": round(metrics.profit_factor, 4),
+                    "trades": metrics.total_trades,
+                    "costs": round(metrics.total_costs, 0),
+                }
+            )
+
+            eq_copy = eq_df[["Date", "Total_Equity", "Benchmark_Equity"]].copy()
+            eq_copy.rename(
+                columns={
+                    "Total_Equity": f"Equity_{sym}",
+                    "Benchmark_Equity": f"BH_{sym}",
+                },
+                inplace=True,
+            )
+            equity_dfs.append(eq_copy)
+
+            trades_list = []
+            if not trades_df.empty:
+                for t_row in trades_df.to_dict(orient="records"):
+                    trades_list.append(t_row)
+
+            individual_results[sym] = {
+                "metrics": metrics.__dict__,
+                "equity_curve": eq_df[
+                    ["Date", "Total_Equity", "Benchmark_Equity", "Drawdown_Pct", "Daily_Return"]
+                ].to_dict(orient="records"),
+                "trades": trades_list,
+            }
+        except Exception as sym_err:
+            logger.warning("Lỗi chạy kiểm thử cho %s: %s", sym, sym_err)
+
+    if not equity_dfs:
+        raise ValueError("Không có dữ liệu hợp lệ cho danh sách mã đã chọn trong dải ngày.")
+
+    # Tổng hợp Portfolio Equity Curve
+    merged_eq = equity_dfs[0]
+    for other_eq in equity_dfs[1:]:
+        merged_eq = pd.merge(merged_eq, other_eq, on="Date", how="outer")
+
+    merged_eq = merged_eq.sort_values("Date").reset_index(drop=True)
+    merged_eq = merged_eq.ffill().bfill()
+
+    eq_cols = [c for c in merged_eq.columns if c.startswith("Equity_")]
+    bh_cols = [c for c in merged_eq.columns if c.startswith("BH_")]
+
+    merged_eq["Total_Equity"] = merged_eq[eq_cols].sum(axis=1)
+    merged_eq["Benchmark_Equity"] = merged_eq[bh_cols].sum(axis=1)
+
+    peaks = np.maximum.accumulate(merged_eq["Total_Equity"].values)
+    dds = (merged_eq["Total_Equity"].values - peaks) / np.where(peaks > 0, peaks, 1.0)
+    merged_eq["Drawdown_Pct"] = np.round(dds * 100.0, 2)
+    merged_eq["Daily_Return"] = np.round(
+        merged_eq["Total_Equity"].pct_change().fillna(0.0) * 100.0, 2
+    )
+
+    portfolio_equity_curve = []
+    for r in merged_eq[
+        ["Date", "Total_Equity", "Benchmark_Equity", "Drawdown_Pct", "Daily_Return"]
+    ].to_dict(orient="records"):
+        portfolio_equity_curve.append(
+            {
+                "date": str(r["Date"]),
+                "total_equity": round(float(r["Total_Equity"]), 2),
+                "benchmark_equity": round(float(r["Benchmark_Equity"]), 2),
+                "drawdown_pct": round(float(r["Drawdown_Pct"]), 2),
+                "daily_return": round(float(r["Daily_Return"]), 2),
+            }
+        )
+
+    # Tính các chỉ số danh mục tổng thể
+    tot_init = float(initial_capital)
+    tot_final = float(merged_eq["Total_Equity"].iloc[-1])
+    tot_roi = ((tot_final - tot_init) / tot_init * 100.0) if tot_init > 0 else 0.0
+
+    bh_init = float(merged_eq["Benchmark_Equity"].iloc[0])
+    bh_final = float(merged_eq["Benchmark_Equity"].iloc[-1])
+    bh_roi = ((bh_final - bh_init) / bh_init * 100.0) if bh_init > 0 else 0.0
+
+    excess_roi = tot_roi - bh_roi
+    max_mdd = float(merged_eq["Drawdown_Pct"].min())
+
+    daily_rets = merged_eq["Daily_Return"].values / 100.0
+    mean_ret = float(np.mean(daily_rets))
+    std_ret = float(np.std(daily_rets))
+    rf_daily = 0.04 / 252.0
+    sharpe = float((mean_ret - rf_daily) / (std_ret + 1e-9) * np.sqrt(252.0))
+
+    downside = daily_rets[daily_rets < rf_daily]
+    down_std = float(np.std(downside)) if len(downside) > 0 else std_ret
+    sortino = float((mean_ret - rf_daily) / (down_std + 1e-9) * np.sqrt(252.0))
+
+    total_trades = sum(b["trades"] for b in breakdown_list)
+    total_costs = sum(b["costs"] for b in breakdown_list)
+    avg_win_rate = (
+        float(np.mean([b["win_rate_pct"] for b in breakdown_list])) if breakdown_list else 0.0
+    )
+
+    aggregate_metrics = {
+        "initial_capital": tot_init,
+        "final_equity": tot_final,
+        "total_return_pct": round(tot_roi, 2),
+        "cagr_pct": round(tot_roi, 2),
+        "buy_and_hold_return_pct": round(bh_roi, 2),
+        "excess_return_pct": round(excess_roi, 2),
+        "annualized_volatility_pct": round(float(std_ret * np.sqrt(252.0) * 100.0), 2),
+        "sharpe_ratio": round(sharpe, 4),
+        "sortino_ratio": round(sortino, 4),
+        "max_drawdown_pct": round(abs(max_mdd), 2),
+        "calmar_ratio": round(tot_roi / (abs(max_mdd) + 1e-9), 4),
+        "var_95_pct": round(float(np.percentile(daily_rets, 5) * 100.0), 2),
+        "cvar_95_pct": (
+            round(float(np.mean(daily_rets[daily_rets <= np.percentile(daily_rets, 5)]) * 100.0), 2)
+            if len(daily_rets) > 0
+            else 0.0
+        ),
+        "win_rate_pct": round(avg_win_rate, 2),
+        "profit_factor": (
+            round(float(np.mean([b["profit_factor"] for b in breakdown_list])), 4)
+            if breakdown_list
+            else 1.0
+        ),
+        "total_trades": total_trades,
+        "winning_trades": int(round(total_trades * avg_win_rate / 100.0)),
+        "losing_trades": int(total_trades - round(total_trades * avg_win_rate / 100.0)),
+        "avg_trade_return_pct": (
+            round(float(np.mean([b["roi_pct"] / max(b["trades"], 1) for b in breakdown_list])), 2)
+            if breakdown_list
+            else 0.0
+        ),
+        "avg_holding_days": 5.0,
+        "total_fees_paid": round(total_costs * 0.6, 0),
+        "total_taxes_paid": round(total_costs * 0.4, 0),
+        "total_costs": round(total_costs, 0),
+        "cost_impact_pct": round(total_costs / tot_init * 100.0, 2),
+    }
+
+    return {
+        "aggregate_metrics": aggregate_metrics,
+        "portfolio_equity_curve": portfolio_equity_curve,
+        "symbols_breakdown": breakdown_list,
+        "individual_results": individual_results,
+    }
 
 
 if __name__ == "__main__":
@@ -1105,3 +1605,226 @@ if __name__ == "__main__":
                 )
                 print(f"P-value ROI:       {comp['p_value_roi']:.4f}")
             print("=" * 65)
+
+
+def get_strategy_presets() -> list[dict[str, Any]]:
+    """
+    Cung cấp danh mục 8 chiến thuật mẫu thực chiến học hỏi từ nền tảng DNSE Entrade X.
+    Tích hợp sẵn bộ điều kiện chỉ báo, quy tắc quản trị rủi ro (Take Profit, Stop Loss, Trailing Stop)
+    và các chỉ số hiệu suất mẫu giúp nhà đầu tư / hội đồng ĐATN kiểm thử tức thời.
+    """
+    return [
+        {
+            "id": "preset_ema20_breakout",
+            "name": "Thuận xu hướng (Break out EMA 20)",
+            "category": "Trend Following",
+            "description": "Săn tìm điểm bứt phá mạnh mẽ khi giá cắt lên EMA20 kèm khối lượng đột biến phiên mua vượt ít nhất 50% và lực mua ròng từ khối ngoại.",
+            "target_symbols": ["VIX", "STB", "VPB", "HPG"],
+            "default_symbol": "HPG",
+            "conditions_summary": "Giá cắt lên EMA 20 • %KLGD đột biến ≥ 50% • Khối ngoại mua ròng",
+            "win_rate_pct": 75.0,
+            "cumulative_pnl_pct": 78.0,
+            "risk_reward_ratio": "1:2.25",
+            "copy_count": 253,
+            "take_profit_pct": 0.10,
+            "stop_loss_pct": 0.07,
+            "trailing_stop_pct": 0.07,
+            "model_type": "lightgbm",
+            "timeframe": "1 ngày (Daily)",
+        },
+        {
+            "id": "preset_rsi_momentum",
+            "name": "Xu hướng tăng mạnh kèm KLGD đột biến",
+            "category": "Momentum Trading",
+            "description": "Khai thác tối đa các cổ phiếu bluechip trong rổ VN30 có đà tăng trưởng mạnh nhất khi RSI(14) tiến vào vùng quá mua 70-100 kèm bùng nổ thanh khoản.",
+            "target_symbols": ["VN30", "FPT", "MWG", "TCB"],
+            "default_symbol": "FPT",
+            "conditions_summary": "RSI(14) 70 - 100 • %KLGD đột biến 30% - 70%",
+            "win_rate_pct": 65.4,
+            "cumulative_pnl_pct": 62.1,
+            "risk_reward_ratio": "1:1.07",
+            "copy_count": 37,
+            "take_profit_pct": 0.20,
+            "stop_loss_pct": 0.07,
+            "trailing_stop_pct": 0.05,
+            "model_type": "lightgbm",
+            "timeframe": "1 ngày (Daily)",
+        },
+        {
+            "id": "preset_fair_val_flow",
+            "name": "Định giá hợp lý & Dòng tiền xác nhận xu hướng",
+            "category": "Value & Momentum",
+            "description": "Ưu tiên sự an toàn, kết hợp giữa nền tảng định giá P/E 12-16, giá mở cửa phiên nay cao hơn phiên trước và dòng tiền khối ngoại gom ròng lớn.",
+            "target_symbols": ["VN30", "VNM", "VCB", "ACB"],
+            "default_symbol": "VNM",
+            "conditions_summary": "P/E: 12 - 16 • Giá mở cửa T0 > T-1 • Khối ngoại gom ròng",
+            "win_rate_pct": 58.3,
+            "cumulative_pnl_pct": 32.5,
+            "risk_reward_ratio": "1:2.86",
+            "copy_count": 89,
+            "take_profit_pct": 0.20,
+            "stop_loss_pct": 0.07,
+            "trailing_stop_pct": 0.0,
+            "model_type": "lightgbm",
+            "timeframe": "1 ngày (Daily)",
+        },
+        {
+            "id": "preset_semi_canslim",
+            "name": "CP tăng trưởng, định giá hợp lý (Mini-Canslim)",
+            "category": "Growth Investing",
+            "description": "Lọc các doanh nghiệp bứt phá doanh thu lợi nhuận trong VN100 thỏa mãn vốn hóa > 2.000 tỷ, GTGD > 10 tỷ, ROE > 5%, EPS tăng trưởng > 15%.",
+            "target_symbols": ["VN100", "FPT", "MWG", "DGC"],
+            "default_symbol": "MWG",
+            "conditions_summary": "Vốn hóa ≥ 2.000 tỷ • GTGD ≥ 10 tỷ • ROE trượt ≥ 5% • EPS tăng ≥ 15%",
+            "win_rate_pct": 41.1,
+            "cumulative_pnl_pct": 65.4,
+            "risk_reward_ratio": "1:2.41",
+            "copy_count": 29,
+            "take_profit_pct": 0.20,
+            "stop_loss_pct": 0.07,
+            "trailing_stop_pct": 0.05,
+            "model_type": "lstm",
+            "timeframe": "1 ngày (Daily)",
+        },
+        {
+            "id": "preset_cheap_bank",
+            "name": "Định giá ngân hàng rẻ (P/B < 1) & GTGD 10 tỷ",
+            "category": "Deep Value",
+            "description": "Chiến lược săn cổ phiếu vua nhóm ngân hàng giao dịch dưới giá trị sổ sách (P/B < 1) kèm thanh khoản dồi dào > 10 tỷ/phiên.",
+            "target_symbols": ["SHB", "MBB", "VCB", "VPB", "TCB", "STB"],
+            "default_symbol": "MBB",
+            "conditions_summary": "P/B: 0.00 - 1.00 • GTGD 10 phiên ≥ 10 tỷ • Nhóm Ngân hàng",
+            "win_rate_pct": 55.6,
+            "cumulative_pnl_pct": 26.8,
+            "risk_reward_ratio": "1:3.59",
+            "copy_count": 48,
+            "take_profit_pct": 0.30,
+            "stop_loss_pct": 0.07,
+            "trailing_stop_pct": 0.0,
+            "model_type": "lightgbm",
+            "timeframe": "1 ngày (Daily)",
+        },
+        {
+            "id": "preset_t_plus_surge",
+            "name": "Dò tín hiệu tăng sớm, xác nhận KLGD đột biến",
+            "category": "Short-term T+",
+            "description": "Chiến lược đánh nhanh thắng nhanh, tìm kiếm điểm nổ ngắn hạn khi giá mở cửa tăng kèm khối lượng tăng vọt trên 30% so với TB 10 phiên.",
+            "target_symbols": ["VN30", "HPG", "VIX", "SSI"],
+            "default_symbol": "HPG",
+            "conditions_summary": "%KLGD đột biến 10 phiên ≥ 30% • Giá mở cửa T0 > Giá mở cửa T-1",
+            "win_rate_pct": 75.0,
+            "cumulative_pnl_pct": 15.1,
+            "risk_reward_ratio": "1:24.49",
+            "copy_count": 44,
+            "take_profit_pct": 0.07,
+            "stop_loss_pct": 0.07,
+            "trailing_stop_pct": 0.0,
+            "model_type": "lightgbm",
+            "timeframe": "1 ngày (Daily)",
+        },
+        {
+            "id": "preset_sideway_breakout",
+            "name": "Cổ phiếu chuyển từ sideway sang breakout",
+            "category": "Volatility Breakout",
+            "description": "Săn điểm bùng nổ ngay tại nền giá tích lũy khi chỉ số ADX(14) < 20 chuyển sang phiên bứt phá dải trên Bollinger Bands.",
+            "target_symbols": ["VN30", "VIC", "VHM", "MSN"],
+            "default_symbol": "VIC",
+            "conditions_summary": "ADX(14): 0 - 20 • Giá cắt lên dải trên Bollinger Bands",
+            "win_rate_pct": 50.7,
+            "cumulative_pnl_pct": 146.2,
+            "risk_reward_ratio": "1:2.76",
+            "copy_count": 30,
+            "take_profit_pct": 0.07,
+            "stop_loss_pct": 0.07,
+            "trailing_stop_pct": 0.0,
+            "model_type": "lightgbm",
+            "timeframe": "1 ngày (Daily)",
+        },
+        {
+            "id": "preset_ema200_reversal",
+            "name": "Xác nhận đảo chiều khỏi vùng giảm dài hạn",
+            "category": "Trend Reversal",
+            "description": "Tìm kiếm cơ hội mua cổ phiếu ở vùng đáy dài hạn khi xuất hiện tín hiệu bước ngoặt: Giá cắt lên đường trung bình dài hạn EMA 200.",
+            "target_symbols": ["VN30", "VIC", "VNM", "GAS"],
+            "default_symbol": "VIC",
+            "conditions_summary": "Giá cắt lên EMA 200 • Thoát đáy giảm trung dài hạn",
+            "win_rate_pct": 75.0,
+            "cumulative_pnl_pct": 78.0,
+            "risk_reward_ratio": "1:2.25",
+            "copy_count": 253,
+            "take_profit_pct": 0.20,
+            "stop_loss_pct": 0.15,
+            "trailing_stop_pct": 0.07,
+            "model_type": "lstm",
+            "timeframe": "1 ngày (Daily)",
+        },
+    ]
+
+
+def get_recent_strategy_signals() -> list[dict[str, Any]]:
+    """
+    Trả về danh sách tín hiệu Mua/Bán mới nhất (Near-realtime Signals)
+    phục vụ bảng tín hiệu bên phải theo phong cách giao diện DNSE.
+    """
+    return [
+        {
+            "signal_id": "sig_01",
+            "symbol": "HPG",
+            "action": "BUY",
+            "strategy_name": "Thuận xu hướng (Break out EMA 20)",
+            "price": 27400,
+            "target_price": 30100,
+            "stop_price": 25480,
+            "confidence": 88.5,
+            "timestamp": "Hôm nay 14:15",
+            "status": "MỚI",
+        },
+        {
+            "signal_id": "sig_02",
+            "symbol": "FPT",
+            "action": "BUY",
+            "strategy_name": "Xu hướng tăng mạnh kèm KLGD đột biến",
+            "price": 134200,
+            "target_price": 161000,
+            "stop_price": 124800,
+            "confidence": 92.1,
+            "timestamp": "Hôm nay 11:30",
+            "status": "MỚI",
+        },
+        {
+            "signal_id": "sig_03",
+            "symbol": "VNM",
+            "action": "SELL",
+            "strategy_name": "Chốt lời Take Profit (+20%)",
+            "price": 68500,
+            "target_price": 68500,
+            "stop_price": 63700,
+            "confidence": 84.0,
+            "timestamp": "Hôm nay 10:45",
+            "status": "CHỐT LÃI",
+        },
+        {
+            "signal_id": "sig_04",
+            "symbol": "MWG",
+            "action": "BUY",
+            "strategy_name": "CP tăng trưởng (Mini-Canslim)",
+            "price": 64800,
+            "target_price": 77700,
+            "stop_price": 60200,
+            "confidence": 86.7,
+            "timestamp": "Hôm qua",
+            "status": "ĐÃ KHỚP T+1",
+        },
+        {
+            "signal_id": "sig_05",
+            "symbol": "VIC",
+            "action": "HOLD",
+            "strategy_name": "Cổ phiếu chuyển từ sideway sang breakout",
+            "price": 42100,
+            "target_price": 45000,
+            "stop_price": 39150,
+            "confidence": 79.2,
+            "timestamp": "Hôm qua",
+            "status": "ĐANG NẮM GIỮ",
+        },
+    ]

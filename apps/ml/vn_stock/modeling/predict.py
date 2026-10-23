@@ -164,27 +164,42 @@ def prepare_inference_features(
             idx_df["VNINDEX_Return_1d"] = idx_df["Close"].pct_change().fillna(0.0)
             df_raw = idx_df
 
-    # 2. Thử nạp từ panel interim (đã có sẵn cột VNINDEX_Return_1d)
+    target_date_str = get_target_market_date()
+    target_dt = pd.to_datetime(target_date_str)
+
+    # 2. Thử nạp từ panel interim (nếu đã đủ nến tới target_date)
     if df_raw is None:
         try:
-            df_raw = load_panel_dataset(symbols=[clean_sym])
+            panel_cand = load_panel_dataset(symbols=[clean_sym])
+            if panel_cand is not None and not panel_cand.empty:
+                max_panel_dt = pd.to_datetime(panel_cand["Date"]).max()
+                if max_panel_dt >= target_dt:
+                    df_raw = panel_cand
+                else:
+                    logger.info(
+                        "Dữ liệu panel của %s mới đến %s, mục tiêu là %s. Tự động đồng bộ nến mới từ SSI...",
+                        clean_sym,
+                        max_panel_dt.strftime("%Y-%m-%d"),
+                        target_date_str,
+                    )
         except (FileNotFoundError, ValueError, KeyError) as err:
             logger.debug("Không thể nạp dữ liệu từ panel: %s", err)
 
-    # 3. Fallback nếu panel chưa có: nạp từ raw và merge VNINDEX
+    # 3. Fallback nếu panel chưa có hoặc thiếu nến phiên mục tiêu: nạp/kéo từ SSI và merge VNINDEX
     if df_raw is None or df_raw.empty or len(df_raw) < 200:
-        stock_df = load_local_data(clean_sym)
-        if stock_df is None or len(stock_df) < 200:
-            try:
-                stock_df = fetch_stock_data(clean_sym)
-            except Exception as e:
-                logger.warning("Không thể tải nến SSI cho %s: %s", clean_sym, e)
-                if stock_df is None:
-                    raise
+        try:
+            stock_df = fetch_stock_data(clean_sym, end_date=target_date_str)
+        except Exception as e:
+            logger.warning("Không thể kéo SSI trực tiếp cho %s: %s. Dùng cache cục bộ.", clean_sym, e)
+            stock_df = load_local_data(clean_sym)
+            if stock_df is None:
+                raise
 
-        vnindex_df = load_local_data("VNINDEX")
-        if vnindex_df is None or len(vnindex_df) < 200:
-            vnindex_df = fetch_daily_index("VNINDEX")
+        try:
+            vnindex_df = fetch_daily_index("VNINDEX", end_date=target_date_str)
+        except Exception as e:
+            logger.warning("Không thể kéo VNINDEX từ SSI: %s. Dùng cache cục bộ.", e)
+            vnindex_df = load_local_data("VNINDEX")
 
         if vnindex_df is not None:
             vn_clean = vnindex_df.sort_values("Date").copy()

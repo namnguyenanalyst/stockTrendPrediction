@@ -254,3 +254,98 @@ def test_backtest_result_to_dict():
     assert "dates" in d["equity_curve_summary"]
     assert "total_equity" in d["equity_curve_summary"]
     assert isinstance(d["metrics"]["total_return_pct"], float)
+
+
+def test_dnse_risk_management_stop_loss():
+    """Kiểm tra cơ chế Cắt lỗ tự động (Stop Loss): bán ngay khi giảm >= stop_loss_pct sau T+2."""
+    from vn_stock.backtest import get_strategy_presets, get_recent_strategy_signals
+    # Giá: ngày 0: 100, ngày 1: 100 (mua), ngày 2: 95, ngày 3: 85 (giảm 15% -> kích hoạt Stop Loss 10%), ngày 4: 80
+    dates = pd.date_range("2026-01-01", periods=5, freq="B")
+    df = pd.DataFrame({
+        "Date": dates,
+        "Open": [100.0, 100.0, 95.0, 85.0, 80.0],
+        "High": [101.0, 101.0, 96.0, 86.0, 81.0],
+        "Low": [99.0, 99.0, 94.0, 84.0, 79.0],
+        "Close": [100.0, 100.0, 95.0, 85.0, 80.0],
+        "Volume": [1_000_000] * 5,
+    })
+    # Tín hiệu AI luôn là HOLD (1) để kiểm tra việc Stop Loss tự động kích hoạt bán
+    signals = np.array([2, 1, 1, 1, 1])
+
+    res = run_backtest(
+        df=df,
+        signals=signals,
+        symbol="HPG",
+        initial_capital=50_000_000,
+        stop_loss_pct=0.10,  # Cắt lỗ 10%
+        close_at_end=False,
+    )
+
+    sell_trades = res.trades_df[res.trades_df["order_type"] == "SELL"]
+    assert len(sell_trades) == 1
+    assert sell_trades.iloc[0]["reason"] == "STOP_LOSS"
+    assert sell_trades.iloc[0]["exec_price"] < 100.0
+
+
+def test_dnse_presets_and_signals():
+    """Kiểm tra hàm get_strategy_presets và get_recent_strategy_signals."""
+    from vn_stock.backtest import get_strategy_presets, get_recent_strategy_signals
+
+    presets = get_strategy_presets()
+    assert len(presets) == 8
+    assert presets[0]["id"] == "preset_ema20_breakout"
+    assert "win_rate_pct" in presets[0]
+    assert "take_profit_pct" in presets[0]
+
+    signals = get_recent_strategy_signals()
+    assert len(signals) >= 3
+    assert signals[0]["action"] in ["BUY", "SELL", "HOLD"]
+
+
+def test_evaluate_strategy_signals():
+    """Kiểm tra hàm đánh giá bộ điều kiện Mua / Bán chuẩn DNSE."""
+    from vn_stock.backtest import evaluate_strategy_signals, prepare_backtest_df
+
+    dates = pd.date_range("2026-01-01", periods=30, freq="B")
+    prices = [50.0 + i * 0.5 for i in range(30)]
+    df = pd.DataFrame({
+        "Date": dates,
+        "Open": prices,
+        "High": [p + 1.0 for p in prices],
+        "Low": [p - 1.0 for p in prices],
+        "Close": prices,
+        "Volume": [2_000_000] * 30,
+    })
+    df_prepared = prepare_backtest_df(df)
+
+    buy_rules = {"use_ma": True, "use_rsi": True, "rsi_threshold": 50.0}
+    sell_rules = {"use_rsi": True, "rsi_sell_threshold": 70.0}
+
+    signals = evaluate_strategy_signals(df_prepared, buy_rules=buy_rules, sell_rules=sell_rules)
+    assert len(signals) == 30
+    assert set(signals).issubset({0, 1, 2})
+
+
+def test_run_portfolio_backtest():
+    """Kiểm tra chạy Backtest danh mục đa mã (Equal-Weighted Portfolio)."""
+    from vn_stock.backtest import run_portfolio_backtest
+
+    res = run_portfolio_backtest(
+        symbols=["VIC", "HPG"],
+        start_date="2024-01-01",
+        end_date="2024-06-30",
+        initial_capital=100_000_000,
+        buy_rules={"use_ma": True},
+        sell_rules={"take_profit_pct": 0.15, "stop_loss_pct": 0.07},
+    )
+
+    assert "aggregate_metrics" in res
+    assert "portfolio_equity_curve" in res
+    assert "symbols_breakdown" in res
+    assert "individual_results" in res
+
+    agg = res["aggregate_metrics"]
+    assert agg["initial_capital"] == 100_000_000
+    assert len(res["symbols_breakdown"]) >= 1
+    assert len(res["portfolio_equity_curve"]) > 0
+
