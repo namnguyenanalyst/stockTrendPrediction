@@ -115,9 +115,22 @@ export interface MarketBoardResponse {
   top_volume?: StockBoardItem[];
 }
 
+export interface MarketSyncStatusResponse {
+  target_date: string;
+  session_type: "session_T" | "session_T_minus_1";
+  session_name: string;
+  status_label: string;
+  is_market_closed: boolean;
+  prediction_horizon_desc: string;
+  current_time?: string;
+  updated_symbols?: string[];
+  total_symbols?: number;
+}
+
 export interface DayForecast {
   day_offset: number; // 1, 2, 3
   day_name: string; // "T+1", "T+2", "T+3"
+  date?: string; // "YYYY-MM-DD"
   predicted_trend: "GIẢM" | "ĐI NGANG" | "TĂNG";
   signal: string; // "BÁN (SELL)" | "NẮM GIỮ (HOLD)" | "MUA (BUY)"
   confidence: number;
@@ -172,6 +185,8 @@ export interface PredictionResponse {
   horizon: string;
   horizon_days?: number;
   is_live_synced?: boolean;
+  market_session_label?: string;
+  session_info?: MarketSyncStatusResponse;
   trajectory?: DayForecast[];
   summary_guidance?: string;
   training_info?: {

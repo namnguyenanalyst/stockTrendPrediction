@@ -9,6 +9,7 @@ import {
   BacktestSummaryResponse,
   BatchPredictionResponse,
   MarketBoardResponse,
+  MarketSyncStatusResponse,
   PredictionResponse,
   RetrainResponse,
   StockHistoryResponse,
@@ -93,6 +94,26 @@ export async function getStockSummary(symbol: string): Promise<StockSummaryRespo
 
 export async function getMarketBoard(): Promise<MarketBoardResponse> {
   return fetchJson<MarketBoardResponse>("/api/stocks/board");
+}
+
+export async function getMarketSyncStatus(): Promise<MarketSyncStatusResponse> {
+  return fetchJson<MarketSyncStatusResponse>("/api/stocks/sync-status");
+}
+
+export async function triggerMarketSync(): Promise<{
+  status: string;
+  target_date?: string;
+  session_type?: string;
+  total_symbols?: number;
+}> {
+  return fetchJson<{
+    status: string;
+    target_date?: string;
+    session_type?: string;
+    total_symbols?: number;
+  }>("/api/stocks/sync", {
+    method: "POST",
+  });
 }
 
 // 3. Dự báo xu hướng AI

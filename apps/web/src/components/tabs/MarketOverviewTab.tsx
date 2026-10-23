@@ -7,13 +7,14 @@ import {
   BarChart2,
   Calendar,
   ChevronRight,
-  Eye,
   Layers,
+  Minus,
   Percent,
   Search,
   Sparkles,
   TrendingDown,
   TrendingUp,
+  X,
 } from "lucide-react";
 import { IChartApi } from "lightweight-charts";
 import { CandlestickChart } from "@/components/charts/CandlestickChart";
@@ -46,6 +47,25 @@ type Timeframe = "1M" | "3M" | "6M" | "1Y" | "ALL";
 type ViewMode = "split" | "board" | "chart";
 
 const DEFAULT_RIBBON_SYMBOLS = ["VN30", "VNINDEX", "HNX30", "VN30F1M"];
+
+const CATEGORY_TABS = [
+  { id: "ALL", label: "Tất cả cổ phiếu" },
+  { id: "VN30", label: "VN30" },
+  { id: "BANK", label: "Ngân hàng" },
+  { id: "REAL_ESTATE", label: "Bất động sản" },
+  { id: "TECH", label: "Công nghệ" },
+  { id: "RETAIL", label: "Bán lẻ & Tiêu dùng" },
+  { id: "STEEL", label: "Thép & Vật liệu" },
+  { id: "FINANCE", label: "Dịch vụ tài chính" },
+  { id: "ENERGY", label: "Năng lượng & Dầu khí" },
+];
+
+const EXCHANGE_TABS = [
+  { id: "ALL", label: "Tất cả sàn" },
+  { id: "HOSE", label: "HOSE" },
+  { id: "HNX", label: "HNX" },
+  { id: "UPCOM", label: "UPCOM" },
+];
 
 // Component Sparkline mini cho từng dòng của bảng giá
 const TableSparkline: React.FC<{ data: number[]; isUp: boolean }> = ({ data, isUp }) => {
@@ -128,7 +148,71 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
   const [timeframe, setTimeframe] = useState<Timeframe>("6M");
   const [viewMode, setViewMode] = useState<ViewMode>("split");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  const [selectedExchange, setSelectedExchange] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState<boolean>(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Đóng dropdown tìm kiếm khi click ra ngoài
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsSearchDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Danh sách gợi ý tìm kiếm theo mã hoặc tên công ty
+  const stocks = marketBoard?.stocks;
+  const searchSuggestions = useMemo(() => {
+    if (!searchQuery.trim() || !stocks) return [];
+    const q = searchQuery.trim().toUpperCase();
+    return stocks
+      .filter(
+        (s) => s.symbol.toUpperCase().includes(q) || s.name.toUpperCase().includes(q)
+      )
+      .slice(0, 8);
+  }, [searchQuery, stocks]);
+
+  const handleSelectSearchedSymbol = (sym: string) => {
+    const cleanSym = sym.trim().toUpperCase();
+    if (cleanSym) {
+      onSelectSymbol?.(cleanSym);
+      setSearchQuery("");
+      setIsSearchDropdownOpen(false);
+    }
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const q = searchQuery.trim().toUpperCase();
+      if (!q) return;
+
+      // 1. Kiểm tra nếu có mã trùng khớp chính xác trong bảng giá
+      const exact = marketBoard?.stocks?.find((s) => s.symbol.toUpperCase() === q);
+      if (exact) {
+        handleSelectSearchedSymbol(exact.symbol);
+        return;
+      }
+
+      // 2. Nếu có danh sách gợi ý, chọn mục đầu tiên
+      if (searchSuggestions.length > 0) {
+        handleSelectSearchedSymbol(searchSuggestions[0].symbol);
+        return;
+      }
+
+      // 3. Cho phép kích hoạt tra cứu trực tiếp mã do người dùng gõ
+      handleSelectSearchedSymbol(q);
+    } else if (e.key === "Escape") {
+      setIsSearchDropdownOpen(false);
+    }
+  };
 
   const candleChartRef = useRef<IChartApi | null>(null);
   const rsiChartRef = useRef<IChartApi | null>(null);
@@ -212,22 +296,61 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
 
   const isPriceUp = (summary?.change_pct ?? 0) >= 0;
 
-  // Lọc danh sách cổ phiếu theo Category & Search Query
+  // Lọc danh sách cổ phiếu theo Category, Exchange & Search Query
   const filteredStocks = useMemo(() => {
     if (!marketBoard || !marketBoard.stocks) return [];
     let list = marketBoard.stocks;
 
-    if (selectedCategory === "CORE") {
-      const coreSet = new Set(["VIC", "HPG", "FPT", "VNM", "MWG"]);
-      list = list.filter((s) => coreSet.has(s.symbol));
+    // Lọc theo sàn giao dịch (Exchange)
+    if (selectedExchange !== "ALL") {
+      list = list.filter((s) => s.exchange?.toUpperCase() === selectedExchange);
+    }
+
+    // Lọc theo nhóm ngành / rổ (Category)
+    if (selectedCategory === "VN30" || selectedCategory === "CORE") {
+      const vn30Set = new Set([
+        "ACB", "BCM", "BID", "BVH", "CTG", "FPT", "GAS", "GVR", "HDB", "HPG",
+        "MBB", "MSN", "MWG", "PLX", "POW", "SAB", "SHB", "SSB", "SSI", "STB",
+        "TCB", "TPB", "VCB", "VHM", "VIB", "VIC", "VJC", "VNM", "VPB", "VRE",
+      ]);
+      list = list.filter((s) => vn30Set.has(s.symbol.toUpperCase()));
     } else if (selectedCategory === "BANK") {
-      list = list.filter((s) => s.sector.includes("Ngân hàng"));
+      list = list.filter((s) => s.sector?.includes("Ngân hàng"));
     } else if (selectedCategory === "REAL_ESTATE") {
-      list = list.filter((s) => s.sector.includes("Bất động sản"));
+      list = list.filter((s) => s.sector?.includes("Bất động sản"));
     } else if (selectedCategory === "TECH") {
-      list = list.filter((s) => s.sector.includes("Công nghệ"));
+      list = list.filter((s) => s.sector?.includes("Công nghệ"));
     } else if (selectedCategory === "RETAIL") {
-      list = list.filter((s) => s.sector.includes("Bán lẻ") || s.sector.includes("tiêu dùng"));
+      list = list.filter(
+        (s) =>
+          s.sector?.includes("Bán lẻ") ||
+          s.sector?.includes("tiêu dùng") ||
+          s.sector?.includes("Đồ uống") ||
+          s.sector?.includes("Vận tải") ||
+          s.sector?.includes("Hàng không")
+      );
+    } else if (selectedCategory === "STEEL") {
+      list = list.filter(
+        (s) =>
+          s.sector?.includes("Thép") ||
+          s.sector?.includes("Vật liệu") ||
+          s.sector?.includes("Tài nguyên")
+      );
+    } else if (selectedCategory === "FINANCE") {
+      list = list.filter(
+        (s) =>
+          s.sector?.includes("Chứng khoán") ||
+          s.sector?.includes("tài chính") ||
+          s.sector?.includes("Tài chính") ||
+          s.sector?.includes("Bảo hiểm")
+      );
+    } else if (selectedCategory === "ENERGY") {
+      list = list.filter(
+        (s) =>
+          s.sector?.includes("Dầu khí") ||
+          s.sector?.includes("Năng lượng") ||
+          s.sector?.includes("Khí")
+      );
     }
 
     if (searchQuery.trim()) {
@@ -238,7 +361,36 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
     }
 
     return list;
-  }, [marketBoard, selectedCategory, searchQuery]);
+  }, [marketBoard, selectedCategory, selectedExchange, searchQuery]);
+
+  // Thống kê độ rộng thị trường (Market Breadth) chuẩn phong cách DNSE
+  const breadthStats = useMemo(() => {
+    if (marketBoard?.breadth) {
+      return marketBoard.breadth;
+    }
+    const stocks = marketBoard?.stocks || [];
+    let ceiling = 0;
+    let advancing = 0;
+    let unchanged = 0;
+    let declining = 0;
+    let floor = 0;
+
+    for (const s of stocks) {
+      if (s.ceiling && s.close >= s.ceiling) {
+        ceiling++;
+      } else if (s.floor && s.close <= s.floor) {
+        floor++;
+      } else if (s.change > 0) {
+        advancing++;
+      } else if (s.change < 0) {
+        declining++;
+      } else {
+        unchanged++;
+      }
+    }
+
+    return { ceiling, advancing, unchanged, declining, floor };
+  }, [marketBoard]);
 
   return (
     <div className="space-y-4">
@@ -272,103 +424,235 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
       />
 
       {/* ========================================================================= */}
-      {/* 2. TOOLBAR LỌC & THỐNG KÊ ĐỘ RỘNG THỊ TRƯỜNG                              */}
+      {/* 2. SUB-NAV PHÂN LOẠI DANH MỤC & THANH ĐIỀU KHIỂN CHUẨN PHONG CÁCH DNSE    */}
       {/* ========================================================================= */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
-        {/* Nhóm Tabs Phân loại */}
-        <div className="flex flex-wrap items-center gap-1">
-          {[
-            { id: "ALL", label: "Tất cả" },
-            { id: "CORE", label: "Rổ Core VN30" },
-            { id: "BANK", label: "Ngân hàng" },
-            { id: "REAL_ESTATE", label: "Bất động sản" },
-            { id: "TECH", label: "Công nghệ" },
-            { id: "RETAIL", label: "Bán lẻ / Tiêu dùng" },
-          ].map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                selectedCategory === cat.id
-                  ? "bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/30"
-                  : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
+      <div className="space-y-2">
+        {/* Tier 1: Sub-Nav Tab Strip (Phân loại danh mục nằm ngang phẳng mịn chuẩn DNSE) */}
+        <div className="border-b border-slate-800/80 bg-slate-950/40">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar px-1">
+            {CATEGORY_TABS.map((cat) => {
+              const isActive = selectedCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`group relative whitespace-nowrap px-3.5 py-2.5 text-xs font-semibold transition-all ${isActive
+                      ? "text-emerald-400 font-bold"
+                      : "text-slate-400 hover:text-slate-200"
+                    }`}
+                >
+                  <span>{cat.label}</span>
+                  {isActive && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Thanh công cụ tìm kiếm & Độ rộng thị trường */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Ô tìm kiếm mã nhanh */}
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
-            <input
-              type="text"
-              placeholder="Tìm mã cổ phiếu..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-7 w-36 rounded-lg border border-slate-800 bg-slate-950 pl-8 pr-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none sm:w-44"
-            />
+        {/* Tier 2: Action Toolbar (Tìm kiếm, Sàn giao dịch, Thống kê biến động & Chế độ xem) */}
+        <div className="flex flex-col gap-2.5 py-1 sm:flex-row sm:items-center sm:justify-between">
+          {/* Bên trái: Ô tìm kiếm + Bộ lọc Sàn giao dịch */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Ô tìm kiếm mã cổ phiếu thông minh phong cách Terminal */}
+            <div ref={searchContainerRef} className="relative flex items-center">
+              <Search className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Tìm mã CP, tên cty..."
+                value={searchQuery}
+                onFocus={() => {
+                  if (searchQuery.trim()) setIsSearchDropdownOpen(true);
+                }}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setIsSearchDropdownOpen(true);
+                }}
+                onKeyDown={handleSearchKeyDown}
+                className="h-8 w-44 rounded-lg border border-slate-800 bg-slate-900/90 pl-8 pr-7 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-500/60 focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 sm:w-52 transition-all"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setIsSearchDropdownOpen(false);
+                  }}
+                  className="absolute right-2 text-slate-500 hover:text-slate-300"
+                  title="Xóa tìm kiếm"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+
+              {/* Dropdown Popover gợi ý mã cổ phiếu tức thì */}
+              {isSearchDropdownOpen && searchQuery.trim() && (
+                <div className="absolute left-0 top-full z-50 mt-1 w-80 rounded-xl border border-slate-800 bg-slate-950/95 p-1.5 shadow-2xl backdrop-blur-md">
+                  <div className="flex items-center justify-between px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    <span>Gợi ý cổ phiếu ({searchSuggestions.length})</span>
+                    <span className="text-[9px] lowercase text-emerald-400">Nhấn Enter để mở</span>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto divide-y divide-slate-800/40">
+                    {searchSuggestions.length > 0 ? (
+                      searchSuggestions.map((stk) => {
+                        const isUp = stk.change >= 0;
+                        return (
+                          <button
+                            key={stk.symbol}
+                            type="button"
+                            onClick={() => handleSelectSearchedSymbol(stk.symbol)}
+                            className="flex w-full items-center justify-between px-2.5 py-2 text-left hover:bg-slate-800/70 rounded-lg transition-colors group"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-100 group-hover:text-emerald-400 transition-colors">
+                                {stk.symbol}
+                              </span>
+                              <span className="rounded bg-slate-800 px-1 py-0.5 text-[9px] text-slate-400 font-medium">
+                                {stk.exchange}
+                              </span>
+                              <span className="truncate text-xs text-slate-400 max-w-[120px]">
+                                {stk.name}
+                              </span>
+                            </div>
+                            <div className="text-right whitespace-nowrap">
+                              <div className="text-xs font-semibold text-slate-200">
+                                {stk.close.toFixed(2)}
+                              </div>
+                              <div
+                                className={`text-[10px] font-bold ${isUp ? "text-emerald-400" : "text-rose-400"
+                                  }`}
+                              >
+                                {isUp ? "+" : ""}
+                                {stk.change_pct.toFixed(2)}%
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectSearchedSymbol(searchQuery)}
+                        className="flex w-full items-center justify-between px-2.5 py-2 text-left hover:bg-slate-800/70 rounded-lg text-xs text-emerald-400 font-medium"
+                      >
+                        <span>Mở phân tích kỹ thuật mã &quot;{searchQuery.trim().toUpperCase()}&quot; (Nhấn Enter)</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Bộ chọn Sàn giao dịch phong cách DNSE */}
+            <div className="flex items-center gap-1">
+              {EXCHANGE_TABS.map((exch) => {
+                const isActive = selectedExchange === exch.id;
+                return (
+                  <button
+                    key={exch.id}
+                    onClick={() => setSelectedExchange(exch.id)}
+                    className={`h-8 rounded-lg px-2.5 text-xs font-semibold transition-all border ${isActive
+                        ? "bg-slate-800 text-emerald-400 border-emerald-500/40 shadow-sm"
+                        : "bg-slate-900/70 text-slate-400 border-slate-800/80 hover:bg-slate-800 hover:text-slate-200"
+                      }`}
+                  >
+                    {exch.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Thước đo độ rộng thị trường (Market Breadth) */}
-          {marketBoard?.breadth && (
-            <div className="hidden items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 p-1 text-[10px] font-bold md:flex">
-              <span className="rounded bg-purple-500/10 px-1.5 py-0.5 text-purple-400" title="Trần">
-                Trần: {marketBoard.breadth.ceiling}
+          {/* Bên phải: Thống kê biến động chuẩn DNSE + Chế độ xem */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Thống kê biến động */}
+            <div className="flex items-center gap-1.5">
+              <span className="hidden text-xs font-medium text-slate-400 sm:inline whitespace-nowrap">
+                Thống kê biến động:
               </span>
-              <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-400" title="Tăng">
-                Tăng: {marketBoard.breadth.advancing}
-              </span>
-              <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-400" title="Tham chiếu">
-                TC: {marketBoard.breadth.unchanged}
-              </span>
-              <span className="rounded bg-rose-500/10 px-1.5 py-0.5 text-rose-400" title="Giảm">
-                Giảm: {marketBoard.breadth.declining}
-              </span>
-              <span className="rounded bg-cyan-500/10 px-1.5 py-0.5 text-cyan-400" title="Sàn">
-                Sàn: {marketBoard.breadth.floor}
-              </span>
-            </div>
-          )}
 
-          {/* Bộ chọn Chế độ hiển thị (View Mode Switcher) */}
-          <div className="flex items-center rounded-lg border border-slate-800 bg-slate-950 p-0.5">
-            <button
-              onClick={() => setViewMode("split")}
-              className={`rounded px-2 py-0.5 text-xs font-semibold transition-all ${
-                viewMode === "split"
-                  ? "bg-slate-800 text-emerald-400"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-              title="Chế độ Kết hợp Bảng giá & Biểu đồ"
-            >
-              Kết hợp
-            </button>
-            <button
-              onClick={() => setViewMode("board")}
-              className={`rounded px-2 py-0.5 text-xs font-semibold transition-all ${
-                viewMode === "board"
-                  ? "bg-slate-800 text-emerald-400"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-              title="Chỉ Bảng giá"
-            >
-              Bảng giá
-            </button>
-            <button
-              onClick={() => setViewMode("chart")}
-              className={`rounded px-2 py-0.5 text-xs font-semibold transition-all ${
-                viewMode === "chart"
-                  ? "bg-slate-800 text-emerald-400"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-              title="Chuyên sâu Biểu đồ nến"
-            >
-              Biểu đồ
-            </button>
+              <div className="flex items-center gap-1 text-xs font-bold">
+                {/* Trần */}
+                <div
+                  title="Số mã chạm giá Trần (Ceiling)"
+                  className="flex items-center gap-1 rounded-md border border-purple-500/30 bg-purple-950/40 px-2 py-1 text-purple-400 shadow-sm"
+                >
+                  <ArrowUpRight className="h-3 w-3" />
+                  <span>{breadthStats.ceiling}</span>
+                </div>
+
+                {/* Tăng */}
+                <div
+                  title="Số mã Tăng giá (Advancing)"
+                  className="flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-950/40 px-2 py-1 text-emerald-400 shadow-sm"
+                >
+                  <TrendingUp className="h-3 w-3" />
+                  <span>{breadthStats.advancing}</span>
+                </div>
+
+                {/* Tham chiếu */}
+                <div
+                  title="Số mã Đứng giá / Tham chiếu (Unchanged)"
+                  className="flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-950/40 px-2 py-1 text-amber-400 shadow-sm"
+                >
+                  <Minus className="h-3 w-3" />
+                  <span>{breadthStats.unchanged}</span>
+                </div>
+
+                {/* Giảm */}
+                <div
+                  title="Số mã Giảm giá (Declining)"
+                  className="flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-950/40 px-2 py-1 text-rose-400 shadow-sm"
+                >
+                  <TrendingDown className="h-3 w-3" />
+                  <span>{breadthStats.declining}</span>
+                </div>
+
+                {/* Sàn */}
+                <div
+                  title="Số mã chạm giá Sàn (Floor)"
+                  className="flex items-center gap-1 rounded-md border border-cyan-500/30 bg-cyan-950/40 px-2 py-1 text-cyan-400 shadow-sm"
+                >
+                  <ArrowDownRight className="h-3 w-3" />
+                  <span>{breadthStats.floor}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Chế độ hiển thị (View Mode Switcher) */}
+            <div className="flex items-center rounded-lg border border-slate-800 bg-slate-900/90 p-0.5 shadow-inner">
+              <button
+                onClick={() => setViewMode("split")}
+                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${viewMode === "split"
+                    ? "bg-slate-800 text-emerald-400 shadow-sm border border-emerald-500/30"
+                    : "text-slate-400 hover:text-slate-200"
+                  }`}
+                title="Chế độ Kết hợp Bảng giá & Biểu đồ"
+              >
+                Kết hợp
+              </button>
+              <button
+                onClick={() => setViewMode("board")}
+                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${viewMode === "board"
+                    ? "bg-slate-800 text-emerald-400 shadow-sm border border-emerald-500/30"
+                    : "text-slate-400 hover:text-slate-200"
+                  }`}
+                title="Chỉ Bảng giá Điện tử"
+              >
+                Bảng giá
+              </button>
+              <button
+                onClick={() => setViewMode("chart")}
+                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${viewMode === "chart"
+                    ? "bg-slate-800 text-emerald-400 shadow-sm border border-emerald-500/30"
+                    : "text-slate-400 hover:text-slate-200"
+                  }`}
+                title="Chuyên sâu Biểu đồ nến kỹ thuật"
+              >
+                Biểu đồ
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -378,20 +662,19 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
       {/* ========================================================================= */}
       {viewMode !== "chart" && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          {/* CỘT TRÁI: BẢNG GIÁ ĐIỆN TỬ (70% - 75% CHIỀU RỘNG) */}
+          {/* CỘT TRÁI: BẢNG GIÁ ĐIỆN TỬ (70% - 75% CHIỀU RỘNG, GIỚI HẠN 10 DÒNG KÈM THANH CUỘN DỌC) */}
           <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/60 shadow-lg backdrop-blur-sm lg:col-span-8 xl:col-span-9">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[530px] overflow-y-auto">
               <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-800/80 bg-slate-950/80 text-[11px] font-bold text-slate-400">
-                    <th className="py-2.5 pl-4 pr-2">MÃ CHỨNG KHOÁN</th>
+                <thead className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/95 backdrop-blur-md text-[11px] font-bold text-slate-400">
+                  <tr>
+                    <th className="py-2.5 pl-4 pr-3">MÃ CHỨNG KHOÁN</th>
                     <th className="px-3 py-2.5 text-right">GIÁ KHỚP</th>
                     <th className="px-3 py-2.5 text-right">BIẾN ĐỘNG</th>
-                    <th className="px-3 py-2.5 text-right">TỔNG KHỐI LƯỢNG</th>
+                    <th className="px-3 py-2.5 text-right">KLGD</th>
                     <th className="px-3 py-2.5 text-center">BIỂU ĐỒ 10P</th>
                     <th className="px-3 py-2.5 text-center">LỰC MUA / BÁN</th>
-                    <th className="px-3 py-2.5 text-center">AI BIAS</th>
-                    <th className="py-2.5 pl-2 pr-4 text-center">THAO TÁC</th>
+                    <th className="py-2.5 pl-3 pr-4 text-center">AI BIAS</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/40">
@@ -411,22 +694,39 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                     return (
                       <tr
                         key={stock.symbol}
-                        onClick={() => onSelectSymbol?.(stock.symbol)}
-                        className={`cursor-pointer transition-colors ${
+                        onClick={() => {
+                          onSelectSymbol?.(stock.symbol);
+                          openDetailModal({
+                            symbol: stock.symbol,
+                            name: stock.name,
+                            exchange: stock.exchange,
+                            sector: stock.sector,
+                            currentValue: stock.close,
+                            change: stock.change,
+                            changePct: stock.change_pct,
+                            reference: stock.reference,
+                            stockCeiling: stock.ceiling,
+                            stockFloor: stock.floor,
+                            volume: stock.volume,
+                            isIndex: false,
+                          });
+                        }}
+                        title={`Nhấn để mở biểu đồ nến chi tiết của ${stock.symbol}`}
+                        className={`group cursor-pointer transition-colors ${
                           isSelected
                             ? "bg-emerald-500/10 hover:bg-emerald-500/15"
-                            : "hover:bg-slate-800/50"
+                            : "hover:bg-slate-800/60"
                         }`}
                       >
                         {/* 1. Mã chứng khoán & Logo */}
-                        <td className="py-2 pl-4 pr-2">
+                        <td className="py-2 pl-4 pr-3">
                           <div className="flex items-center gap-2">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 font-black text-slate-200 ring-1 ring-slate-700/60">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 font-black text-slate-200 ring-1 ring-slate-700/60 group-hover:ring-emerald-500/50 transition-all">
                               {stock.symbol.slice(0, 2)}
                             </div>
                             <div>
                               <div className="flex items-center gap-1.5">
-                                <span className="font-extrabold tracking-tight text-slate-100">
+                                <span className="font-extrabold tracking-tight text-slate-100 group-hover:text-emerald-400 transition-colors">
                                   {stock.symbol}
                                 </span>
                                 <span className="rounded bg-slate-800 px-1 py-0.2 text-[9px] text-slate-400">
@@ -506,50 +806,18 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                         </td>
 
                         {/* 7. AI Bias */}
-                        <td className="px-3 py-2 text-center">
+                        <td className="py-2 pl-3 pr-4 text-center">
                           <span
-                            className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                            className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
                               stock.ai_bias === "TĂNG"
-                                ? "bg-emerald-500/10 text-emerald-400"
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                                 : stock.ai_bias === "GIẢM"
-                                ? "bg-rose-500/10 text-rose-400"
-                                : "bg-slate-800 text-slate-300"
+                                ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                : "bg-slate-800 text-slate-300 border border-slate-700/50"
                             }`}
                           >
                             {stock.ai_bias}
                           </span>
-                        </td>
-
-                        {/* 8. Thao tác */}
-                        <td className="py-2 pl-2 pr-4 text-center">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onSelectSymbol?.(stock.symbol);
-                              openDetailModal({
-                                symbol: stock.symbol,
-                                name: stock.name,
-                                exchange: stock.exchange,
-                                sector: stock.sector,
-                                currentValue: stock.close,
-                                change: stock.change,
-                                changePct: stock.change_pct,
-                                reference: stock.reference,
-                                stockCeiling: stock.ceiling,
-                                stockFloor: stock.floor,
-                                volume: stock.volume,
-                                isIndex: false,
-                              });
-                            }}
-                            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-all ${
-                              isSelected
-                                ? "bg-emerald-500 text-slate-950 font-bold"
-                                : "border border-slate-700/80 bg-slate-800 text-slate-300 hover:border-emerald-500/50 hover:text-emerald-400"
-                            }`}
-                          >
-                            <Eye className="h-3 w-3" />
-                            <span>Soi nến</span>
-                          </button>
                         </td>
                       </tr>
                     );
@@ -686,11 +954,10 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                 </span>
                 {summary && (
                   <span
-                    className={`flex items-center gap-0.5 rounded-md px-2 py-0.5 text-xs font-bold ${
-                      isPriceUp
+                    className={`flex items-center gap-0.5 rounded-md px-2 py-0.5 text-xs font-bold ${isPriceUp
                         ? "bg-emerald-500/10 text-emerald-400"
                         : "bg-rose-500/10 text-rose-400"
-                    }`}
+                      }`}
                   >
                     {isPriceUp ? (
                       <ArrowUpRight className="h-3 w-3 stroke-[2.5]" />
@@ -711,11 +978,10 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                 <button
                   key={tf}
                   onClick={() => setTimeframe(tf)}
-                  className={`rounded px-2.5 py-1 text-xs font-semibold transition-all ${
-                    timeframe === tf
+                  className={`rounded px-2.5 py-1 text-xs font-semibold transition-all ${timeframe === tf
                       ? "bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/30 font-bold"
                       : "text-slate-400 hover:text-slate-200"
-                  }`}
+                    }`}
                 >
                   {tf === "ALL" ? "Tất cả" : tf}
                 </button>
@@ -755,9 +1021,8 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
               </div>
               <div className="mt-1">
                 <span
-                  className={`text-sm font-bold ${
-                    (summary?.sma_20_dev ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
-                  }`}
+                  className={`text-sm font-bold ${(summary?.sma_20_dev ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
+                    }`}
                 >
                   {summary ? `${(summary.sma_20_dev * 100).toFixed(2)}%` : "---"}
                 </span>
@@ -772,9 +1037,8 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
               </div>
               <div className="mt-1">
                 <span
-                  className={`text-sm font-bold ${
-                    (summary?.sma_50_dev ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
-                  }`}
+                  className={`text-sm font-bold ${(summary?.sma_50_dev ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
+                    }`}
                 >
                   {summary ? `${(summary.sma_50_dev * 100).toFixed(2)}%` : "---"}
                 </span>
@@ -802,13 +1066,12 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
               </div>
               <div className="mt-1">
                 <span
-                  className={`text-sm font-bold ${
-                    (latestInd?.vol_ratio ?? 1) >= 1.2
+                  className={`text-sm font-bold ${(latestInd?.vol_ratio ?? 1) >= 1.2
                       ? "text-emerald-400"
                       : (latestInd?.vol_ratio ?? 1) <= 0.8
-                      ? "text-amber-400"
-                      : "text-slate-200"
-                  }`}
+                        ? "text-amber-400"
+                        : "text-slate-200"
+                    }`}
                 >
                   {latestInd ? `${latestInd.vol_ratio.toFixed(2)}x` : "---"}
                 </span>
@@ -841,11 +1104,10 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
               </div>
               <div className="mt-1">
                 <span
-                  className={`text-sm font-bold ${
-                    (latestInd?.vnindex_return_1d ?? 0) >= 0
+                  className={`text-sm font-bold ${(latestInd?.vnindex_return_1d ?? 0) >= 0
                       ? "text-emerald-400"
                       : "text-rose-400"
-                  }`}
+                    }`}
                 >
                   {latestInd
                     ? `${((latestInd.vnindex_return_1d ?? 0) * 100).toFixed(2)}%`
@@ -879,7 +1141,7 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
           setActiveRibbonSymbols(newSyms);
           try {
             localStorage.setItem("active_ribbon_symbols", JSON.stringify(newSyms));
-          } catch {}
+          } catch { }
         }}
       />
     </div>

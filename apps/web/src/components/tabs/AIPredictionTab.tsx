@@ -223,6 +223,11 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           <span>
             Dữ liệu căn cứ: <strong className="text-slate-200">Phiên {activePred?.data_as_of_date || activePred?.date || "gần nhất"}</strong>
           </span>
+          {activePred?.market_session_label && (
+            <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400 border border-emerald-500/20">
+              {activePred.market_session_label}
+            </span>
+          )}
           <span className="text-slate-600">•</span>
           <span>
             Kỳ hạn: <strong className="text-purple-300">3 phiên tiếp theo (T+1 → T+3)</strong>
@@ -466,10 +471,15 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                   <div>
                     {/* Header ngày */}
                     <div className="flex items-center justify-between pb-2 border-b border-slate-800/60">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-800 text-xs font-bold text-slate-200">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="flex h-6 px-1.5 items-center justify-center rounded-md bg-slate-800 text-xs font-bold text-slate-200">
                           {step.day_name}
                         </span>
+                        {step.date && (
+                          <span className="rounded bg-purple-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-purple-300 border border-purple-500/20">
+                            {step.date}
+                          </span>
+                        )}
                         <span className="text-xs font-semibold text-slate-300">
                           {idx === 0
                             ? "Phiên mở vị thế (Open)"
