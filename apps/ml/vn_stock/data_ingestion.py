@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 import shutil
 import time
+from typing import Any
 
 import pandas as pd
 
@@ -12,6 +13,11 @@ from vn_stock.config import (
     DEFAULT_SYMBOLS,
     PANEL_DATA_DIR,
     RAW_DATA_DIR,
+    get_default_end_date,
+)
+from vn_stock.market_session import (
+    get_target_market_date,
+    get_target_market_session_info,
 )
 from vn_stock.ssi_client import SSIFastConnectClient
 
@@ -82,7 +88,8 @@ def validate_downloaded_data(
 
     if expected_end is not None:
         target_end = pd.to_datetime(expected_end)
-        if max_date < target_end:
+        # Dung sai 4 ngày cho ngày nghỉ lễ hoặc cuối tuần nếu expected_end rơi vào ngày không giao dịch
+        if max_date < target_end - pd.Timedelta(days=4):
             raise ValueError(
                 f"Dữ liệu {symbol_name} không phủ đủ ngày kết thúc cố định: max_date={max_date.strftime('%Y-%m-%d')} "
                 f"< expected_end={expected_end}."
@@ -102,13 +109,11 @@ def check_cache_coverage(df: pd.DataFrame, start_date: str, end_date: str | None
 
     if end_date is not None:
         target_end = pd.to_datetime(end_date)
-        if max_d < target_end:
-            return False
     else:
-        # Khi end_date=None (truy vấn thời gian thực), cho phép dung sai 4 ngày
-        target_end = pd.Timestamp.now().normalize() - pd.Timedelta(days=4)
-        if max_d < target_end:
-            return False
+        target_end = pd.to_datetime(get_target_market_date())
+
+    if max_d < target_end:
+        return False
 
     return True
 
@@ -197,13 +202,14 @@ def load_local_data(
 def fetch_daily_index(
     index_id: str = "VNINDEX",
     start_date: str = DEFAULT_START_DATE,
-    end_date: str | None = DEFAULT_END_DATE,
+    end_date: str | None = None,
     save_to_raw: bool = True,
     force_refresh: bool = False,
 ) -> pd.DataFrame:
     """Tải và lưu trữ dữ liệu chỉ số thị trường (VNINDEX), tự động tính Return 1d."""
     raw_parquet_path = RAW_DATA_DIR / f"{index_id.upper()}.parquet"
     raw_csv_path = RAW_DATA_DIR / f"{index_id.upper()}.csv"
+    effective_end = end_date or get_default_end_date()
 
     if not force_refresh:
         cached_df = None
@@ -215,19 +221,19 @@ def fetch_daily_index(
         if cached_df is not None and not cached_df.empty:
             cached_df["Date"] = pd.to_datetime(cached_df["Date"])
             # Kiểm tra bao phủ cache
-            if check_cache_coverage(cached_df, start_date=start_date, end_date=end_date):
+            if check_cache_coverage(cached_df, start_date=start_date, end_date=effective_end):
                 ret_col = f"{index_id.upper()}_Return_1d"
                 if ret_col not in cached_df.columns:
                     cached_df[ret_col] = cached_df[f"{index_id.upper()}_Close"].pct_change(1)
                 return cached_df
-            elif end_date is not None and cached_df["Date"].max() < pd.to_datetime(end_date):
-                # Thử gọi API cho đoạn (max_date + 1, end_date] xem có phiên mới không
+            elif cached_df["Date"].max() < pd.to_datetime(effective_end):
+                # Thử gọi API cho đoạn (max_date + 1, effective_end] xem có phiên mới không
                 max_cache_date = cached_df["Date"].max()
                 next_start = (max_cache_date + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
                 try:
                     ssi_client = SSIFastConnectClient()
                     tail_df = ssi_client.get_daily_index(
-                        index_id=index_id, start_date=next_start, end_date=end_date
+                        index_id=index_id, start_date=next_start, end_date=effective_end
                     )
                     if tail_df.empty:
                         # Đoạn cuối không có phiên giao dịch mới -> Cache HIT
@@ -237,6 +243,15 @@ def fetch_daily_index(
                                 1
                             )
                         return cached_df
+                    else:
+                        # Ghép nến mới vào cache hiện tại
+                        combined = pd.concat([cached_df, tail_df], ignore_index=True)
+                        combined = combined.drop_duplicates(subset=["Date"]).sort_values("Date").reset_index(drop=True)
+                        ret_col = f"{index_id.upper()}_Return_1d"
+                        combined[ret_col] = combined[f"{index_id.upper()}_Close"].pct_change(1)
+                        if save_to_raw:
+                            _atomic_save_parquet(combined, raw_parquet_path)
+                        return combined
                 except Exception as exc:  # noqa: BLE001
                     logger.warning(
                         "Không thể kiểm tra đoạn ngày mới cho %s: %s. Fallback tải lại toàn bộ.",
@@ -246,9 +261,9 @@ def fetch_daily_index(
 
     # Tải mới toàn bộ từ API
     ssi_client = SSIFastConnectClient()
-    df = ssi_client.get_daily_index(index_id=index_id, start_date=start_date, end_date=end_date)
+    df = ssi_client.get_daily_index(index_id=index_id, start_date=start_date, end_date=effective_end)
     validate_downloaded_data(
-        df, expected_start=start_date, expected_end=end_date, is_index=True, symbol_name=index_id
+        df, expected_start=start_date, expected_end=effective_end, is_index=True, symbol_name=index_id
     )
 
     df[f"{index_id.upper()}_Return_1d"] = df[f"{index_id.upper()}_Close"].pct_change(1)
@@ -262,28 +277,51 @@ def fetch_daily_index(
 def fetch_stock_data(
     symbol: str = DEFAULT_SYMBOL,
     start_date: str = DEFAULT_START_DATE,
-    end_date: str | None = DEFAULT_END_DATE,
+    end_date: str | None = None,
     save_to_raw: bool = True,
     force_refresh: bool = False,
     unit: str = "kVND",
 ) -> pd.DataFrame:
     """Tải dữ liệu OHLCV đơn mã (ưu tiên đọc Parquet cache có kiểm tra bao phủ ngày, fallback API)."""
     symbol = symbol.upper()
+    effective_end = end_date or get_default_end_date()
+
     if not force_refresh:
         local_df = load_local_data(symbol)
-        if (
-            local_df is not None
-            and not local_df.empty
-            and check_cache_coverage(local_df, start_date=start_date, end_date=end_date)
-        ):
-            return local_df
+        if local_df is not None and not local_df.empty:
+            if check_cache_coverage(local_df, start_date=start_date, end_date=effective_end):
+                return local_df
+            # Nếu cache có sẵn nhưng thiếu các phiên mới nhất
+            max_local_date = local_df["Date"].max()
+            if max_local_date < pd.to_datetime(effective_end):
+                next_start = (max_local_date + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+                try:
+                    ssi_client = SSIFastConnectClient()
+                    tail_df = ssi_client.get_daily_ohlcv(
+                        symbol=symbol,
+                        start_date=next_start,
+                        end_date=effective_end,
+                        unit=unit,
+                    )
+                    if not tail_df.empty:
+                        cleaned_tail = clean_stock_data(tail_df, symbol=symbol)
+                        combined = pd.concat([local_df, cleaned_tail], ignore_index=True)
+                        combined = combined.drop_duplicates(subset=["Date"]).sort_values("Date").reset_index(drop=True)
+                        if save_to_raw:
+                            parquet_path = RAW_DATA_DIR / f"{symbol}.parquet"
+                            _atomic_save_parquet(combined, parquet_path)
+                        return combined
+                    else:
+                        return local_df
+                except Exception as inc_exc:
+                    logger.warning("Không thể kéo nến mới đoạn đuôi cho %s: %s", symbol, inc_exc)
 
     try:
         ssi_client = SSIFastConnectClient()
         df = ssi_client.get_daily_ohlcv(
             symbol=symbol,
             start_date=start_date,
-            end_date=end_date,
+            end_date=effective_end,
             unit=unit,
         )
         if df.empty:
@@ -299,7 +337,7 @@ def fetch_stock_data(
     validate_downloaded_data(
         cleaned_df,
         expected_start=start_date,
-        expected_end=end_date,
+        expected_end=effective_end,
         is_index=False,
         symbol_name=symbol,
     )
@@ -309,6 +347,60 @@ def fetch_stock_data(
         _atomic_save_parquet(cleaned_df, parquet_path)
 
     return cleaned_df
+
+
+def sync_latest_market_data(
+    symbols: list[str] | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    """
+    Tự động đồng bộ nến thị trường mới nhất tới phiên chốt hợp lệ gần nhất (T hoặc T-1).
+    - Cập nhật VNINDEX
+    - Cập nhật các mã được chỉ định (mặc định DEFAULT_SYMBOLS = ['VIC', 'HPG', 'FPT', 'VNM', 'MWG'])
+    - Cập nhật phân vùng Panel dataset interim
+    """
+    session_info = get_target_market_session_info()
+    target_date = session_info["target_date"]
+
+    logger.info(
+        "Bắt đầu đồng bộ dữ liệu thị trường tới phiên %s (%s)...",
+        target_date,
+        session_info["session_name"],
+    )
+    synced_symbols = []
+    errors = {}
+
+    # 1. Đồng bộ VNINDEX
+    try:
+        fetch_daily_index(index_id="VNINDEX", end_date=target_date, force_refresh=force)
+        synced_symbols.append("VNINDEX")
+    except Exception as exc:
+        logger.error("Lỗi đồng bộ VNINDEX: %s", exc)
+        errors["VNINDEX"] = str(exc)
+
+    # 2. Đồng bộ các mã chỉ định
+    target_list = symbols or DEFAULT_SYMBOLS
+    for sym in target_list:
+        try:
+            fetch_stock_data(symbol=sym, end_date=target_date, force_refresh=force)
+            synced_symbols.append(sym)
+        except Exception as exc:
+            logger.warning("Lỗi đồng bộ mã %s: %s", sym, exc)
+            errors[sym] = str(exc)
+
+    # 3. Xây dựng lại panel nếu đồng bộ thành công
+    try:
+        build_panel_dataset(symbols=target_list, end_date=target_date, force_refresh=False)
+    except Exception as exc:
+        logger.warning("Lỗi cập nhật panel interim sau đồng bộ: %s", exc)
+
+    return {
+        "status": "success" if not errors else "partial",
+        "target_date": target_date,
+        "session_info": session_info,
+        "synced_symbols": synced_symbols,
+        "errors": errors,
+    }
 
 
 def build_panel_dataset(

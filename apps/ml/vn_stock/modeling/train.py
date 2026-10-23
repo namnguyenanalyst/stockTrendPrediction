@@ -477,7 +477,14 @@ def train_production_model(
         val_buffer_days,
     )
 
-    # Bước 1: Nạp panel dataset (tự động hút dữ liệu tươi nhất)
+    # Bước 1: Tự động đồng bộ nến thị trường mới nhất và nạp panel dataset
+    from vn_stock.data_ingestion import sync_latest_market_data
+
+    try:
+        sync_latest_market_data(symbols=symbols, force=False)
+    except Exception as sync_exc:
+        logger.warning("Không thể tự động đồng bộ nến mới trước khi huấn luyện: %s", sync_exc)
+
     raw_panel = build_panel_dataset(symbols=symbols, force_refresh=False)
     feat_df = compute_features_per_symbol(raw_panel, drop_na=True)
     study_df = apply_study_window(feat_df)

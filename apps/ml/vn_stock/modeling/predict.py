@@ -29,9 +29,20 @@ from vn_stock.config import (
     DEFAULT_SYMBOL,
     MODELS_DIR,
     SIGNAL_RECOMMENDATIONS,
+    SUPPORTED_INDICES,
 )
-from vn_stock.data_ingestion import fetch_stock_data, load_local_data, load_panel_dataset
+from vn_stock.data_ingestion import (
+    fetch_daily_index,
+    fetch_stock_data,
+    load_local_data,
+    load_panel_dataset,
+)
 from vn_stock.features import ALL_FEATURE_COLS, FEATURE_COLS, compute_features_per_symbol
+from vn_stock.market_session import (
+    get_future_trading_days,
+    get_target_market_date,
+    get_target_market_session_info,
+)
 
 
 def load_prediction_artifacts(
@@ -123,30 +134,61 @@ def prepare_inference_features(
     seq_length: int = DEFAULT_SEQ_LENGTH,
 ) -> tuple[pd.DataFrame, float, str]:
     """
-    Nạp dữ liệu lịch sử và tính toán bộ 13 đặc trưng tương đối + Symbol_Code cho một mã cổ phiếu.
+    Nạp dữ liệu lịch sử và tính toán bộ 13 đặc trưng tương đối + Symbol_Code cho một mã cổ phiếu hoặc chỉ số.
 
     Returns:
         tuple[df_features, latest_close_price, latest_date_str]
     """
     clean_sym = symbol.upper()
-
-    # 1. Thử nạp từ panel interim (đã có sẵn cột VNINDEX_Return_1d)
     df_raw = None
-    try:
-        df_raw = load_panel_dataset(symbols=[clean_sym])
-    except (FileNotFoundError, ValueError, KeyError) as err:
-        logger.debug("Không thể nạp dữ liệu từ panel: %s", err)
 
-    # 2. Fallback nếu panel chưa có: nạp từ raw và merge VNINDEX
+    # 1. Hỗ trợ nạp chỉ số thị trường (VNINDEX, VN30, HNX30, ...)
+    if clean_sym in SUPPORTED_INDICES:
+        idx_df = load_local_data(clean_sym)
+        if idx_df is None or len(idx_df) < 50:
+            try:
+                raw_idx = fetch_daily_index(clean_sym)
+                c_col = [c for c in raw_idx.columns if "Close" in c][0]
+                idx_df = pd.DataFrame()
+                idx_df["Date"] = raw_idx["Date"]
+                idx_df["Close"] = raw_idx[c_col]
+                idx_df["Open"] = idx_df["Close"]
+                idx_df["High"] = idx_df["Close"]
+                idx_df["Low"] = idx_df["Close"]
+                idx_df["Volume"] = 10000000
+                idx_df["Symbol"] = clean_sym
+            except Exception as e:
+                logger.warning("Không thể nạp chỉ số %s: %s", clean_sym, e)
+
+        if idx_df is not None:
+            idx_df["VNINDEX_Return_1d"] = idx_df["Close"].pct_change().fillna(0.0)
+            df_raw = idx_df
+
+    # 2. Thử nạp từ panel interim (đã có sẵn cột VNINDEX_Return_1d)
+    if df_raw is None:
+        try:
+            df_raw = load_panel_dataset(symbols=[clean_sym])
+        except (FileNotFoundError, ValueError, KeyError) as err:
+            logger.debug("Không thể nạp dữ liệu từ panel: %s", err)
+
+    # 3. Fallback nếu panel chưa có: nạp từ raw và merge VNINDEX
     if df_raw is None or df_raw.empty or len(df_raw) < 200:
         stock_df = load_local_data(clean_sym)
-        if stock_df is None:
-            stock_df = fetch_stock_data(clean_sym)
+        if stock_df is None or len(stock_df) < 200:
+            try:
+                stock_df = fetch_stock_data(clean_sym)
+            except Exception as e:
+                logger.warning("Không thể tải nến SSI cho %s: %s", clean_sym, e)
+                if stock_df is None:
+                    raise
 
         vnindex_df = load_local_data("VNINDEX")
+        if vnindex_df is None or len(vnindex_df) < 200:
+            vnindex_df = fetch_daily_index("VNINDEX")
+
         if vnindex_df is not None:
             vn_clean = vnindex_df.sort_values("Date").copy()
-            close_col = "Close" if "Close" in vn_clean.columns else "Giá đóng cửa"
+            close_col = "VNINDEX_Close" if "VNINDEX_Close" in vn_clean.columns else "Close"
             vn_clean["VNINDEX_Return_1d"] = vn_clean[close_col].pct_change()
             df_raw = pd.merge(
                 stock_df,
@@ -165,9 +207,11 @@ def prepare_inference_features(
     # Tính toán bộ đặc trưng
     df_feat = compute_features_per_symbol(df_raw, drop_na=True)
     if len(df_feat) < seq_length:
-        raise ValueError(
-            f"Mã {clean_sym} chỉ có {len(df_feat)} phiên hợp lệ, không đủ tối thiểu seq_length={seq_length}."
-        )
+        df_feat = compute_features_per_symbol(df_raw, drop_na=False).bfill().dropna(subset=FEATURE_COLS)
+        if len(df_feat) < seq_length:
+            raise ValueError(
+                f"Mã {clean_sym} chỉ có {len(df_feat)} phiên hợp lệ, không đủ tối thiểu seq_length={seq_length}."
+            )
 
     latest_row = df_feat.iloc[-1]
     latest_close = float(latest_row["Close"])
@@ -263,8 +307,8 @@ def predict_trend(
     }
 
     # Xây dựng Quỹ đạo dự phóng 3 phiên (Multi-step Trend Trajectory T+1 -> T+3 theo vi cấu trúc T+2.5 Việt Nam)
-    # Xác suất phản ánh trực tiếp phân phối sinh lời 3 phiên do mô hình học được, loại bỏ các hệ số suy giảm giả định
     p_down, p_hold, p_up = float(probs[0]), float(probs[1]), float(probs[2])
+    future_days = get_future_trading_days(latest_date, count=horizon_days)
     trajectory = []
 
     # Phiên T+1: Khớp lệnh mở vị thế tại giá mở cửa (Open)
@@ -272,6 +316,9 @@ def predict_trend(
     trajectory.append({
         "day_offset": 1,
         "day_name": "T+1",
+        "date": future_days[0]["date"] if future_days else "",
+        "target_date": future_days[0]["date"] if future_days else "",
+        "formatted_target_date": future_days[0]["formatted_date"] if future_days else "",
         "predicted_trend": CLASS_NAMES[pred_1],
         "signal": SIGNAL_RECOMMENDATIONS[pred_1],
         "confidence": round(float(max(p_down, p_hold, p_up)), 4),
@@ -280,13 +327,16 @@ def predict_trend(
             CLASS_NAMES[1]: round(p_hold, 4),
             CLASS_NAMES[2]: round(p_up, 4),
         },
-        "note": "Khớp lệnh mở vị thế tại giá mở cửa (Open) kèm trượt giá 0.05% nếu có tín hiệu MUA.",
+        "note": f"Khớp lệnh mở vị thế tại giá Open phiên {future_days[0]['formatted_date'] if future_days else 'T+1'} kèm trượt giá 0.05% nếu có tín hiệu MUA.",
     })
 
     # Phiên T+2: Nắm giữ & chờ cổ phiếu về tài khoản (vị thế được bảo lưu theo quy chế VSDC)
     trajectory.append({
         "day_offset": 2,
         "day_name": "T+2",
+        "date": future_days[1]["date"] if len(future_days) > 1 else "",
+        "target_date": future_days[1]["date"] if len(future_days) > 1 else "",
+        "formatted_target_date": future_days[1]["formatted_date"] if len(future_days) > 1 else "",
         "predicted_trend": CLASS_NAMES[pred_1],
         "signal": "NẮM GIỮ (HOLD)",
         "confidence": round(float(max(p_down, p_hold, p_up)), 4),
@@ -295,13 +345,16 @@ def predict_trend(
             CLASS_NAMES[1]: round(p_hold, 4),
             CLASS_NAMES[2]: round(p_up, 4),
         },
-        "note": "Cổ phiếu đang về tài khoản theo chu kỳ thanh toán T+2 (khóa vị thế bán theo quy chế VSDC).",
+        "note": f"Cổ phiếu đang về tài khoản trong phiên {future_days[1]['formatted_date'] if len(future_days) > 1 else 'T+2'} (khóa vị thế bán theo quy chế VSDC).",
     })
 
     # Phiên T+3: Cổ phiếu khả dụng trong tài khoản - Đạt tới chân trời dự phóng đích
     trajectory.append({
         "day_offset": 3,
         "day_name": "T+3",
+        "date": future_days[2]["date"] if len(future_days) > 2 else "",
+        "target_date": future_days[2]["date"] if len(future_days) > 2 else "",
+        "formatted_target_date": future_days[2]["formatted_date"] if len(future_days) > 2 else "",
         "predicted_trend": CLASS_NAMES[pred_label],
         "signal": SIGNAL_RECOMMENDATIONS[pred_label],
         "confidence": round(float(max(p_down, p_hold, p_up)), 4),
@@ -310,7 +363,7 @@ def predict_trend(
             CLASS_NAMES[1]: round(p_hold, 4),
             CLASS_NAMES[2]: round(p_up, 4),
         },
-        "note": "Cổ phiếu khả dụng. Sẵn sàng hiện thực hóa lợi nhuận hoặc quản trị rủi ro theo xu hướng chu kỳ.",
+        "note": f"Cổ phiếu khả dụng phiên {future_days[2]['formatted_date'] if len(future_days) > 2 else 'T+3'}. Sẵn sàng hiện thực hóa lợi nhuận hoặc quản trị rủi ro.",
     })
 
     if pred_label == 2:
@@ -333,6 +386,8 @@ def predict_trend(
         except Exception:
             pass
 
+    session_info = get_target_market_session_info()
+
     return {
         "symbol": clean_sym,
         "date": latest_date,
@@ -349,6 +404,7 @@ def predict_trend(
         "trajectory": trajectory,
         "summary_guidance": guidance,
         "training_info": training_info,
+        "market_session_label": session_info["status_label"],
     }
 
 

@@ -70,17 +70,24 @@ class SSIFastConnectClient:
             "consumerSecret": self.consumer_secret,
         }
 
-        response = self._session.post(url, json=payload, headers=self._headers, timeout=15)
-        response.raise_for_status()
-        data = response.json()
+        last_err = None
+        for attempt in range(3):
+            try:
+                response = self._session.post(url, json=payload, headers=self._headers, timeout=30)
+                response.raise_for_status()
+                data = response.json()
+                if data.get("status") == 200 and "data" in data:
+                    self._access_token = data["data"]["accessToken"]
+                    self._token_expiry = now + timedelta(hours=6)
+                    return self._access_token
+                else:
+                    raise RuntimeError(f"Lỗi xác thực SSI FC-Data: {data.get('message')}")
+            except Exception as exc:
+                last_err = exc
+                logger.warning("Lấy AccessToken SSI lần %d/3 thất bại: %s", attempt + 1, exc)
+                time.sleep(1.0)
 
-        if data.get("status") != 200 or "data" not in data:
-            raise RuntimeError(f"Lỗi xác thực SSI FC-Data: {data.get('message')}")
-
-        self._access_token = data["data"]["accessToken"]
-        # Token của SSI thường có thời hạn 8-24 tiếng, an toàn cache trong 6 tiếng
-        self._token_expiry = now + timedelta(hours=6)
-        return self._access_token
+        raise RuntimeError(f"Không thể lấy JWT Access Token từ SSI sau 3 lần thử: {last_err}") from last_err
 
     def _format_date_for_ssi(self, date_str: str) -> str:
         """Chuyển định dạng YYYY-MM-DD sang DD/MM/YYYY theo chuẩn SSI API."""
@@ -101,7 +108,7 @@ class SSIFastConnectClient:
         unit: str = "kVND",  # "kVND" (chia 1000 để tương thích dự án cũ) hoặc "VND"
     ) -> pd.DataFrame:
         """
-        Truy vấn nến lịch sử ngày (Daily OHLCV) có hỗ trợ phân trang tự động.
+        Truy vấn nến lịch sử ngày (Daily OHLCV) có hỗ trợ phân trang tự động và retry.
 
         Args:
             symbol: Mã cổ phiếu (VIC, FPT, HPG, ...)
@@ -136,9 +143,26 @@ class SSIFastConnectClient:
             }
 
             url = self.api_url + "api/v2/Market/DailyOhlc"
-            res = self._session.get(url, params=params, headers=headers, timeout=20)
-            res.raise_for_status()
-            res_data = res.json()
+            res_data = None
+            last_err = None
+
+            for attempt in range(3):
+                try:
+                    res = self._session.get(url, params=params, headers=headers, timeout=30)
+                    res.raise_for_status()
+                    res_data = res.json()
+                    status_str = str(res_data.get("status", "")).lower()
+                    if status_str in ["200", "success"]:
+                        break
+                    else:
+                        last_err = RuntimeError(f"API trả về status {status_str}: {res_data.get('message')}")
+                except Exception as exc:
+                    last_err = exc
+                logger.warning("Truy vấn DailyOhlc %s trang %d lần %d/3 thất bại: %s", symbol, page_index, attempt + 1, last_err)
+                time.sleep(1.2)
+
+            if res_data is None:
+                raise RuntimeError(f"Lỗi truy vấn DailyOhlc {symbol} sau 3 lần thử: {last_err}") from last_err
 
             status_str = str(res_data.get("status", "")).lower()
             if status_str not in ["200", "success"]:

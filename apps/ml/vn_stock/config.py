@@ -29,8 +29,22 @@ STUDY_START_DATE = "2023-04-03"
 DEFAULT_SYMBOL = "VIC"
 DEFAULT_SYMBOLS = ["VIC", "HPG", "FPT", "VNM", "MWG"]
 DEFAULT_START_DATE = FETCH_START_DATE
-DEFAULT_END_DATE = "2026-10-21"
+
+def get_default_end_date() -> str:
+    """Tự động lấy ngày phiên chốt hợp lệ gần nhất (T sau 15:00, hoặc T-1 trước 15:00)."""
+    try:
+        from vn_stock.market_session import get_target_market_date
+
+        return get_target_market_date()
+    except Exception:
+        return "2026-10-22"
+
+DEFAULT_END_DATE = get_default_end_date()
 DEFAULT_SEQ_LENGTH = 20
+
+# Danh mục các chỉ số thị trường hỗ trợ
+SUPPORTED_INDICES = ["VNINDEX", "VN30", "HNX", "HNX30", "VN100", "UPCOM", "VN30F1M"]
+SYMBOL_UNKNOWN_CODE = -1
 
 # Bảng mã hóa cố định định danh cổ phiếu (Symbol -> Code) đảm bảo tính nhất quán tuyệt đối giữa Train và Inference
 VN30_SYMBOLS = [
