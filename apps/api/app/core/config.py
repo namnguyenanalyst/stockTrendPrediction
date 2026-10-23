@@ -24,6 +24,7 @@ class Settings(BaseSettings):
 
     # Danh mục mã cổ phiếu hỗ trợ
     CORE_SYMBOLS: list[str] = ["VIC", "HPG", "FPT", "VNM", "MWG"]
+    AUTO_SYNC_ON_STARTUP: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",

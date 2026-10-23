@@ -36,6 +36,8 @@ SYMBOL_METADATA = {
         "is_core": True,
         "sector": "Bán lẻ",
     },
+    "VHM": {"name": "Công ty Cổ phần Vinhomes", "exchange": "HOSE", "is_core": True, "sector": "Bất động sản"},
+    "SSI": {"name": "Công ty Cổ phần Chứng khoán SSI", "exchange": "HOSE", "is_core": True, "sector": "Dịch vụ tài chính"},
     "ACB": {"name": "Ngân hàng Á Châu", "exchange": "HOSE", "is_core": False, "sector": "Ngân hàng"},
     "BID": {
         "name": "Ngân hàng Đầu tư và Phát triển Việt Nam",
@@ -47,14 +49,43 @@ SYMBOL_METADATA = {
     "MBB": {"name": "Ngân hàng Quân Đội", "exchange": "HOSE", "is_core": False, "sector": "Ngân hàng"},
     "TCB": {"name": "Ngân hàng Kỹ Thương Việt Nam", "exchange": "HOSE", "is_core": False, "sector": "Ngân hàng"},
     "VCB": {"name": "Ngân hàng Ngoại Thương Việt Nam", "exchange": "HOSE", "is_core": False, "sector": "Ngân hàng"},
-    "VHM": {"name": "Công ty Cổ phần Vinhomes", "exchange": "HOSE", "is_core": False, "sector": "Bất động sản"},
     "VPB": {"name": "Ngân hàng Việt Nam Thịnh Vượng", "exchange": "HOSE", "is_core": False, "sector": "Ngân hàng"},
-    "SSI": {"name": "Công ty Cổ phần Chứng khoán SSI", "exchange": "HOSE", "is_core": False, "sector": "Dịch vụ tài chính"},
+    "DGC": {"name": "CTCP Tập đoàn Hóa chất Đức Giang", "exchange": "HOSE", "is_core": False, "sector": "Hóa chất"},
+    "MSN": {"name": "CTCP Tập đoàn Masan", "exchange": "HOSE", "is_core": False, "sector": "Hàng tiêu dùng"},
+    "PLX": {"name": "Tập đoàn Xăng dầu Việt Nam", "exchange": "HOSE", "is_core": False, "sector": "Năng lượng & Dầu khí"},
+    "POW": {"name": "Tổng công ty Điện lực Dầu khí VN", "exchange": "HOSE", "is_core": False, "sector": "Tiện ích & Năng lượng"},
+    "SAB": {"name": "Tổng CTCP Bia - Rượu - Nước giải khát Sài Gòn", "exchange": "HOSE", "is_core": False, "sector": "Đồ uống"},
+    "SHB": {"name": "Ngân hàng TMCP Sài Gòn - Hà Nội", "exchange": "HOSE", "is_core": False, "sector": "Ngân hàng"},
+    "STB": {"name": "Ngân hàng TMCP Sài Gòn Thương Tín", "exchange": "HOSE", "is_core": False, "sector": "Ngân hàng"},
+    "TPB": {"name": "Ngân hàng TMCP Tiên Phong", "exchange": "HOSE", "is_core": False, "sector": "Ngân hàng"},
+    "VIB": {"name": "Ngân hàng TMCP Quốc tế Việt Nam", "exchange": "HOSE", "is_core": False, "sector": "Ngân hàng"},
+    "VRE": {"name": "Công ty Cổ phần Vincom Retail", "exchange": "HOSE", "is_core": False, "sector": "Bất động sản"},
+    "GAS": {"name": "Tổng Công ty Khí Việt Nam", "exchange": "HOSE", "is_core": False, "sector": "Dầu khí"},
+    "GVR": {"name": "Tập đoàn Công nghiệp Cao su Việt Nam", "exchange": "HOSE", "is_core": False, "sector": "Hóa chất & Cao su"},
+    "BCM": {"name": "Tổng công ty Đầu tư và Phát triển Công nghiệp", "exchange": "HOSE", "is_core": False, "sector": "Bất động sản"},
+    "BVH": {"name": "Tập đoàn Bảo Việt", "exchange": "HOSE", "is_core": False, "sector": "Bảo hiểm"},
+    "HDB": {"name": "Ngân hàng TMCP Phát triển TP.HCM", "exchange": "HOSE", "is_core": False, "sector": "Ngân hàng"},
+    "SSB": {"name": "Ngân hàng TMCP Đông Nam Á", "exchange": "HOSE", "is_core": False, "sector": "Ngân hàng"},
+    "VJC": {"name": "CTCP Hàng không VietJet", "exchange": "HOSE", "is_core": False, "sector": "Hàng không & Vận tải"},
 }
 
 
 def get_available_symbols() -> list[StockSymbolInfo]:
     """Lấy danh sách các mã cổ phiếu được hỗ trợ trong hệ thống."""
+    # Quét thêm các file parquet trong raw để bổ sung mã người dùng vừa tải
+    symbols_dict = dict(SYMBOL_METADATA)
+    raw_dir = settings.DATA_DIR / "raw"
+    if raw_dir.exists():
+        for p in raw_dir.glob("*.parquet"):
+            sym = p.stem.upper()
+            if sym not in symbols_dict and not sym.startswith("_") and sym not in ["VNINDEX", "VN30"]:
+                symbols_dict[sym] = {
+                    "name": f"Công ty Cổ phần {sym}",
+                    "exchange": "HOSE",
+                    "is_core": False,
+                    "sector": "Đa ngành",
+                }
+
     return [
         StockSymbolInfo(
             symbol=sym,
@@ -62,12 +93,12 @@ def get_available_symbols() -> list[StockSymbolInfo]:
             exchange=info["exchange"],
             is_core=info["is_core"],
         )
-        for sym, info in SYMBOL_METADATA.items()
+        for sym, info in symbols_dict.items()
     ]
 
 
-def load_stock_dataframe(symbol: str) -> pd.DataFrame:
-    """Nạp DataFrame lịch sử của một mã cổ phiếu từ panel interim hoặc raw parquet."""
+def load_stock_dataframe(symbol: str, allow_remote_fetch: bool = True) -> pd.DataFrame:
+    """Nạp DataFrame lịch sử của một mã cổ phiếu từ panel interim, raw parquet hoặc tải on-demand từ SSI."""
     clean_sym = symbol.upper()
 
     # 1. Hỗ trợ các chỉ số thị trường (VNINDEX, VN30, HNX30, VN30F1M, HNX, VN100, UPCOM)
@@ -82,10 +113,12 @@ def load_stock_dataframe(symbol: str) -> pd.DataFrame:
     }
 
     if clean_sym in index_factors:
-        vni_path = settings.DATA_DIR / "raw" / "VNINDEX.parquet"
+        vni_path = settings.DATA_DIR / "raw" / f"{clean_sym}.parquet"
+        if not vni_path.exists():
+            vni_path = settings.DATA_DIR / "raw" / "VNINDEX.parquet"
         if vni_path.exists():
             df_vni = pd.read_parquet(vni_path).sort_values("Date").reset_index(drop=True)
-            c_col = "VNINDEX_Close" if "VNINDEX_Close" in df_vni.columns else "Close"
+            c_col = "VNINDEX_Close" if "VNINDEX_Close" in df_vni.columns else ("Close" if "Close" in df_vni.columns else df_vni.columns[1])
             factor, base_vol = index_factors[clean_sym]
 
             df_out = pd.DataFrame()
@@ -121,7 +154,7 @@ def load_stock_dataframe(symbol: str) -> pd.DataFrame:
             df["Symbol"] = clean_sym
         return df.sort_values("Date").reset_index(drop=True)
 
-    # 2. Hỗ trợ tổng hợp dữ liệu cho các mã cổ phiếu trong SYMBOL_METADATA nếu chưa có file parquet riêng
+    # Hệ số tổng hợp nhanh cho các mã rổ VN30
     stock_factors = {
         "ACB": (0.0146, 8202000),
         "BID": (0.0277, 3246000),
@@ -132,8 +165,38 @@ def load_stock_dataframe(symbol: str) -> pd.DataFrame:
         "VHM": (0.0242, 11200000),
         "VPB": (0.0114, 18300000),
         "SSI": (0.0164, 14900000),
+        "DGC": (0.063, 4200000),
+        "MSN": (0.043, 5100000),
+        "PLX": (0.022, 2800000),
+        "POW": (0.007, 9800000),
+        "SAB": (0.033, 1200000),
+        "SHB": (0.006, 21000000),
+        "STB": (0.018, 16000000),
+        "TPB": (0.010, 8500000),
+        "VIB": (0.012, 7300000),
+        "VRE": (0.011, 8900000),
+        "GAS": (0.041, 1400000),
+        "GVR": (0.019, 3200000),
+        "BCM": (0.041, 850000),
+        "BVH": (0.025, 1200000),
+        "HDB": (0.015, 9500000),
+        "SSB": (0.010, 6500000),
+        "VJC": (0.060, 1800000),
     }
 
+    # 2. Lazy On-demand fetch từ cổng SSI FastConnect nếu được phép
+    if allow_remote_fetch:
+        try:
+            from vn_stock.data_ingestion import fetch_stock_data
+            df = fetch_stock_data(clean_sym)
+            if df is not None and not df.empty:
+                if "Symbol" not in df.columns:
+                    df["Symbol"] = clean_sym
+                return df.sort_values("Date").reset_index(drop=True)
+        except Exception as exc:
+            logger.warning("Không thể tải nến SSI cho mã %s: %s", clean_sym, exc)
+
+    # 3. Fallback tổng hợp từ VNINDEX nếu có trong danh sách VN30
     if clean_sym in stock_factors:
         vni_path = settings.DATA_DIR / "raw" / "VNINDEX.parquet"
         if vni_path.exists():
@@ -162,8 +225,9 @@ def load_stock_dataframe(symbol: str) -> pd.DataFrame:
 
     raise HTTPException(
         status_code=404,
-        detail=f"Không tìm thấy dữ liệu cho mã '{clean_sym}'.",
+        detail=f"Không tìm thấy dữ liệu cho mã '{clean_sym}' trên thị trường chứng khoán.",
     )
+
 
 
 def get_stock_history(
@@ -337,10 +401,18 @@ def get_market_board_data() -> MarketBoardResponse:
     raw_vni_path = settings.DATA_DIR / "raw" / "VNINDEX.parquet"
     vni_df = pd.read_parquet(raw_vni_path) if raw_vni_path.exists() else None
 
-    vni_close = 1738.67
-    vni_chg = 46.70
-    vni_pct = 2.76
-    vni_sparkline = [1690.0, 1695.5, 1702.0, 1698.3, 1705.9, 1689.8, 1691.9, 1738.67]
+    if vni_df is not None and len(vni_df) >= 2:
+        c_col = "VNINDEX_Close" if "VNINDEX_Close" in vni_df.columns else "Close"
+        vni_close = round(float(vni_df.iloc[-1][c_col]), 2)
+        vni_prev = round(float(vni_df.iloc[-2][c_col]), 2)
+        vni_chg = round(vni_close - vni_prev, 2)
+        vni_pct = round((vni_chg / vni_prev) * 100, 2) if vni_prev > 0 else 0.0
+        vni_sparkline = [round(float(x), 2) for x in vni_df[c_col].tail(10).tolist()]
+    else:
+        vni_close = 1760.63
+        vni_chg = 21.96
+        vni_pct = 1.26
+        vni_sparkline = [1690.0, 1695.5, 1702.0, 1698.3, 1705.9, 1689.8, 1691.9, 1738.67, 1760.63]
 
     # 1. Danh sách 7 chỉ số thị trường chuẩn khớp với tab Chỉ số
     index_configs = [
@@ -426,7 +498,7 @@ def get_market_board_data() -> MarketBoardResponse:
     indices: list[IndexOverview] = []
     for cfg in index_configs:
         try:
-            df_idx = load_stock_dataframe(cfg["symbol"])
+            df_idx = load_stock_dataframe(cfg["symbol"], allow_remote_fetch=False)
             if len(df_idx) >= 2:
                 cur_val = round(float(df_idx["Close"].iloc[-1]), 2)
                 prev_val = round(float(df_idx["Close"].iloc[-2]), 2)
@@ -466,7 +538,7 @@ def get_market_board_data() -> MarketBoardResponse:
             {"name": f"Công ty {sym}", "exchange": "HOSE", "sector": "Đa ngành", "is_core": True},
         )
         try:
-            df = load_stock_dataframe(sym)
+            df = load_stock_dataframe(sym, allow_remote_fetch=False)
             if len(df) >= 2:
                 last = df.iloc[-1]
                 prev = df.iloc[-2]

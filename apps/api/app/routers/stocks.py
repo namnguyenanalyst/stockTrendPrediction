@@ -82,3 +82,27 @@ async def get_summary(
 async def get_market_board() -> MarketBoardResponse:
     """Endpoint truy vấn bảng giá thị trường toàn diện."""
     return stock_service.get_market_board_data()
+
+
+@router.get(
+    "/sync-status",
+    summary="Kiểm tra trạng thái phiên giao dịch và đồng bộ nến thị trường",
+    description="Trả về ngày chốt phiên gần nhất (T hoặc T-1) và thông tin phiên.",
+)
+async def get_sync_status() -> dict:
+    """Endpoint lấy trạng thái phiên thị trường và nến chốt."""
+    from app.services.prediction_service import get_market_sync_status
+
+    return get_market_sync_status()
+
+
+@router.post(
+    "/sync",
+    summary="Kích hoạt đồng bộ nến thị trường mới nhất từ SSI FC-Data",
+    description="Chủ động kéo nến mới nhất cho VNINDEX và các mã cổ phiếu.",
+)
+async def trigger_sync() -> dict:
+    """Endpoint kích hoạt đồng bộ dữ liệu thị trường."""
+    from app.services.prediction_service import trigger_market_sync
+
+    return trigger_market_sync()

@@ -27,12 +27,37 @@ logging.basicConfig(
 logger = logging.getLogger("vn_stock_api")
 
 
+async def run_startup_sync():
+    """Tự động kiểm tra và đồng bộ nến thị trường mới nhất trong nền khi khởi động."""
+    import asyncio
+    await asyncio.sleep(0.5)  # Nhường event loop cho server mở port ngay lập tức
+    try:
+        from vn_stock.market_session import get_target_market_session_info
+        session = get_target_market_session_info()
+        logger.info(
+            "Kiểm tra phiên thị trường khởi động: Mục tiêu nến %s (%s)",
+            session["target_date"],
+            session["session_name"],
+        )
+        from vn_stock.data_ingestion import sync_latest_market_data
+        res = sync_latest_market_data(force=False)
+        logger.info("Hoàn tất kiểm tra đồng bộ nến thị trường: %s", res.get("status"))
+    except Exception as exc:
+        logger.warning("Không thể tự động đồng bộ khi khởi động (sử dụng cache hiện có): %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Quản lý vòng đời khởi động và tắt ứng dụng FastAPI (Lifespan handler)."""
+    import asyncio
+
     logger.info("Khởi động VN Stock API Backend (version %s)...", settings.VERSION)
     logger.info("Đường dẫn dữ liệu: %s", settings.DATA_DIR)
     logger.info("Đường dẫn mô hình: %s", settings.MODELS_DIR)
+
+    if settings.AUTO_SYNC_ON_STARTUP:
+        asyncio.create_task(run_startup_sync())
+
     yield
     logger.info("Đang tắt dịch vụ VN Stock API Backend...")
 

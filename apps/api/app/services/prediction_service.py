@@ -38,13 +38,6 @@ def predict_stock_signal(
             detail=f"Mô hình '{model_type}' không hợp lệ. Hệ thống chỉ hỗ trợ 'lightgbm' hoặc 'lstm'.",
         )
 
-    if clean_sym not in settings.CORE_SYMBOLS:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Mã cổ phiếu '{clean_sym}' không nằm trong danh mục hỗ trợ ({', '.join(settings.CORE_SYMBOLS)}).",
-        )
-
-
     try:
         from vn_stock.modeling import predict_trend
 
@@ -53,6 +46,9 @@ def predict_stock_signal(
             model_type=model_clean,
             models_dir=settings.MODELS_DIR,
         )
+
+        session_info = get_market_sync_status()
+        session_label = session_info.get("status_label", "")
 
         return PredictionResponse(
             symbol=res["symbol"],
@@ -67,6 +63,8 @@ def predict_stock_signal(
             horizon=res.get("horizon", "T+3"),
             horizon_days=res.get("horizon_days", 3),
             is_live_synced=res.get("is_live_synced", False),
+            market_session_label=res.get("market_session_label", session_label),
+            session_info=session_info,
             trajectory=res.get("trajectory", []),
             summary_guidance=res.get("summary_guidance", ""),
             training_info=res.get("training_info"),
@@ -100,12 +98,6 @@ def sync_live_and_predict(
             detail=f"Mô hình '{model_type}' không hợp lệ. Chỉ hỗ trợ 'lightgbm' hoặc 'lstm'.",
         )
 
-    if clean_sym not in settings.CORE_SYMBOLS:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Mã cổ phiếu '{clean_sym}' không nằm trong danh mục hỗ trợ ({', '.join(settings.CORE_SYMBOLS)}).",
-        )
-
     try:
         from vn_stock.data_ingestion import fetch_stock_data
         from vn_stock.modeling import predict_trend
@@ -124,6 +116,9 @@ def sync_live_and_predict(
             is_live_synced=True,
         )
 
+        session_info = get_market_sync_status()
+        session_label = session_info.get("status_label", "")
+
         return PredictionResponse(
             symbol=res["symbol"],
             date=res["date"],
@@ -137,6 +132,8 @@ def sync_live_and_predict(
             horizon=res.get("horizon", "T+3"),
             horizon_days=res.get("horizon_days", 3),
             is_live_synced=True,
+            market_session_label=res.get("market_session_label", session_label),
+            session_info=session_info,
             trajectory=res.get("trajectory", []),
             summary_guidance=res.get("summary_guidance", ""),
             training_info=res.get("training_info"),
@@ -194,3 +191,23 @@ def predict_batch_signals(model_type: str = "lightgbm") -> BatchPredictionRespon
         total_symbols=len(results),
         predictions=results,
     )
+
+
+def get_market_sync_status() -> dict:
+    """Trả về trạng thái phiên giao dịch hiện tại và tiến trình đồng bộ dữ liệu."""
+    try:
+        from vn_stock.market_session import get_target_market_session_info
+        return get_target_market_session_info()
+    except Exception as e:
+        logger.warning("Không thể lấy session info: %s", e)
+        return {"status": "unknown", "error": str(e)}
+
+
+def trigger_market_sync(force: bool = False) -> dict:
+    """Kích hoạt thủ công tiến trình đồng bộ toàn bộ nến thị trường phiên gần nhất."""
+    try:
+        from vn_stock.data_ingestion import sync_latest_market_data
+        return sync_latest_market_data(force=force)
+    except Exception as e:
+        logger.exception("Lỗi kích hoạt đồng bộ thị trường")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi đồng bộ dữ liệu: {e}")

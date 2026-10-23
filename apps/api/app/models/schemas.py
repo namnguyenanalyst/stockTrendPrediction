@@ -151,6 +151,7 @@ class MarketBoardResponse(BaseModel):
 class DayForecast(BaseModel):
     day_offset: int = Field(..., description="Chỉ số ngày (1: T+1, 2: T+2, 3: T+3)")
     day_name: str = Field(..., description="Tên phiên ('T+1', 'T+2', 'T+3')")
+    date: str = Field(default="", description="Ngày giao dịch dương lịch tương ứng")
     predicted_trend: str = Field(..., description="Xu hướng dự phóng ('GIẢM', 'ĐI NGANG', 'TĂNG')")
     signal: str = Field(
         ..., description="Tín hiệu hành động ('BÁN (SELL)', 'NẮM GIỮ (HOLD)', 'MUA (BUY)')"
@@ -177,6 +178,8 @@ class PredictionResponse(BaseModel):
     horizon: str = Field(default="T+3", description="Kỳ hạn dự báo")
     horizon_days: int = Field(default=3, description="Số ngày nắm giữ mục tiêu (3 phiên)")
     is_live_synced: bool = Field(default=False, description="Trạng thái đồng bộ nến mới nhất từ SSI")
+    market_session_label: str = Field(default="", description="Nhãn phiên giao dịch căn cứ")
+    session_info: dict | None = Field(default=None, description="Chi tiết trạng thái phiên giao dịch")
     trajectory: list[DayForecast] = Field(
         default_factory=list, description="Quỹ đạo dự phóng 3 phiên T+1, T+2, T+3"
     )

@@ -164,14 +164,54 @@ def test_predict_batch_post():
 
 
 def test_invalid_symbol_backtest():
-    """Kiểm tra backtest với mã không thuộc core symbols trả về 400."""
-    payload = {
-        "symbol": "SSI",
+    """Kiểm tra backtest với mã không tồn tại hoặc model không hỗ trợ."""
+    # Model không hợp lệ trả về 400
+    payload_bad_model = {
+        "symbol": "VIC",
+        "model_type": "invalid_model_xyz",
+        "initial_capital": 100_000_000.0,
+    }
+    res_bad_model = client.post("/api/backtest/run", json=payload_bad_model)
+    assert res_bad_model.status_code == 400
+
+    # Mã không tồn tại trả về 404
+    payload_bad_sym = {
+        "symbol": "NON_EXISTENT_XYZ",
         "model_type": "lightgbm",
         "initial_capital": 100_000_000.0,
     }
-    response = client.post("/api/backtest/run", json=payload)
-    assert response.status_code == 400
+    res_bad_sym = client.post("/api/backtest/run", json=payload_bad_sym)
+    assert res_bad_sym.status_code == 404
+
+
+def test_stocks_sync_status():
+    """Kiểm tra endpoint GET /api/stocks/sync-status."""
+    response = client.get("/api/stocks/sync-status")
+    assert response.status_code == 200
+    data = response.json()
+    assert "target_date" in data
+    assert "session_type" in data
+    assert "session_name" in data
+    assert "status_label" in data
+    assert "is_market_closed" in data
+    assert "prediction_horizon_desc" in data
+
+
+def test_predict_universal_symbol():
+    """Kiểm tra dự đoán với mã mở rộng ngoài 5 mã mặc định (ví dụ VHM)."""
+    response = client.get("/api/predict/signal?symbol=VHM&model_type=lightgbm")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["symbol"] == "VHM"
+    assert "probabilities" in data
+
+
+def test_stocks_trigger_sync():
+    """Kiểm tra endpoint POST /api/stocks/sync."""
+    response = client.post("/api/stocks/sync")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] in ["success", "completed", "running"]
 
 
 def test_predict_live_endpoints():
