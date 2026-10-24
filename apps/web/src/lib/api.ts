@@ -152,7 +152,8 @@ export async function syncLivePrediction(
 export async function retrainProductionModel(
   horizon = 3,
   threshold = 0.02,
-  valBufferDays = 40
+  valBufferDays = 40,
+  scope: "CORE" | "VN30" = "VN30"
 ): Promise<RetrainResponse> {
   return fetchJson<RetrainResponse>("/api/predict/retrain", {
     method: "POST",
@@ -160,6 +161,7 @@ export async function retrainProductionModel(
       horizon,
       threshold,
       val_buffer_days: valBufferDays,
+      scope,
     }),
   });
 }

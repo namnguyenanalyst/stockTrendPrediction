@@ -8,6 +8,7 @@ export interface StockSymbolInfo {
   name: string;
   exchange: string;
   is_core: boolean;
+  is_vn30?: boolean;
   sector?: string;
 }
 
@@ -160,6 +161,9 @@ export interface RetrainResponse {
   horizon_days: number;
   threshold: number;
   val_buffer_days: number;
+  scope?: string;
+  symbols_count?: number;
+  symbols?: string[];
   latest_market_date: string;
   train_samples: number;
   val_samples: number;

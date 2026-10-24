@@ -81,8 +81,26 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Lọc danh mục mã theo nhóm phân loại
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+
+  const categoryFiltered = availableSymbols.filter((item) => {
+    if (selectedCategory === "VN30") return !!item.is_vn30;
+    if (selectedCategory === "INDEX") return item.exchange === "INDEX";
+    if (selectedCategory === "BANK") return item.sector?.includes("Ngân hàng");
+    if (selectedCategory === "REALESTATE") return item.sector?.includes("Bất động sản");
+    if (selectedCategory === "STEEL") return item.sector?.includes("Thép");
+    if (selectedCategory === "RETAIL_TECH")
+      return (
+        item.sector?.includes("Công nghệ") ||
+        item.sector?.includes("Bán lẻ") ||
+        item.sector?.includes("Tiêu dùng")
+      );
+    return true;
+  });
+
   // Lọc danh sách mã theo từ khóa
-  const filteredSymbols = availableSymbols.filter(
+  const filteredSymbols = categoryFiltered.filter(
     (item) =>
       item.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -102,6 +120,16 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       handleSelectSymbol(searchQuery);
     }
   };
+
+  const CATEGORY_TABS = [
+    { id: "ALL", label: "Tất cả" },
+    { id: "VN30", label: "⭐ VN30" },
+    { id: "INDEX", label: "📈 Chỉ số" },
+    { id: "BANK", label: "Ngân hàng" },
+    { id: "REALESTATE", label: "BĐS" },
+    { id: "STEEL", label: "Thép" },
+    { id: "RETAIL_TECH", label: "Bán lẻ/CN" },
+  ];
 
   return (
     <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/85 backdrop-blur-md">
@@ -156,37 +184,73 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
             {/* Dropdown gợi ý mã cổ phiếu & chỉ số */}
             {isSearchOpen && (
-              <div className="absolute right-0 mt-1 max-h-64 w-64 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-1.5 shadow-2xl backdrop-blur-xl z-50">
-                <div className="px-2 py-1 text-[10px] font-semibold text-slate-400 border-b border-slate-800/80 mb-1 flex items-center justify-between">
+              <div className="absolute right-0 mt-1 max-h-80 w-80 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-2 shadow-2xl backdrop-blur-xl z-50">
+                {/* Header gợi ý */}
+                <div className="px-1.5 py-1 text-[10px] font-semibold text-slate-400 border-b border-slate-800/80 mb-1.5 flex items-center justify-between">
                   <span>Gợi ý mã giao dịch</span>
-                  <span className="text-emerald-400">Enter để chọn bất kỳ</span>
+                  <span className="text-emerald-400 font-mono text-[9px]">Enter để chọn bất kỳ</span>
                 </div>
-                {filteredSymbols.length > 0 ? (
-                  filteredSymbols.slice(0, 15).map((item) => (
+
+                {/* Thanh phân loại Category Chips */}
+                <div className="flex items-center gap-1 overflow-x-auto pb-1.5 mb-1.5 border-b border-slate-800/80 scrollbar-none">
+                  {CATEGORY_TABS.map((cat) => (
                     <button
-                      key={item.symbol}
-                      onClick={() => handleSelectSymbol(item.symbol)}
-                      className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition ${
-                        selectedSymbol === item.symbol
-                          ? "bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30"
-                          : "text-slate-300 hover:bg-slate-900 hover:text-white"
+                      key={cat.id}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedCategory(cat.id);
+                      }}
+                      className={`rounded-md px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap transition-colors ${
+                        selectedCategory === cat.id
+                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                          : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
                       }`}
                     >
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-slate-100">{item.symbol}</span>
-                        <span className="text-[10px] text-slate-400 truncate max-w-[120px]">
-                          {item.name}
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-mono text-slate-500">
-                        {item.exchange}
-                      </span>
+                      {cat.label}
                     </button>
-                  ))
+                  ))}
+                </div>
+
+                {filteredSymbols.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {filteredSymbols.slice(0, 30).map((item) => (
+                      <button
+                        key={item.symbol}
+                        onClick={() => handleSelectSymbol(item.symbol)}
+                        className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition ${
+                          selectedSymbol === item.symbol
+                            ? "bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30"
+                            : "text-slate-300 hover:bg-slate-900 hover:text-white"
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-bold text-slate-100">{item.symbol}</span>
+                          {item.is_vn30 && (
+                            <span className="rounded bg-amber-500/15 border border-amber-500/30 px-1 py-0.2 text-[9px] font-bold text-amber-400">
+                              VN30
+                            </span>
+                          )}
+                          {item.exchange === "INDEX" && (
+                            <span className="rounded bg-sky-500/15 border border-sky-500/30 px-1 py-0.2 text-[9px] font-bold text-sky-400">
+                              CHỈ SỐ
+                            </span>
+                          )}
+                          <span className="text-[10px] text-slate-400 truncate max-w-[130px]">
+                            {item.name}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-500 shrink-0">
+                          {item.exchange}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 ) : (
-                  <div className="p-2 text-center text-xs text-slate-400">
-                    <p>Nhấn <strong>Enter</strong> để nạp mã:</p>
-                    <span className="font-bold text-emerald-400 uppercase mt-0.5 inline-block">
+                  <div className="p-3 text-center text-xs text-slate-400">
+                    <p>Không thấy trong danh mục đã lưu.</p>
+                    <p className="mt-1">Nhấn <strong>Enter</strong> để tải nến SSI trực tuyến:</p>
+                    <span className="font-bold text-emerald-400 uppercase mt-1 inline-block">
                       &quot;{searchQuery}&quot;
                     </span>
                   </div>
