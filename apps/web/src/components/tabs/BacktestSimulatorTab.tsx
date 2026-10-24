@@ -268,13 +268,12 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
     if (buyConditions.market_condition && buyConditions.market_condition !== "all") {
       tags.push({
         id: "vni",
-        label: `VN-Index: ${
-          buyConditions.market_condition === "uptrend"
+        label: `VN-Index: ${buyConditions.market_condition === "uptrend"
             ? "Tăng"
             : buyConditions.market_condition === "sideways"
-            ? "Đi ngang"
-            : "Giảm"
-        }`,
+              ? "Đi ngang"
+              : "Giảm"
+          }`,
         onRemove: () => setBuyConditions({ ...buyConditions, market_condition: "all" }),
       });
     }
@@ -454,11 +453,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
           <button
             type="button"
             onClick={() => setActiveSubtab("my_strategy")}
-            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${
-              activeSubtab === "my_strategy"
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${activeSubtab === "my_strategy"
                 ? "bg-slate-800 text-emerald-400 border border-slate-700 shadow-md shadow-emerald-500/10"
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
-            }`}
+              }`}
           >
             <History className="h-4 w-4" />
             <span>Chiến thuật của tôi</span>
@@ -467,11 +465,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
           <button
             type="button"
             onClick={() => setActiveSubtab("presets")}
-            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${
-              activeSubtab === "presets"
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${activeSubtab === "presets"
                 ? "bg-slate-800 text-purple-400 border border-slate-700 shadow-md shadow-purple-500/10"
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
-            }`}
+              }`}
           >
             <Sparkles className="h-4 w-4" />
             <span>Chiến thuật mẫu</span>
@@ -530,9 +527,6 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                     className="bg-transparent text-base font-bold text-slate-100 hover:border-b hover:border-slate-600 focus:border-b focus:border-emerald-500 focus:outline-none sm:text-lg"
                     title="Nhấn để đổi tên chiến thuật"
                   />
-                  <p className="text-xs text-slate-400">
-                    Khớp lệnh $Open_{"{t+1}"}$ sàn HOSE • Lưu ký T+2 • Thuế 0.10% • Phí 0.15% • Lô chẵn 100
-                  </p>
                 </div>
               </div>
 
@@ -677,10 +671,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                         {scopeType === "index"
                           ? `(${selectedIndex})`
                           : scopeType === "sector"
-                          ? `(Ngành)`
-                          : scopeType === "portfolio"
-                          ? `(${portfolioSymbols.length} mã)`
-                          : `(${selectedSymbol})`}
+                            ? `(Ngành)`
+                            : scopeType === "portfolio"
+                              ? `(${portfolioSymbols.length} mã)`
+                              : `(${selectedSymbol})`}
                       </span>
                     </>
                   )}
@@ -830,11 +824,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                 <button
                   type="button"
                   onClick={() => setResultsTab("portfolio")}
-                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${
-                    resultsTab === "portfolio"
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${resultsTab === "portfolio"
                       ? "bg-slate-800 text-emerald-400 border border-slate-700"
                       : "text-slate-400 hover:text-slate-200"
-                  }`}
+                    }`}
                 >
                   <BarChart3 className="h-4 w-4" />
                   <span>Biểu đồ tài sản</span>
@@ -844,11 +837,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                   <button
                     type="button"
                     onClick={() => setResultsTab("breakdown")}
-                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${
-                      resultsTab === "breakdown"
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${resultsTab === "breakdown"
                         ? "bg-slate-800 text-emerald-400 border border-slate-700"
                         : "text-slate-400 hover:text-slate-200"
-                    }`}
+                      }`}
                   >
                     <Layers className="h-4 w-4" />
                     <span>Phân rã từng mã ({portfolioResult.symbols_count})</span>
@@ -858,11 +850,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                 <button
                   type="button"
                   onClick={() => setResultsTab("trades")}
-                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${
-                    resultsTab === "trades"
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${resultsTab === "trades"
                       ? "bg-slate-800 text-emerald-400 border border-slate-700"
                       : "text-slate-400 hover:text-slate-200"
-                  }`}
+                    }`}
                 >
                   <ListFilter className="h-4 w-4" />
                   <span>Nhật ký lệnh {detailSymbol ? `(${detailSymbol})` : `(${trades.length})`}</span>
@@ -994,11 +985,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                               <td className="px-3 py-2 font-mono text-slate-400">#{tr.trade_id}</td>
                               <td className="px-3 py-2">
                                 <span
-                                  className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                                    isBuy
+                                  className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold ${isBuy
                                       ? "bg-emerald-500/10 text-emerald-400"
                                       : "bg-rose-500/10 text-rose-400"
-                                  }`}
+                                    }`}
                                 >
                                   {tr.order_type}
                                 </span>
