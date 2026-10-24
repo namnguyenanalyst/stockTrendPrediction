@@ -24,11 +24,29 @@ export const EquityCurveChart: React.FC<EquityCurveChartProps> = ({
       return { points: [], minVal: 0, maxVal: 1, width, padding };
     }
 
+    // Chuẩn hóa dữ liệu phòng thủ chống trường hợp PascalCase hoặc thiếu trường
+    const normalizedData: EquityCurvePoint[] = equityCurve.map((pt) => {
+      const anyPt = pt as unknown as Record<string, unknown>;
+      const totalEquity = Number(pt.total_equity ?? anyPt.Total_Equity ?? initialCapital);
+      const benchmarkEquity = Number(pt.benchmark_equity ?? anyPt.Benchmark_Equity ?? initialCapital);
+      const drawdownPct = Number(pt.drawdown_pct ?? anyPt.Drawdown_Pct ?? 0);
+      const dailyReturn = Number(pt.daily_return ?? anyPt.Daily_Return ?? 0);
+      const dateStr = String(pt.date ?? anyPt.Date ?? "");
+
+      return {
+        date: dateStr,
+        total_equity: isNaN(totalEquity) ? initialCapital : totalEquity,
+        benchmark_equity: isNaN(benchmarkEquity) ? initialCapital : benchmarkEquity,
+        drawdown_pct: isNaN(drawdownPct) ? 0 : drawdownPct,
+        daily_return: isNaN(dailyReturn) ? 0 : dailyReturn,
+      };
+    });
+
     // Lấy min và max giá trị tài sản
     let min = initialCapital;
     let max = initialCapital;
 
-    equityCurve.forEach((pt) => {
+    normalizedData.forEach((pt) => {
       if (pt.total_equity < min) min = pt.total_equity;
       if (pt.total_equity > max) max = pt.total_equity;
       if (pt.benchmark_equity < min) min = pt.benchmark_equity;
@@ -44,12 +62,12 @@ export const EquityCurveChart: React.FC<EquityCurveChartProps> = ({
     const chartH = height - padding.top - padding.bottom;
 
     const scaleX = (idx: number) =>
-      padding.left + (idx / Math.max(equityCurve.length - 1, 1)) * chartW;
+      padding.left + (idx / Math.max(normalizedData.length - 1, 1)) * chartW;
 
     const scaleY = (val: number) =>
-      padding.top + chartH - ((val - paddedMin) / (paddedMax - paddedMin)) * chartH;
+      padding.top + chartH - ((val - paddedMin) / (paddedMax - paddedMin || 1)) * chartH;
 
-    const pts = equityCurve.map((pt, idx) => ({
+    const pts = normalizedData.map((pt, idx) => ({
       x: scaleX(idx),
       yAI: scaleY(pt.total_equity),
       yBH: scaleY(pt.benchmark_equity),
@@ -242,23 +260,23 @@ export const EquityCurveChart: React.FC<EquityCurveChartProps> = ({
       {hoveredPoint && (
         <div className="mt-2 flex flex-wrap items-center justify-between rounded-lg bg-slate-900 border border-slate-800 px-3 py-1.5 text-xs">
           <span className="font-semibold text-slate-300">
-            Ngày: {hoveredPoint.data.date}
+            Ngày: {hoveredPoint.data.date || "--"}
           </span>
           <div className="flex items-center gap-4">
             <span className="font-bold text-emerald-400">
-              AI: {hoveredPoint.data.total_equity.toLocaleString("vi-VN")} đ (
+              AI: {(hoveredPoint.data.total_equity ?? 0).toLocaleString("vi-VN")} đ (
               {(
-                ((hoveredPoint.data.total_equity - initialCapital) /
-                  initialCapital) *
+                (((hoveredPoint.data.total_equity ?? initialCapital) - initialCapital) /
+                  (initialCapital || 1)) *
                 100
               ).toFixed(2)}
               %)
             </span>
             <span className="font-bold text-cyan-400">
-              B&H: {hoveredPoint.data.benchmark_equity.toLocaleString("vi-VN")} đ (
+              B&H: {(hoveredPoint.data.benchmark_equity ?? 0).toLocaleString("vi-VN")} đ (
               {(
-                ((hoveredPoint.data.benchmark_equity - initialCapital) /
-                  initialCapital) *
+                (((hoveredPoint.data.benchmark_equity ?? initialCapital) - initialCapital) /
+                  (initialCapital || 1)) *
                 100
               ).toFixed(2)}
               %)
@@ -266,7 +284,7 @@ export const EquityCurveChart: React.FC<EquityCurveChartProps> = ({
             <span className="text-slate-400">
               Drawdown:{" "}
               <strong className="text-rose-400">
-                {hoveredPoint.data.drawdown_pct.toFixed(2)}%
+                {(hoveredPoint.data.drawdown_pct ?? 0).toFixed(2)}%
               </strong>
             </span>
           </div>

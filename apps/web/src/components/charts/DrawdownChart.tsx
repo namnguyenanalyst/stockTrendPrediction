@@ -20,9 +20,18 @@ export const DrawdownChart: React.FC<DrawdownChartProps> = ({
       return { points: [], minDrawdown: -10, width, padding };
     }
 
+    const normalizedData = equityCurve.map((pt) => {
+      const anyPt = pt as unknown as Record<string, unknown>;
+      const dd = Number(pt.drawdown_pct ?? anyPt.Drawdown_Pct ?? 0);
+      return {
+        dd: isNaN(dd) ? 0 : dd,
+        date: String(pt.date ?? anyPt.Date ?? ""),
+      };
+    });
+
     let minDD = 0;
-    equityCurve.forEach((pt) => {
-      if (pt.drawdown_pct < minDD) minDD = pt.drawdown_pct;
+    normalizedData.forEach((pt) => {
+      if (pt.dd < minDD) minDD = pt.dd;
     });
 
     // Làm tròn min drawdown xuống bội số 5
@@ -32,15 +41,15 @@ export const DrawdownChart: React.FC<DrawdownChartProps> = ({
     const chartH = height - padding.top - padding.bottom;
 
     const scaleX = (idx: number) =>
-      padding.left + (idx / Math.max(equityCurve.length - 1, 1)) * chartW;
+      padding.left + (idx / Math.max(normalizedData.length - 1, 1)) * chartW;
 
     const scaleY = (ddPct: number) =>
-      padding.top + (Math.abs(ddPct) / Math.abs(floorMin)) * chartH;
+      padding.top + (Math.abs(ddPct) / Math.abs(floorMin || 1)) * chartH;
 
-    const pts = equityCurve.map((pt, idx) => ({
+    const pts = normalizedData.map((pt, idx) => ({
       x: scaleX(idx),
-      y: scaleY(pt.drawdown_pct),
-      dd: pt.drawdown_pct,
+      y: scaleY(pt.dd),
+      dd: pt.dd,
       date: pt.date,
     }));
 

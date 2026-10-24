@@ -1532,7 +1532,8 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                         }
                         initialCapital={
                           detailSymbol
-                            ? initialCapital / (portfolioResult?.symbols_count || 1)
+                            ? portfolioResult?.individual_results?.[detailSymbol]?.metrics?.initial_capital ||
+                              initialCapital / (portfolioResult?.symbols_count || 1)
                             : initialCapital
                         }
                         height={320}
