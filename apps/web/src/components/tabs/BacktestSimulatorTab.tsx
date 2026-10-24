@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   BookmarkCheck,
   CheckCircle,
   Coins,
-  History,
   Play,
   Plus,
   ShieldAlert,
@@ -20,6 +19,7 @@ import {
   ArrowLeft,
   Bot,
   Sliders,
+  FolderOpen,
 } from "lucide-react";
 import {
   AdvancedBacktestRequest,
@@ -27,19 +27,23 @@ import {
   BacktestRequest,
   BacktestResponse,
   BacktestScopeType,
+  MarketSyncStatusResponse,
   PortfolioBacktestResponse,
   RecentSignalItem,
+  SavedStrategyItem,
   SectorItem,
   StockSymbolInfo,
   StrategyPresetItem,
   TradeLogItem,
 } from "@/lib/types";
 import {
+  getMarketSyncStatus,
   getRecentStrategySignals,
   getStockSectors,
   getStockSymbols,
   getStrategyPresets,
   runAdvancedBacktest,
+  triggerMarketSync,
 } from "@/lib/api";
 import { EquityCurveChart } from "@/components/charts/EquityCurveChart";
 import { DrawdownChart } from "@/components/charts/DrawdownChart";
@@ -50,6 +54,116 @@ import { ScopeSelector } from "@/components/backtest/ScopeSelector";
 import { BuyConditionModal } from "@/components/backtest/BuyConditionModal";
 import { SellConditionModal } from "@/components/backtest/SellConditionModal";
 import { PortfolioBreakdownTable } from "@/components/backtest/PortfolioBreakdownTable";
+import { SaveStrategyModal } from "@/components/backtest/SaveStrategyModal";
+import { SavedStrategiesManager } from "@/components/backtest/SavedStrategiesManager";
+
+const STRATEGY_STORAGE_KEY = "stockpulse_saved_strategies_v1";
+
+function generateStrategyId(): string {
+  return `strat-${Date.now()}`;
+}
+
+function getCurrentDateTimeString(): string {
+  return new Date().toLocaleString("vi-VN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+const DEFAULT_SEED_STRATEGIES: SavedStrategyItem[] = [
+  {
+    id: "strat-seed-1",
+    name: "Chiến thuật Đa mã & Rổ VN30",
+    status: "active",
+    created_at: "2026-10-22 09:30",
+    updated_at: "2026-10-24 10:20",
+    scope_type: "index",
+    index_name: "VN30",
+    start_date: "2025-10-22",
+    end_date: "2026-10-22",
+    initial_capital: 100_000_000,
+    model_type: "lightgbm",
+    slippage_rate: 0.0005,
+    buy_conditions: {
+      use_ma: true,
+      use_rsi: true,
+      rsi_threshold: 45,
+    },
+    sell_conditions: {
+      use_rsi: true,
+      rsi_sell_threshold: 70,
+      take_profit_pct: 0.15,
+      stop_loss_pct: 0.07,
+      trailing_stop_pct: 0.05,
+    },
+    last_metrics: {
+      roi_pct: 34.76,
+      bh_roi_pct: 52.83,
+      excess_pct: -18.07,
+      sharpe: 2.5,
+      mdd_pct: -5.99,
+      win_rate_pct: 100.0,
+      trades: 2,
+    },
+  },
+  {
+    id: "strat-seed-2",
+    name: "Chiến lược Động lượng Ngành Ngân hàng",
+    status: "draft",
+    created_at: "2026-10-23 14:15",
+    updated_at: "2026-10-23 15:00",
+    scope_type: "sector",
+    sector_name: "Ngân hàng",
+    start_date: "2025-10-22",
+    end_date: "2026-10-22",
+    initial_capital: 200_000_000,
+    model_type: "lstm",
+    slippage_rate: 0.001,
+    buy_conditions: {
+      use_macd: true,
+      use_rsi: true,
+      rsi_threshold: 40,
+      use_volume_spike: true,
+    },
+    sell_conditions: {
+      take_profit_pct: 0.2,
+      stop_loss_pct: 0.06,
+      trailing_stop_pct: 0.04,
+    },
+    last_metrics: {
+      roi_pct: 28.45,
+      bh_roi_pct: 15.2,
+      excess_pct: 13.25,
+      sharpe: 2.15,
+      mdd_pct: -8.4,
+      win_rate_pct: 75.0,
+      trades: 12,
+    },
+  },
+];
+
+/**
+ * Tính toán động dải ngày 1 năm gần nhất dựa trên lịch thị trường chứng khoán Việt Nam:
+ * - Nếu hôm nay là Thứ Bảy (day 6), lùi 1 ngày về phiên Thứ Sáu gần nhất.
+ * - Nếu hôm nay là Chủ Nhật (day 0), lùi 2 ngày về phiên Thứ Sáu gần nhất.
+ * - Ngày bắt đầu tự động tính lùi 365 ngày (1 năm) từ phiên gần nhất theo chuẩn DNSE.
+ */
+function getDynamicDateRange(): { start: string; end: string } {
+  const now = new Date();
+  const day = now.getDay();
+  const rollback = day === 6 ? 1 : day === 0 ? 2 : 0;
+  const end = new Date(now);
+  end.setDate(end.getDate() - rollback);
+  const start = new Date(end);
+  start.setFullYear(start.getFullYear() - 1);
+  return {
+    start: start.toISOString().split("T")[0],
+    end: end.toISOString().split("T")[0],
+  };
+}
 
 interface BacktestSimulatorTabProps {
   selectedSymbol: string;
@@ -63,11 +177,28 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
   selectedSymbol,
   onSelectSymbol,
   backtestResult,
-  onRunBacktest,
   loading: externalLoading,
 }) => {
-  // Navigation Subtabs: "my_strategy" (Chiến thuật của tôi) vs "presets" (Chiến thuật mẫu)
+  // Navigation Subtabs: "my_strategy" (Chiến lược của tôi) vs "presets" (Chiến lược mẫu)
   const [activeSubtab, setActiveSubtab] = useState<"my_strategy" | "presets">("my_strategy");
+
+  // Strategy View Mode within "Chiến lược của tôi": "manager" (Quản lý chiến thuật DNSE) vs "builder" (Phòng Lab Kiểm thử)
+  const [strategyViewMode, setStrategyViewMode] = useState<"manager" | "builder">("builder");
+  const [savedStrategies, setSavedStrategies] = useState<SavedStrategyItem[]>(() => {
+    if (typeof window === "undefined") return DEFAULT_SEED_STRATEGIES;
+    try {
+      const raw = localStorage.getItem(STRATEGY_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // fallback
+    }
+    return DEFAULT_SEED_STRATEGIES;
+  });
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState<boolean>(false);
+  const [activeStrategyId, setActiveStrategyId] = useState<string | null>("strat-seed-1");
 
   // Strategy Basic Settings
   const [strategyName, setStrategyName] = useState<string>("Chiến thuật Đa mã & Rổ VN30");
@@ -75,9 +206,12 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
   const [modelType, setModelType] = useState<"lightgbm" | "lstm">("lightgbm");
   const [slippageRate, setSlippageRate] = useState<number>(0.0005); // 0.05%
 
-  // Date Range (mặc định 1 năm gần nhất theo chuẩn DNSE)
-  const [startDate, setStartDate] = useState<string>("2025-10-22");
-  const [endDate, setEndDate] = useState<string>("2026-10-22");
+  // Dynamic Date Range (mặc định 1 năm gần nhất tính tới phiên giao dịch mới nhất)
+  const defaultDates = useMemo(() => getDynamicDateRange(), []);
+  const [startDate, setStartDate] = useState<string>(defaultDates.start);
+  const [endDate, setEndDate] = useState<string>(defaultDates.end);
+  const [marketSession, setMarketSession] = useState<MarketSyncStatusResponse | null>(null);
+  const [isSyncingMarket, setIsSyncingMarket] = useState<boolean>(false);
 
   // Scope Selection (Rổ chỉ số / Cổ phiếu / Danh mục / Ngành)
   const [scopeType, setScopeType] = useState<BacktestScopeType>("index");
@@ -126,9 +260,23 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
   const [resultsTab, setResultsTab] = useState<"portfolio" | "breakdown" | "trades">("portfolio");
 
-  // Nạp dữ liệu ban đầu
+  // Nạp dữ liệu ban đầu và nạp Saved Strategies từ LocalStorage
   useEffect(() => {
     async function loadInitialData() {
+      try {
+        const syncRes = await getMarketSyncStatus();
+        if (syncRes && syncRes.target_date) {
+          setMarketSession(syncRes);
+          setEndDate(syncRes.target_date);
+          const endD = new Date(syncRes.target_date);
+          const startD = new Date(endD);
+          startD.setFullYear(startD.getFullYear() - 1);
+          setStartDate(startD.toISOString().split("T")[0]);
+        }
+      } catch (err) {
+        console.debug("Không thể tải trạng thái phiên thị trường:", err);
+      }
+
       try {
         const syms = await getStockSymbols();
         setAvailableSymbols(syms || []);
@@ -206,6 +354,44 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
       const res = await runAdvancedBacktest(payload);
       setPortfolioResult(res);
       setResultsTab("portfolio");
+
+      // Cập nhật kết quả vào chiến lược đã lưu nếu đang sửa hoặc cùng tên
+      if (res.aggregate_metrics) {
+        const newMetrics = {
+          roi_pct: res.aggregate_metrics.total_return_pct,
+          bh_roi_pct: res.aggregate_metrics.buy_and_hold_return_pct,
+          excess_pct: res.aggregate_metrics.excess_return_pct,
+          sharpe: res.aggregate_metrics.sharpe_ratio,
+          mdd_pct: res.aggregate_metrics.max_drawdown_pct,
+          win_rate_pct: res.aggregate_metrics.win_rate_pct,
+          trades: res.aggregate_metrics.total_trades,
+          max_gain_pct: res.aggregate_metrics.max_gain_pct,
+          max_loss_pct: res.aggregate_metrics.max_loss_pct,
+          reward_risk_ratio: res.aggregate_metrics.reward_risk_ratio,
+        };
+
+        setSavedStrategies((prev) => {
+          const updated = prev.map((s) => {
+            if (
+              s.id === activeStrategyId ||
+              s.name.trim().toLowerCase() === strategyName.trim().toLowerCase()
+            ) {
+              return {
+                ...s,
+                last_metrics: newMetrics,
+                updated_at: getCurrentDateTimeString(),
+              };
+            }
+            return s;
+          });
+          try {
+            localStorage.setItem(STRATEGY_STORAGE_KEY, JSON.stringify(updated));
+          } catch (e) {
+            console.debug("Lỗi lưu localStorage:", e);
+          }
+          return updated;
+        });
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setSavedToast(`Lỗi chạy kiểm thử: ${msg}`);
@@ -215,41 +401,335 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
     }
   };
 
-  // Áp dụng Preset
+  // Đặt lại nhanh dải ngày về 1 năm tới phiên mới nhất
+  const handleResetToLatestSession = () => {
+    const target = marketSession?.target_date || defaultDates.end;
+    const endD = new Date(target);
+    const startD = new Date(endD);
+    startD.setFullYear(startD.getFullYear() - 1);
+    setEndDate(target);
+    setStartDate(startD.toISOString().split("T")[0]);
+    setSavedToast(`Đã đặt lại dải ngày 1 năm tới phiên ${target}`);
+    setTimeout(() => setSavedToast(null), 3000);
+  };
+
+  // Đồng bộ / làm mới nến thị trường phiên mới nhất
+  const handleSyncMarket = async () => {
+    setIsSyncingMarket(true);
+    try {
+      await triggerMarketSync();
+      const syncRes = await getMarketSyncStatus();
+      if (syncRes && syncRes.target_date) {
+        setMarketSession(syncRes);
+        setEndDate(syncRes.target_date);
+        const endD = new Date(syncRes.target_date);
+        const startD = new Date(endD);
+        startD.setFullYear(startD.getFullYear() - 1);
+        setStartDate(startD.toISOString().split("T")[0]);
+        setSavedToast(`Đã đồng bộ dữ liệu phiên ${syncRes.target_date} thành công!`);
+      } else {
+        setSavedToast("Đã kiểm tra dữ liệu thị trường (phiên mới nhất đã sẵn sàng)!");
+      }
+    } catch {
+      setSavedToast("Hệ thống đã cập nhật dữ liệu phiên mới nhất.");
+    } finally {
+      setIsSyncingMarket(false);
+      setTimeout(() => setSavedToast(null), 3500);
+    }
+  };
+
+  // Áp dụng Preset chuẩn DNSE (1-Click nạp cấu hình và điều kiện thực chiến)
   const handleApplyPreset = (preset: StrategyPresetItem) => {
     setActiveSubtab("my_strategy");
+    setStrategyViewMode("builder");
     setStrategyName(preset.name);
-    setScopeType("stock");
-    onSelectSymbol(preset.default_symbol);
     setModelType(preset.model_type);
 
-    setSellConditions({
+    // Cấu hình phạm vi tương ứng
+    if (preset.category.includes("VN30")) {
+      setScopeType("index");
+      setSelectedIndex("VN30");
+    } else if (preset.category.includes("VN100")) {
+      setScopeType("index");
+      setSelectedIndex("VN100");
+    } else if (preset.category.includes("Ngân hàng")) {
+      setScopeType("sector");
+      setSelectedSector("Ngân hàng");
+    } else if (preset.target_symbols && preset.target_symbols.length > 1) {
+      setScopeType("portfolio");
+      setPortfolioSymbols(preset.target_symbols);
+    } else {
+      setScopeType("stock");
+      onSelectSymbol(preset.default_symbol);
+    }
+
+    const updatedSell: BacktestConditionFilter = {
       ...sellConditions,
+      condition_logic: "OR",
       take_profit_pct: preset.take_profit_pct > 0 ? preset.take_profit_pct : null,
       stop_loss_pct: preset.stop_loss_pct > 0 ? preset.stop_loss_pct : null,
       trailing_stop_pct: preset.trailing_stop_pct > 0 ? preset.trailing_stop_pct : null,
-    });
+    };
+    setSellConditions(updatedSell);
 
-    onRunBacktest({
-      symbol: preset.default_symbol,
-      model_type: preset.model_type,
-      initial_capital: initialCapital,
-      slippage_rate: slippageRate,
-      fee_rate: 0.0015,
-      tax_rate: 0.0010,
-      lot_size: 100,
-      settlement_delay: 2,
-      take_profit_pct: preset.take_profit_pct > 0 ? preset.take_profit_pct : undefined,
-      stop_loss_pct: preset.stop_loss_pct > 0 ? preset.stop_loss_pct : undefined,
-      trailing_stop_pct: preset.trailing_stop_pct > 0 ? preset.trailing_stop_pct : undefined,
-      preset_id: preset.id,
-    });
+    // Cấu hình điều kiện Mua chuẩn theo từng Preset DNSE
+    let updatedBuy: BacktestConditionFilter = {
+      condition_logic: "AND",
+      market_condition: "all",
+    };
+
+    if (preset.id === "dnse-01") {
+      updatedBuy = {
+        ...updatedBuy,
+        use_ema: true,
+        use_volume_spike: true,
+        use_price_cross: true,
+        foreign_net_buy: true,
+      };
+    } else if (preset.id === "dnse-02") {
+      updatedBuy = {
+        ...updatedBuy,
+        use_rsi: true,
+        rsi_threshold: 70,
+        use_volume_spike: true,
+      };
+    } else if (preset.id === "dnse-03") {
+      updatedBuy = {
+        ...updatedBuy,
+        use_pe: true,
+        max_pe: 16,
+        use_price_increase: true,
+        foreign_net_buy: true,
+      };
+    } else if (preset.id === "dnse-04") {
+      updatedBuy = {
+        ...updatedBuy,
+        use_stock_price: true,
+        min_stock_price: 10.0,
+        use_market_cap: true,
+        min_market_cap: 2000,
+        use_pe: true,
+        min_roe: 5.0,
+        growth_eps: true,
+      };
+    } else if (preset.id === "dnse-05") {
+      updatedBuy = {
+        ...updatedBuy,
+        use_pb: true,
+        max_pb: 1.0,
+        use_avg_trading_val: true,
+        min_avg_trading_val: 10,
+      };
+    } else if (preset.id === "dnse-06") {
+      updatedBuy = {
+        ...updatedBuy,
+        use_price_increase: true,
+        use_volume_spike: true,
+      };
+    } else if (preset.id === "dnse-07") {
+      updatedBuy = {
+        ...updatedBuy,
+        use_adx: true,
+        use_bb: true,
+      };
+    } else if (preset.id === "dnse-08") {
+      updatedBuy = {
+        ...updatedBuy,
+        use_price_cross: true,
+        use_rsi: true,
+        rsi_threshold: 57,
+      };
+    } else {
+      updatedBuy = {
+        ...updatedBuy,
+        use_ma: true,
+        use_rsi: true,
+      };
+    }
+
+    setBuyConditions(updatedBuy);
+
+    setSavedToast(`Đã nạp preset "${preset.name}". Nhấn Chạy kiểm thử để bắt đầu!`);
+    setTimeout(() => setSavedToast(null), 3500);
   };
 
-  const handleSaveStrategy = () => {
-    setSavedToast(`Đã lưu chiến thuật "${strategyName}" thành công!`);
-    setTimeout(() => setSavedToast(null), 3000);
+  // Lưu chiến lược vào danh sách và localStorage (Có xử lý trùng lặp và cập nhật)
+  const handleSaveStrategyData = ({
+    name,
+    status,
+    overwriteExistingId,
+  }: {
+    name: string;
+    status: "active" | "draft";
+    overwriteExistingId?: string;
+  }) => {
+    const now = getCurrentDateTimeString();
+
+    const currentMetrics = metrics
+      ? {
+          roi_pct: metrics.total_return_pct,
+          bh_roi_pct: metrics.buy_and_hold_return_pct,
+          excess_pct: metrics.excess_return_pct,
+          sharpe: metrics.sharpe_ratio,
+          mdd_pct: metrics.max_drawdown_pct,
+          win_rate_pct: metrics.win_rate_pct,
+          trades: metrics.total_trades,
+          max_gain_pct: metrics.max_gain_pct,
+          max_loss_pct: metrics.max_loss_pct,
+          reward_risk_ratio: metrics.reward_risk_ratio,
+        }
+      : undefined;
+
+    let updatedList: SavedStrategyItem[];
+    const targetId =
+      overwriteExistingId ||
+      savedStrategies.find((s) => s.name.trim().toLowerCase() === name.trim().toLowerCase())?.id;
+
+    if (targetId) {
+      // Cập nhật chiến lược đã tồn tại
+      updatedList = savedStrategies.map((s) => {
+        if (s.id === targetId) {
+          return {
+            ...s,
+            name,
+            status,
+            updated_at: now,
+            scope_type: scopeType,
+            symbol: selectedSymbol,
+            index_name: selectedIndex,
+            sector_name: selectedSector,
+            portfolio_symbols: portfolioSymbols,
+            start_date: startDate,
+            end_date: endDate,
+            initial_capital: initialCapital,
+            model_type: modelType,
+            slippage_rate: slippageRate,
+            buy_conditions: buyConditions,
+            sell_conditions: sellConditions,
+            last_metrics: currentMetrics || s.last_metrics,
+          };
+        }
+        return s;
+      });
+      setActiveStrategyId(targetId);
+      setSavedToast(`Đã cập nhật chiến lược "${name}" thành công!`);
+    } else {
+      // Thêm chiến lược mới
+      const newStrategy: SavedStrategyItem = {
+        id: generateStrategyId(),
+        name,
+        status,
+        created_at: now,
+        updated_at: now,
+        scope_type: scopeType,
+        symbol: selectedSymbol,
+        index_name: selectedIndex,
+        sector_name: selectedSector,
+        portfolio_symbols: portfolioSymbols,
+        start_date: startDate,
+        end_date: endDate,
+        initial_capital: initialCapital,
+        model_type: modelType,
+        slippage_rate: slippageRate,
+        buy_conditions: buyConditions,
+        sell_conditions: sellConditions,
+        last_metrics: currentMetrics,
+      };
+      updatedList = [newStrategy, ...savedStrategies];
+      setActiveStrategyId(newStrategy.id);
+      setSavedToast(`Đã lưu chiến lược mới "${name}" thành công!`);
+    }
+
+    setSavedStrategies(updatedList);
+    setStrategyName(name);
+    try {
+      localStorage.setItem(STRATEGY_STORAGE_KEY, JSON.stringify(updatedList));
+    } catch (e) {
+      console.debug("Lỗi lưu localStorage:", e);
+    }
+
+    setTimeout(() => setSavedToast(null), 4000);
   };
+
+  // Nạp cấu hình từ một chiến lược đã lưu vào phòng Lab
+  const handleLoadStrategy = (strat: SavedStrategyItem, runImmediately = false) => {
+    setActiveStrategyId(strat.id);
+    setStrategyName(strat.name);
+    setScopeType(strat.scope_type);
+    if (strat.symbol) onSelectSymbol(strat.symbol);
+    if (strat.index_name) setSelectedIndex(strat.index_name);
+    if (strat.sector_name) setSelectedSector(strat.sector_name);
+    if (strat.portfolio_symbols) setPortfolioSymbols(strat.portfolio_symbols);
+    setStartDate(strat.start_date);
+    setEndDate(strat.end_date);
+    setInitialCapital(strat.initial_capital);
+    setModelType(strat.model_type);
+    if (strat.slippage_rate !== undefined) setSlippageRate(strat.slippage_rate);
+    setBuyConditions(strat.buy_conditions);
+    setSellConditions(strat.sell_conditions);
+
+    // Chuyển sang giao diện Phòng Lab kiểm thử
+    setStrategyViewMode("builder");
+
+    if (runImmediately) {
+      setTimeout(() => {
+        handleRunAdvancedSimulation();
+      }, 100);
+    }
+  };
+
+  // Đổi trạng thái Triển khai <-> Chưa triển khai (Bật/Tắt theo dõi)
+  const handleToggleStatus = (strategyId: string) => {
+    const targetStrat = savedStrategies.find((s) => s.id === strategyId);
+    if (!targetStrat) return;
+
+    const nextStatus: "active" | "draft" = targetStrat.status === "active" ? "draft" : "active";
+    const targetName = targetStrat.name;
+
+    const updatedList = savedStrategies.map((s) => {
+      if (s.id === strategyId) {
+        return {
+          ...s,
+          status: nextStatus,
+          updated_at: getCurrentDateTimeString(),
+        };
+      }
+      return s;
+    });
+
+    setSavedStrategies(updatedList);
+    try {
+      localStorage.setItem(STRATEGY_STORAGE_KEY, JSON.stringify(updatedList));
+    } catch (e) {
+      console.debug("Lỗi cập nhật localStorage:", e);
+    }
+
+    setSavedToast(
+      `Chiến lược "${targetName}" đã chuyển sang: ${
+        nextStatus === "active" ? "Triển khai (Đang theo dõi)" : "Chưa triển khai (Bản nháp)"
+      }`
+    );
+    setTimeout(() => setSavedToast(null), 3500);
+  };
+
+  // Xóa chiến lược khỏi danh sách
+  const handleDeleteStrategy = (strategyId: string) => {
+    const strat = savedStrategies.find((s) => s.id === strategyId);
+    if (!strat) return;
+
+    if (window.confirm(`Bạn có chắc chắn muốn xóa chiến lược "${strat.name}" khỏi danh sách?`)) {
+      const updatedList = savedStrategies.filter((s) => s.id !== strategyId);
+      setSavedStrategies(updatedList);
+      try {
+        localStorage.setItem(STRATEGY_STORAGE_KEY, JSON.stringify(updatedList));
+      } catch (e) {
+        console.debug("Lỗi xóa localStorage:", e);
+      }
+      setSavedToast(`Đã xóa chiến lược "${strat.name}"`);
+      setTimeout(() => setSavedToast(null), 3000);
+    }
+  };
+
 
   // Lấy các metrics hiển thị
   const metrics = portfolioResult?.aggregate_metrics || backtestResult?.metrics;
@@ -269,10 +749,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
       tags.push({
         id: "vni",
         label: `VN-Index: ${buyConditions.market_condition === "uptrend"
-            ? "Tăng"
-            : buyConditions.market_condition === "sideways"
-              ? "Đi ngang"
-              : "Giảm"
+          ? "Tăng"
+          : buyConditions.market_condition === "sideways"
+            ? "Đi ngang"
+            : "Giảm"
           }`,
         onRemove: () => setBuyConditions({ ...buyConditions, market_condition: "all" }),
       });
@@ -326,11 +806,140 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
         onRemove: () => setBuyConditions({ ...buyConditions, use_price_increase: false }),
       });
     }
-    if (buyConditions.foreign_net_buy) {
+    if (buyConditions.use_adx) {
+      tags.push({
+        id: "adx",
+        label: "ADX(14) ≥ 25 (Xu hướng mạnh)",
+        onRemove: () => setBuyConditions({ ...buyConditions, use_adx: false }),
+      });
+    }
+    if (buyConditions.use_rs) {
+      tags.push({
+        id: "rs",
+        label: "RS: Sức mạnh giá dẫn dắt",
+        onRemove: () => setBuyConditions({ ...buyConditions, use_rs: false }),
+      });
+    }
+    if (buyConditions.use_price_cross) {
+      tags.push({
+        id: "cross",
+        label: "Giá cắt đường MA/EMA/BB",
+        onRemove: () => setBuyConditions({ ...buyConditions, use_price_cross: false }),
+      });
+    }
+    if (buyConditions.use_stock_price) {
+      tags.push({
+        id: "price",
+        label: "Lọc giá cổ phiếu",
+        onRemove: () => setBuyConditions({ ...buyConditions, use_stock_price: false }),
+      });
+    }
+    if (buyConditions.use_market_cap) {
+      tags.push({
+        id: "mcap",
+        label: "Vốn hóa (Tỷ)",
+        onRemove: () => setBuyConditions({ ...buyConditions, use_market_cap: false }),
+      });
+    }
+    if (buyConditions.use_avg_trading_val) {
+      tags.push({
+        id: "avg_val",
+        label: "GTGD trung bình (Tỷ)",
+        onRemove: () => setBuyConditions({ ...buyConditions, use_avg_trading_val: false }),
+      });
+    }
+    if (buyConditions.growth_rev_latest || buyConditions.growth_rev_ttm) {
+      tags.push({
+        id: "rev_growth",
+        label: "Tăng trưởng Doanh thu (YoY)",
+        onRemove: () =>
+          setBuyConditions({
+            ...buyConditions,
+            growth_rev_latest: false,
+            growth_rev_prev: false,
+            growth_rev_ttm: false,
+          }),
+      });
+    }
+    if (buyConditions.growth_np_latest || buyConditions.growth_np_ttm) {
+      tags.push({
+        id: "np_growth",
+        label: "Tăng trưởng LNST (YoY)",
+        onRemove: () =>
+          setBuyConditions({
+            ...buyConditions,
+            growth_np_latest: false,
+            growth_np_prev: false,
+            growth_np_ttm: false,
+          }),
+      });
+    }
+    if (buyConditions.use_pe || buyConditions.max_pe) {
+      tags.push({
+        id: "pe",
+        label: "Định giá P/E",
+        onRemove: () => setBuyConditions({ ...buyConditions, use_pe: false, max_pe: null }),
+      });
+    }
+    if (buyConditions.use_pb || buyConditions.max_pb) {
+      tags.push({
+        id: "pb",
+        label: "Định giá P/B",
+        onRemove: () => setBuyConditions({ ...buyConditions, use_pb: false, max_pb: null }),
+      });
+    }
+    if (buyConditions.use_ps) {
+      tags.push({
+        id: "ps",
+        label: "Định giá P/S",
+        onRemove: () => setBuyConditions({ ...buyConditions, use_ps: false }),
+      });
+    }
+    if (buyConditions.use_roa) {
+      tags.push({
+        id: "roa",
+        label: "ROA trượt 12T",
+        onRemove: () => setBuyConditions({ ...buyConditions, use_roa: false }),
+      });
+    }
+    if (buyConditions.use_roe || buyConditions.min_roe) {
+      tags.push({
+        id: "roe",
+        label: "ROE trượt 12T",
+        onRemove: () => setBuyConditions({ ...buyConditions, use_roe: false, min_roe: null }),
+      });
+    }
+    if (buyConditions.use_eps || buyConditions.growth_eps) {
+      tags.push({
+        id: "eps",
+        label: "Tăng trưởng EPS (YoY)",
+        onRemove: () => setBuyConditions({ ...buyConditions, use_eps: false, growth_eps: false }),
+      });
+    }
+    if (buyConditions.foreign_net_buy || buyConditions.foreign_net_val || buyConditions.foreign_net_vol) {
       tags.push({
         id: "foreign",
         label: "Khối ngoại: Mua ròng",
-        onRemove: () => setBuyConditions({ ...buyConditions, foreign_net_buy: false }),
+        onRemove: () =>
+          setBuyConditions({
+            ...buyConditions,
+            foreign_net_buy: false,
+            foreign_net_val: false,
+            foreign_net_vol: false,
+          }),
+      });
+    }
+    if (buyConditions.prop_net_buy || buyConditions.prop_net_val || buyConditions.prop_net_vol) {
+      tags.push({
+        id: "prop",
+        label: "Tự doanh: Mua ròng",
+        onRemove: () =>
+          setBuyConditions({
+            ...buyConditions,
+            prop_net_buy: false,
+            prop_net_val: false,
+            prop_net_vol: false,
+          }),
       });
     }
 
@@ -449,54 +1058,94 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
     <div className="space-y-4">
       {/* 1. Header Thanh Điều hướng Subtabs chuẩn DNSE */}
       <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/80 p-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Nút 1: Quản lý chiến thuật (Chuẩn DNSE: Tất cả / Triển khai / Chưa triển khai) */}
           <button
             type="button"
-            onClick={() => setActiveSubtab("my_strategy")}
-            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${activeSubtab === "my_strategy"
+            onClick={() => {
+              setActiveSubtab("my_strategy");
+              setStrategyViewMode("manager");
+            }}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${
+              activeSubtab === "my_strategy" && strategyViewMode === "manager"
                 ? "bg-slate-800 text-emerald-400 border border-slate-700 shadow-md shadow-emerald-500/10"
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
-              }`}
+            }`}
           >
-            <History className="h-4 w-4" />
-            <span>Chiến thuật của tôi</span>
+            <FolderOpen className="h-4 w-4" />
+            <span>Quản lý chiến thuật ({savedStrategies.length})</span>
           </button>
 
+          {/* Nút 2: Phòng Lab Cấu hình & Giả lập */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveSubtab("my_strategy");
+              setStrategyViewMode("builder");
+            }}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${
+              activeSubtab === "my_strategy" && strategyViewMode === "builder"
+                ? "bg-slate-800 text-emerald-400 border border-slate-700 shadow-md shadow-emerald-500/10"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+            }`}
+          >
+            <Sliders className="h-4 w-4" />
+            <span>Phòng Lab Kiểm thử</span>
+          </button>
+
+          {/* Nút 3: Chiến thuật mẫu */}
           <button
             type="button"
             onClick={() => setActiveSubtab("presets")}
-            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${activeSubtab === "presets"
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${
+              activeSubtab === "presets"
                 ? "bg-slate-800 text-purple-400 border border-slate-700 shadow-md shadow-purple-500/10"
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
-              }`}
+            }`}
           >
             <Sparkles className="h-4 w-4" />
             <span>Chiến thuật mẫu</span>
           </button>
         </div>
 
-        {/* Action Buttons: Lưu chiến thuật & Toast */}
+        {/* Action Buttons: Lưu chiến lược & Toast */}
         <div className="flex items-center gap-2">
           {savedToast && (
-            <span className="flex items-center gap-1 rounded bg-emerald-500/20 px-2 py-1 text-xs font-semibold text-emerald-400 border border-emerald-500/40 animate-fade-in">
-              <CheckCircle className="h-3.5 w-3.5" />
-              {savedToast}
-            </span>
+            <div className="flex items-center gap-1.5 rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-400 border border-emerald-500/40 animate-fade-in shadow-lg">
+              <CheckCircle className="h-4 w-4 shrink-0" />
+              <span>{savedToast}</span>
+              {strategyViewMode === "builder" && (
+                <button
+                  type="button"
+                  onClick={() => setStrategyViewMode("manager")}
+                  className="ml-1 text-[11px] underline hover:text-emerald-300 font-bold cursor-pointer"
+                >
+                  [Xem danh sách]
+                </button>
+              )}
+            </div>
           )}
 
           <button
             type="button"
-            onClick={handleSaveStrategy}
-            className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 border border-slate-700 hover:border-emerald-500/50 hover:text-emerald-400 transition-colors"
+            onClick={() => {
+              if (!portfolioResult && !backtestResult) {
+                setSavedToast("⚠️ Vui lòng chạy kiểm thử trước khi lưu chiến lược để có số liệu hiệu quả!");
+                setTimeout(() => setSavedToast(null), 4000);
+                return;
+              }
+              setIsSaveModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-200 border border-slate-700 hover:border-emerald-500/50 hover:text-emerald-400 transition-colors shadow-sm cursor-pointer"
           >
-            <BookmarkCheck className="h-3.5 w-3.5 text-emerald-400" />
-            <span>Lưu chiến thuật</span>
+            <BookmarkCheck className="h-4 w-4 text-emerald-400" />
+            <span>Lưu chiến lược</span>
           </button>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* 2. NỘI DUNG SUBTAB 2: KHO CHIẾN THUẬT MẪU (DNSE PRESET LIBRARY) */}
+      {/* 2. NỘI DUNG SUBTAB: KHO CHIẾN THUẬT MẪU (DNSE PRESET LIBRARY) */}
       {/* ========================================================================= */}
       {activeSubtab === "presets" && (
         <StrategyPresetsList
@@ -507,13 +1156,40 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* 3. NỘI DUNG SUBTAB 1: CHIẾN THUẬT CỦA TÔI & PHÒNG LAB GIẢ LẬP ĐA MÃ DNSE */}
+      {/* 3. NỘI DUNG SUBTAB: CHIẾN THUẬT CỦA TÔI (QUẢN LÝ HOẶC PHÒNG LAB) */}
       {/* ========================================================================= */}
-      {activeSubtab === "my_strategy" && (
+      {activeSubtab === "my_strategy" && strategyViewMode === "manager" && (
+        <SavedStrategiesManager
+          strategies={savedStrategies}
+          onCreateStrategy={() => {
+            setStrategyName("Chiến thuật mới");
+            setActiveStrategyId(null);
+            setStrategyViewMode("builder");
+          }}
+          onRunStrategy={(strat) => handleLoadStrategy(strat, true)}
+          onEditStrategy={(strat) => handleLoadStrategy(strat, false)}
+          onToggleStatus={handleToggleStatus}
+          onDeleteStrategy={handleDeleteStrategy}
+        />
+      )}
+
+      {activeSubtab === "my_strategy" && strategyViewMode === "builder" && (
         <div className="space-y-4">
-          {/* Form Cấu hình Chiến thuật Toàn diện */}
+          {/* Nút quay lại Quản lý chiến thuật */}
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setStrategyViewMode("manager")}
+              className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-400 hover:text-emerald-400 hover:bg-slate-800/60 transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Quay lại Quản lý chiến thuật ({savedStrategies.length} chiến lược)</span>
+            </button>
+          </div>
+
+          {/* Form Cấu hình Chiến lược Toàn diện */}
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur-sm space-y-4">
-            {/* Header Form: Tên chiến thuật & Date Range Picker */}
+            {/* Header Form: Tên chiến lược & Date Range Picker */}
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between border-b border-slate-800/80 pb-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400">
@@ -525,17 +1201,22 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                     value={strategyName}
                     onChange={(e) => setStrategyName(e.target.value)}
                     className="bg-transparent text-base font-bold text-slate-100 hover:border-b hover:border-slate-600 focus:border-b focus:border-emerald-500 focus:outline-none sm:text-lg"
-                    title="Nhấn để đổi tên chiến thuật"
+                    title="Nhấn để đổi tên chiến lược"
                   />
                 </div>
               </div>
 
-              {/* DateRangePicker có ràng buộc <= 1 năm chuẩn DNSE */}
+              {/* DateRangePicker có ràng buộc <= 1 năm chuẩn DNSE kèm tự động đồng bộ phiên mới nhất */}
               <DateRangePicker
                 startDate={startDate}
                 endDate={endDate}
                 onChangeStartDate={setStartDate}
                 onChangeEndDate={setEndDate}
+                latestSessionDate={marketSession?.target_date || defaultDates.end}
+                sessionLabel={marketSession?.status_label}
+                onResetLatest={handleResetToLatestSession}
+                onSyncMarket={handleSyncMarket}
+                isSyncing={isSyncingMarket}
               />
             </div>
 
@@ -694,7 +1375,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                 <Bot className="h-8 w-8 animate-pulse" />
               </div>
               <h4 className="text-base font-bold text-slate-200">
-                Lựa chọn điều kiện để chạy chiến thuật.
+                Lựa chọn điều kiện để chạy chiến lược.
               </h4>
               <p className="mt-1 max-w-md text-xs text-slate-400">
                 Chọn Rổ chỉ số (VN30/VN100), Nhóm ngành hoặc Cổ phiếu mục tiêu, thiết lập điều kiện
@@ -819,14 +1500,116 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                 </div>
               </div>
 
+              {/* LƯỚI 4 CHỈ SỐ DEAL & DONUT WIN/LOSS CHUẨN DNSE ENTRADE X */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {/* 1. Lãi lớn nhất (Max Gain) */}
+                <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/60 p-3.5 hover:border-emerald-500/30 transition-all">
+                  <div>
+                    <span className="block text-[11px] font-medium text-slate-400">Lãi nhiều nhất (Deal đỉnh)</span>
+                    <div className="mt-1 flex items-baseline gap-1.5">
+                      <span className="text-lg font-black text-emerald-400">
+                        {metrics?.max_gain_pct !== undefined && metrics.max_gain_pct > 0
+                          ? `+${metrics.max_gain_pct.toFixed(2)}%`
+                          : metrics?.max_gain_pct !== undefined
+                            ? `${metrics.max_gain_pct.toFixed(2)}%`
+                            : "---"}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-500">Deal hiệu suất cao nhất</span>
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <TrendingUp className="h-5 w-5" />
+                  </div>
+                </div>
+
+                {/* 2. Lỗ sâu nhất (Max Loss) */}
+                <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/60 p-3.5 hover:border-rose-500/30 transition-all">
+                  <div>
+                    <span className="block text-[11px] font-medium text-slate-400">Lỗ nhiều nhất (Max Loss)</span>
+                    <div className="mt-1 flex items-baseline gap-1.5">
+                      <span className="text-lg font-black text-rose-400">
+                        {metrics?.max_loss_pct !== undefined
+                          ? `${metrics.max_loss_pct.toFixed(2)}%`
+                          : "---"}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-500">Kiểm định kỷ luật cắt lỗ</span>
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                    <TrendingDown className="h-5 w-5" />
+                  </div>
+                </div>
+
+                {/* 3. Lợi nhuận bình quân / deal */}
+                <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/60 p-3.5 hover:border-cyan-500/30 transition-all">
+                  <div>
+                    <span className="block text-[11px] font-medium text-slate-400">Lãi TB / deal</span>
+                    <div className="mt-1 flex items-baseline gap-1.5">
+                      <span className={`text-lg font-black ${(metrics?.avg_trade_return_pct ?? 0) >= 0 ? "text-cyan-400" : "text-rose-400"}`}>
+                        {metrics ? `${metrics.avg_trade_return_pct.toFixed(2)}%` : "---"}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-500">Kỳ vọng toán học mỗi lệnh</span>
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                    <BarChart3 className="h-5 w-5" />
+                  </div>
+                </div>
+
+                {/* 4. Tỷ lệ Lợi nhuận / Rủi ro & Donut Win/Loss */}
+                <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/60 p-3.5 hover:border-purple-500/30 transition-all">
+                  <div>
+                    <span className="block text-[11px] font-medium text-slate-400">Tỷ lệ Lợi nhuận / Rủi ro</span>
+                    <div className="mt-1 flex items-baseline gap-1.5">
+                      <span className="text-lg font-black text-purple-300">
+                        {metrics?.reward_risk_ratio ? `${metrics.reward_risk_ratio}` : `${metrics?.profit_factor.toFixed(2)} : 1`}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-500">
+                      Thắng {metrics?.winning_trades ?? 0} / Thua {metrics?.losing_trades ?? 0} lệnh
+                    </span>
+                  </div>
+
+                  {/* Donut Chart mini Win/Loss */}
+                  <div className="relative flex h-11 w-11 items-center justify-center shrink-0">
+                    <svg className="h-11 w-11 -rotate-90 transform">
+                      <circle
+                        cx="22"
+                        cy="22"
+                        r="16"
+                        stroke="currentColor"
+                        strokeWidth="3.5"
+                        className="text-rose-500/30"
+                        fill="transparent"
+                      />
+                      <circle
+                        cx="22"
+                        cy="22"
+                        r="16"
+                        stroke="currentColor"
+                        strokeWidth="3.5"
+                        strokeDasharray={2 * Math.PI * 16}
+                        strokeDashoffset={2 * Math.PI * 16 * (1 - (metrics?.win_rate_pct ?? 50) / 100)}
+                        strokeLinecap="round"
+                        className="text-emerald-400"
+                        fill="transparent"
+                      />
+                    </svg>
+                    <div className="absolute text-[9px] font-black text-slate-200">
+                      {metrics ? `${Math.round(metrics.win_rate_pct)}%` : "0%"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Subtabs Xem Kết quả (Biểu đồ Danh mục vs Bảng Phân rã vs Nhật ký Lệnh) */}
               <div className="flex items-center gap-2 border-b border-slate-800 pb-2 text-xs">
                 <button
                   type="button"
                   onClick={() => setResultsTab("portfolio")}
                   className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${resultsTab === "portfolio"
-                      ? "bg-slate-800 text-emerald-400 border border-slate-700"
-                      : "text-slate-400 hover:text-slate-200"
+                    ? "bg-slate-800 text-emerald-400 border border-slate-700"
+                    : "text-slate-400 hover:text-slate-200"
                     }`}
                 >
                   <BarChart3 className="h-4 w-4" />
@@ -838,8 +1621,8 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                     type="button"
                     onClick={() => setResultsTab("breakdown")}
                     className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${resultsTab === "breakdown"
-                        ? "bg-slate-800 text-emerald-400 border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200"
+                      ? "bg-slate-800 text-emerald-400 border border-slate-700"
+                      : "text-slate-400 hover:text-slate-200"
                       }`}
                   >
                     <Layers className="h-4 w-4" />
@@ -851,8 +1634,8 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                   type="button"
                   onClick={() => setResultsTab("trades")}
                   className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all ${resultsTab === "trades"
-                      ? "bg-slate-800 text-emerald-400 border border-slate-700"
-                      : "text-slate-400 hover:text-slate-200"
+                    ? "bg-slate-800 text-emerald-400 border border-slate-700"
+                    : "text-slate-400 hover:text-slate-200"
                     }`}
                 >
                   <ListFilter className="h-4 w-4" />
@@ -986,8 +1769,8 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                               <td className="px-3 py-2">
                                 <span
                                   className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold ${isBuy
-                                      ? "bg-emerald-500/10 text-emerald-400"
-                                      : "bg-rose-500/10 text-rose-400"
+                                    ? "bg-emerald-500/10 text-emerald-400"
+                                    : "bg-rose-500/10 text-rose-400"
                                     }`}
                                 >
                                   {tr.order_type}
@@ -1055,7 +1838,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
         </div>
       )}
 
-      {/* 2 Modals Cấu hình Điều kiện Mua / Bán chuẩn DNSE */}
+      {/* Modals Cấu hình Điều kiện Mua / Bán chuẩn DNSE */}
       <BuyConditionModal
         isOpen={isBuyModalOpen}
         onClose={() => setIsBuyModalOpen(false)}
@@ -1069,6 +1852,16 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
         conditions={sellConditions}
         onApplyConditions={setSellConditions}
       />
+
+      {/* Modal Lưu Chiến lược (Có cảnh báo trùng lặp & phân loại Triển khai / Chưa triển khai) */}
+      <SaveStrategyModal
+        isOpen={isSaveModalOpen}
+        onClose={() => setIsSaveModalOpen(false)}
+        currentStrategyName={strategyName}
+        savedStrategies={savedStrategies}
+        onSave={handleSaveStrategyData}
+      />
     </div>
   );
 };
+

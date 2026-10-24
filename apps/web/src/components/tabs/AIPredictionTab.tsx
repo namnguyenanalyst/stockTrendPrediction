@@ -5,7 +5,6 @@ import {
   Activity,
   Brain,
   CheckCircle2,
-  ChevronRight,
   Clock,
   Cpu,
   HelpCircle,
@@ -746,7 +745,8 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               </h3>
             </div>
             <p className="text-[11px] text-slate-400">
-              Tự động lưu vết các lần chọn cổ phiếu, thời điểm phân tích và khuyến nghị của mô hình AI
+              Tự động lưu vết các lần chọn cổ phiếu, thời điểm phân tích và khuyến nghị của mô hình AI •{" "}
+              <span className="text-emerald-400 font-medium">Nhấn vào dòng bất kỳ để mở biểu đồ nến</span>
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -793,114 +793,103 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                   const isItemBuy = item.signal.includes("MUA") || item.signal.includes("BUY");
                   const isItemSell = item.signal.includes("BÁN") || item.signal.includes("SELL");
 
-                  return (
-                    <tr
-                      key={item.id}
-                      className={`transition-colors hover:bg-slate-800/40 ${selectedSymbol === item.symbol && modelType === item.model_type
-                        ? "bg-slate-800/30"
-                        : ""
-                        }`}
-                    >
-                      <td className="px-3 py-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="h-3 w-3 text-slate-500" />
-                          <span>{item.timestamp}</span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 font-bold text-slate-100 whitespace-nowrap">
-                        <button
-                          onClick={() => {
-                            onSelectSymbol(item.symbol);
-                            onChangeModelType(item.model_type);
-                          }}
-                          className="flex items-center gap-1.5 text-left hover:text-emerald-400 transition-colors"
-                          title={`Xem lại dự báo mã ${item.symbol} với ${item.model_type.toUpperCase()}`}
-                        >
-                          <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                          <span className="font-mono">{item.symbol}</span>
-                        </button>
-                      </td>
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold border ${item.model_type === "lightgbm"
-                            ? "border-purple-500/30 bg-purple-500/10 text-purple-300"
-                            : "border-sky-500/30 bg-sky-500/10 text-sky-300"
-                            }`}
-                        >
-                          {item.model_type === "lightgbm" ? (
-                            <Cpu className="h-2.5 w-2.5" />
-                          ) : (
-                            <Brain className="h-2.5 w-2.5" />
-                          )}
-                          {item.model_type.toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 font-mono text-slate-300 whitespace-nowrap">
-                        {item.data_date}
-                      </td>
-                      <td className="px-3 py-3 font-semibold text-slate-200 whitespace-nowrap">
-                        {(item.current_price * 1000).toLocaleString("vi-VN")} đ
-                      </td>
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold ${isItemBuy
-                            ? "bg-emerald-500/10 text-emerald-400"
-                            : isItemSell
-                              ? "bg-rose-500/10 text-rose-400"
-                              : "bg-amber-500/10 text-amber-400"
-                            }`}
-                        >
-                          {isItemBuy ? (
-                            <TrendingUp className="h-3 w-3" />
-                          ) : isItemSell ? (
-                            <TrendingDown className="h-3 w-3" />
-                          ) : (
-                            <Minus className="h-3 w-3" />
-                          )}
-                          {item.signal}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 font-medium text-emerald-400 whitespace-nowrap">
-                        {(item.prob_up * 100).toFixed(1)}%
-                      </td>
-                      <td className="px-3 py-3 font-medium text-rose-400 whitespace-nowrap">
-                        {(item.prob_down * 100).toFixed(1)}%
-                      </td>
-                      <td className="px-3 py-3 font-semibold text-purple-400 whitespace-nowrap">
-                        {(item.confidence * 100).toFixed(1)}%
-                      </td>
-                      <td className="px-3 py-3 text-right whitespace-nowrap">
-                        <div className="inline-flex items-center gap-1.5">
+                    return (
+                      <tr
+                        key={item.id}
+                        onClick={() => {
+                          onSelectSymbol(item.symbol);
+                          setDetailModalItem({
+                            symbol: item.symbol,
+                            currentValue: item.current_price,
+                            isIndex: item.symbol.includes("VNINDEX") || item.symbol.includes("VN30"),
+                          });
+                          setIsDetailModalOpen(true);
+                        }}
+                        title={`Nhấn để mở biểu đồ nến chi tiết của ${item.symbol}`}
+                        className={`group cursor-pointer transition-colors ${selectedSymbol === item.symbol
+                          ? "bg-emerald-500/10 hover:bg-emerald-500/15"
+                          : "hover:bg-slate-800/60"
+                          }`}
+                      >
+                        <td className="px-3 py-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-3 w-3 text-slate-500" />
+                            <span>{item.timestamp}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 font-bold text-slate-100 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                            <span className="font-mono group-hover:text-emerald-400 transition-colors">
+                              {item.symbol}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold border ${item.model_type === "lightgbm"
+                              ? "border-purple-500/30 bg-purple-500/10 text-purple-300"
+                              : "border-sky-500/30 bg-sky-500/10 text-sky-300"
+                              }`}
+                          >
+                            {item.model_type === "lightgbm" ? (
+                              <Cpu className="h-2.5 w-2.5" />
+                            ) : (
+                              <Brain className="h-2.5 w-2.5" />
+                            )}
+                            {item.model_type.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 font-mono text-slate-300 whitespace-nowrap">
+                          {item.data_date}
+                        </td>
+                        <td className="px-3 py-3 font-semibold text-slate-200 whitespace-nowrap">
+                          {(item.current_price * 1000).toLocaleString("vi-VN")} đ
+                        </td>
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold ${isItemBuy
+                              ? "bg-emerald-500/10 text-emerald-400"
+                              : isItemSell
+                                ? "bg-rose-500/10 text-rose-400"
+                                : "bg-amber-500/10 text-amber-400"
+                              }`}
+                          >
+                            {isItemBuy ? (
+                              <TrendingUp className="h-3 w-3" />
+                            ) : isItemSell ? (
+                              <TrendingDown className="h-3 w-3" />
+                            ) : (
+                              <Minus className="h-3 w-3" />
+                            )}
+                            {item.signal}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 font-medium text-emerald-400 whitespace-nowrap">
+                          {(item.prob_up * 100).toFixed(1)}%
+                        </td>
+                        <td className="px-3 py-3 font-medium text-rose-400 whitespace-nowrap">
+                          {(item.prob_down * 100).toFixed(1)}%
+                        </td>
+                        <td className="px-3 py-3 font-semibold text-purple-400 whitespace-nowrap">
+                          {(item.confidence * 100).toFixed(1)}%
+                        </td>
+                        <td className="px-3 py-3 text-right whitespace-nowrap">
                           <button
-                            onClick={() => {
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
                               onSelectSymbol(item.symbol);
                               onChangeModelType(item.model_type);
                             }}
-                            className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-[11px] font-semibold text-slate-200 hover:border-purple-500 hover:bg-purple-600 hover:text-white transition-all"
-                            title={`Nạp lại dự báo mã ${item.symbol}`}
+                            className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:border-purple-500 hover:bg-purple-600 hover:text-white transition-all shadow-sm"
+                            title={`Nạp lại dự báo mã ${item.symbol} (${item.model_type.toUpperCase()})`}
                           >
                             <span>Xem lại</span>
                           </button>
-                          <button
-                            onClick={() => {
-                              onSelectSymbol(item.symbol);
-                              setDetailModalItem({
-                                symbol: item.symbol,
-                                currentValue: item.current_price,
-                                isIndex: false,
-                              });
-                              setIsDetailModalOpen(true);
-                            }}
-                            className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:border-emerald-500 hover:bg-emerald-500 hover:text-slate-950 transition-all"
-                            title={`Soi nến và phân tích kỹ thuật ${item.symbol}`}
-                          >
-                            <span>Soi nến</span>
-                            <ChevronRight className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
+                        </td>
+                      </tr>
+                    );
                 })
               ) : (
                 <tr>
