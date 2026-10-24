@@ -15,6 +15,7 @@ from app.models.schemas import (
     BacktestSummaryItem,
     BacktestSummaryResponse,
     EquityCurvePoint,
+    IndividualResultItem,
     PortfolioBacktestResponse,
     RecentSignalItem,
     RecentSignalsResponse,
@@ -337,6 +338,65 @@ def run_advanced_backtest(req: AdvancedBacktestRequest) -> PortfolioBacktestResp
             symbol_metadata=metadata,
         )
 
+        parsed_individual: dict[str, IndividualResultItem] = {}
+        for sym, ind in res.get("individual_results", {}).items():
+            sym_pts = [
+                EquityCurvePoint(
+                    date=str(pt.get("date") or pt.get("Date")),
+                    total_equity=round(
+                        float(pt.get("total_equity") if pt.get("total_equity") is not None else pt.get("Total_Equity", 0)), 2
+                    ),
+                    benchmark_equity=round(
+                        float(pt.get("benchmark_equity") if pt.get("benchmark_equity") is not None else pt.get("Benchmark_Equity", 0)), 2
+                    ),
+                    drawdown_pct=round(
+                        float(pt.get("drawdown_pct") if pt.get("drawdown_pct") is not None else pt.get("Drawdown_Pct", 0)), 2
+                    ),
+                    daily_return=round(
+                        float(pt.get("daily_return") if pt.get("daily_return") is not None else pt.get("Daily_Return", 0)), 2
+                    ),
+                )
+                for pt in ind.get("equity_curve", [])
+            ]
+            sym_trades = []
+            for t in ind.get("trades", []):
+                if isinstance(t, TradeLogItem):
+                    sym_trades.append(t)
+                elif isinstance(t, dict):
+                    sym_trades.append(
+                        TradeLogItem(
+                            trade_id=int(t.get("trade_id", 0)),
+                            order_type=str(t.get("order_type", "BUY")),
+                            exec_date=str(t.get("exec_date", "")),
+                            exec_price=round(float(t.get("exec_price", 0.0)), 2),
+                            shares=int(t.get("shares", 0)),
+                            fee=round(float(t.get("fee", 0.0)), 2),
+                            tax=round(float(t.get("tax", 0.0)), 2),
+                            net_cash_flow=round(float(t.get("net_cash_flow", 0.0)), 2),
+                            realized_pnl=(
+                                round(float(t["realized_pnl"]), 2)
+                                if t.get("realized_pnl") is not None and not pd.isna(t["realized_pnl"])
+                                else None
+                            ),
+                            realized_return_pct=(
+                                round(float(t["realized_return_pct"]), 2)
+                                if t.get("realized_return_pct") is not None and not pd.isna(t["realized_return_pct"])
+                                else None
+                            ),
+                            holding_days=(
+                                round(float(t["holding_days"]), 1)
+                                if t.get("holding_days") is not None and not pd.isna(t["holding_days"])
+                                else None
+                            ),
+                            reason=str(t.get("reason", "")),
+                        )
+                    )
+            parsed_individual[sym] = IndividualResultItem(
+                metrics=BacktestMetricsSchema(**ind["metrics"]) if isinstance(ind.get("metrics"), dict) else ind.get("metrics"),
+                equity_curve=sym_pts,
+                trades=sym_trades,
+            )
+
         return PortfolioBacktestResponse(
             scope_type=req.scope_type.value,
             scope_target=scope_target,
@@ -350,7 +410,7 @@ def run_advanced_backtest(req: AdvancedBacktestRequest) -> PortfolioBacktestResp
             symbols_breakdown=[
                 SymbolBreakdownItem(**item) for item in res["symbols_breakdown"]
             ],
-            individual_results=res.get("individual_results", {}),
+            individual_results=parsed_individual,
         )
     except HTTPException:
         raise

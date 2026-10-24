@@ -284,5 +284,92 @@ def test_backtest_run_advanced_validation():
     assert "portfolio_equity_curve" in d
     assert "symbols_breakdown" in d
     assert len(d["symbols_breakdown"]) >= 1
+    assert "individual_results" in d
+    for sym, ind in d["individual_results"].items():
+        assert "equity_curve" in ind
+        if len(ind["equity_curve"]) > 0:
+            first_pt = ind["equity_curve"][0]
+            assert "date" in first_pt
+            assert "total_equity" in first_pt
+            assert "benchmark_equity" in first_pt
+            assert "drawdown_pct" in first_pt
+            assert "daily_return" in first_pt
+
+
+def test_backtest_presets_endpoint():
+    """Kiểm tra endpoint GET /api/backtest/presets."""
+    response = client.get("/api/backtest/presets")
+    assert response.status_code == 200
+    data = response.json()
+    assert "presets" in data
+    assert len(data["presets"]) >= 8
+    first = data["presets"][0]
+    assert "id" in first
+    assert "name" in first
+    assert "category" in first
+
+
+def test_backtest_signals_recent_endpoint():
+    """Kiểm tra endpoint GET /api/backtest/signals/recent."""
+    response = client.get("/api/backtest/signals/recent")
+    assert response.status_code == 200
+    data = response.json()
+    assert "signals" in data
+    assert isinstance(data["signals"], list)
+
+
+def test_predict_retrain_endpoint():
+    """Kiểm tra endpoint POST /api/predict/retrain với mock training engine."""
+    from unittest.mock import patch
+    mock_ret = {
+        "status": "success",
+        "horizon": "T+3",
+        "lightgbm_metrics": {"accuracy": 0.65},
+        "lstm_metrics": {"accuracy": 0.62},
+    }
+    with patch("vn_stock.modeling.train.train_production_model", return_value=mock_ret):
+        payload = {
+            "horizon": 3,
+            "threshold": 0.02,
+            "val_buffer_days": 40,
+            "scope": "VN30",
+        }
+        response = client.post("/api/predict/retrain", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["horizon"] == "T+3"
+
+
+def test_backtest_run_advanced_index_scope_endpoint():
+    """Kiểm tra endpoint POST /api/backtest/run-advanced với scope = index."""
+    payload = {
+        "scope_type": "index",
+        "index_name": "VN30",
+        "start_date": "2024-01-01",
+        "end_date": "2024-04-01",
+    }
+    response = client.post("/api/backtest/run-advanced", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["scope_type"] == "index"
+    assert "VN30" in data["scope_target"]
+    assert len(data["symbols_breakdown"]) >= 1
+
+
+def test_backtest_run_advanced_stock_scope_endpoint():
+    """Kiểm tra endpoint POST /api/backtest/run-advanced với scope = stock."""
+    payload = {
+        "scope_type": "stock",
+        "symbol": "VIC",
+        "start_date": "2024-01-01",
+        "end_date": "2024-04-01",
+    }
+    response = client.post("/api/backtest/run-advanced", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["scope_type"] == "stock"
+    assert data["scope_target"] == "VIC"
+
 
 

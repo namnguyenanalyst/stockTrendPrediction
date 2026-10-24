@@ -540,6 +540,12 @@ class SymbolBreakdownItem(BaseModel):
     costs: float = Field(..., description="Tổng chi phí giao dịch (VNĐ)")
 
 
+class IndividualResultItem(BaseModel):
+    metrics: BacktestMetricsSchema = Field(..., description="Chỉ số hiệu quả tài chính của từng mã")
+    equity_curve: list[EquityCurvePoint] = Field(..., description="Đường cong tài sản của từng mã")
+    trades: list[TradeLogItem] = Field(default_factory=list, description="Danh sách nhật ký khớp lệnh của mã")
+
+
 class PortfolioBacktestResponse(BaseModel):
     scope_type: str = Field(..., description="Phạm vi đã kiểm thử ('stock', 'index', 'sector', 'portfolio')")
     scope_target: str = Field(..., description="Mục tiêu kiểm thử (tên mã, tên rổ, tên ngành)")
@@ -549,5 +555,8 @@ class PortfolioBacktestResponse(BaseModel):
     aggregate_metrics: BacktestMetricsSchema = Field(..., description="Chỉ số hiệu quả tổng hợp toàn danh mục")
     portfolio_equity_curve: list[EquityCurvePoint] = Field(..., description="Đường cong tài sản danh mục")
     symbols_breakdown: list[SymbolBreakdownItem] = Field(..., description="Bảng phân tích chi tiết từng mã thành phần")
-    individual_results: dict[str, Any] = Field(default_factory=dict, description="Kết quả chi tiết từng mã (trades, equity) phục vụ đào sâu (drill-down)")
+    individual_results: dict[str, IndividualResultItem] = Field(
+        default_factory=dict,
+        description="Kết quả chi tiết từng mã (trades, equity) phục vụ đào sâu (drill-down)",
+    )
 
