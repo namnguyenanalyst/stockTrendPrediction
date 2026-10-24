@@ -38,6 +38,7 @@ Hệ thống Agent vận hành theo mô hình phân tầng chặt chẽ giữa *
 ### 1.3. Kho Kỹ năng chuyên sâu theo nhu cầu (On-Demand Skills - `.agents/skills/` & Global)
 Agent tự động kích hoạt kỹ năng tương ứng khi thực hiện tác vụ liên quan:
 * **`clean-code` (Global - `~/.gemini/config/skills/`):** Bộ chuẩn mực viết code tinh gọn (KISS, DRY, SRP, YAGNI), hàm ngắn gọn (<20 dòng), đặt tên bộc lộ ý định, loại bỏ code thừa.
+* **`generate-tests` (Global & Project):** Khung sinh bộ kiểm thử tự động toàn diện theo chuẩn AAA (Arrange, Act, Assert), bao phủ 80%+ logic nghiệp vụ cho PyTest (`apps/ml`, `apps/api`) và Vitest (`apps/web`).
 * **`systematic-debugging`:** Quy trình chẩn đoán lỗi có hệ thống, tìm nguyên nhân gốc (root-cause tracing), tránh sửa code mò mẫm.
 * **`python-testing-patterns`:** Chuẩn mực kiểm thử tự động với PyTest, fixtures, mocks cho các pipeline trong `apps/ml/tests/`.
 * **`postgres-best-practices`:** Chuẩn tối ưu hóa CSDL PostgreSQL từ Supabase (index thời gian + ticker, pooling, batch insert dữ liệu OHLCV).
