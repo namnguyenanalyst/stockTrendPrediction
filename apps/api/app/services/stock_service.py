@@ -138,6 +138,35 @@ def get_index_constituents(index_name: str = "VN30") -> list[str]:
 
 
 
+_market_daily_volume_cache: dict[str, int] | None = None
+
+
+def _get_market_daily_volume_map() -> dict[str, int]:
+    """Tổng hợp chuỗi khối lượng giao dịch thị trường thực tế theo từng ngày giao dịch (dùng cache)."""
+    global _market_daily_volume_cache
+    if _market_daily_volume_cache is not None:
+        return _market_daily_volume_cache
+
+    vol_map: dict[str, int] = {}
+    raw_dir = settings.DATA_DIR / "raw"
+    if raw_dir.exists():
+        dfs = []
+        for f in raw_dir.glob("*.parquet"):
+            if f.stem not in ["VNINDEX", "macro"] and not f.name.startswith("_"):
+                try:
+                    d = pd.read_parquet(f, columns=["Date", "Volume"])
+                    d["Date"] = pd.to_datetime(d["Date"]).dt.strftime("%Y-%m-%d")
+                    dfs.append(d)
+                except Exception:
+                    continue
+        if dfs:
+            total_s = pd.concat(dfs).groupby("Date")["Volume"].sum()
+            vol_map = total_s.to_dict()
+
+    _market_daily_volume_cache = vol_map
+    return vol_map
+
+
 def load_stock_dataframe(symbol: str, allow_remote_fetch: bool = True) -> pd.DataFrame:
     """Nạp DataFrame lịch sử của một mã cổ phiếu từ panel interim, raw parquet hoặc tải on-demand từ SSI."""
     clean_sym = symbol.upper()
@@ -178,7 +207,21 @@ def load_stock_dataframe(symbol: str, allow_remote_fetch: bool = True) -> pd.Dat
             df_out["Low"] = (
                 df_out[["Open", "Close"]].min(axis=1) * (1 - ret.abs() * 0.3 - 0.003)
             ).round(2)
-            df_out["Volume"] = int(base_vol)
+
+            # Tính toán khối lượng giao dịch thực tế theo từng phiên
+            vol_col = next((c for c in df_vni.columns if "volume" in c.lower() or "vol" in c.lower()), None)
+            if vol_col and df_vni[vol_col].nunique() > 1:
+                df_out["Volume"] = (df_vni[vol_col] * factor).fillna(base_vol).astype("int64")
+            else:
+                vol_map = _get_market_daily_volume_map()
+                date_strs = pd.to_datetime(df_vni["Date"]).dt.strftime("%Y-%m-%d")
+                scale_ratio = (base_vol / 276500000.0) if base_vol else 1.0
+                df_out["Volume"] = [
+                    int(vol_map[d] * scale_ratio)
+                    if d in vol_map and vol_map[d] > 0
+                    else int(base_vol * (1.0 + float(abs(r)) * 3.0))
+                    for d, r in zip(date_strs, ret)
+                ]
             return df_out.sort_values("Date").reset_index(drop=True)
 
     panel_path = settings.DATA_DIR / "interim" / "panel" / f"Symbol={clean_sym}"

@@ -317,15 +317,20 @@ def run_advanced_backtest(req: AdvancedBacktestRequest) -> PortfolioBacktestResp
         buy_dict = req.buy_conditions.model_dump()
         sell_dict = req.sell_conditions.model_dump()
 
+        # Nếu không bật cài đặt nâng cao: áp dụng chuẩn DNSE (vốn 100tr, không trượt giá, không mô hình AI)
+        effective_capital = req.initial_capital if req.use_advanced_settings else 100_000_000.0
+        effective_slippage = req.slippage_rate if req.use_advanced_settings else 0.0
+        effective_model = req.model_type if req.use_advanced_settings else "none"
+
         res = run_portfolio_backtest(
             symbols=target_symbols,
             start_date=req.start_date,
             end_date=req.end_date,
-            initial_capital=req.initial_capital,
-            model_type=req.model_type,
+            initial_capital=effective_capital,
+            model_type=effective_model,
             buy_rules=buy_dict,
             sell_rules=sell_dict,
-            slippage_rate=req.slippage_rate,
+            slippage_rate=effective_slippage,
             take_profit_pct=req.sell_conditions.take_profit_pct,
             stop_loss_pct=req.sell_conditions.stop_loss_pct,
             trailing_stop_pct=req.sell_conditions.trailing_stop_pct,
