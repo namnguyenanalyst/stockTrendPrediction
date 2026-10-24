@@ -208,10 +208,12 @@ def test_predict_universal_symbol():
 
 def test_stocks_trigger_sync():
     """Kiểm tra endpoint POST /api/stocks/sync."""
-    response = client.post("/api/stocks/sync")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] in ["success", "completed", "running"]
+    from unittest.mock import patch
+    with patch("vn_stock.data_ingestion.sync_latest_market_data", return_value={"status": "completed"}):
+        response = client.post("/api/stocks/sync")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] in ["success", "completed", "running"]
 
 
 def test_predict_live_endpoints():

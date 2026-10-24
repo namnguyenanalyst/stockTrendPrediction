@@ -7,12 +7,16 @@ interface EquityCurveChartProps {
   equityCurve: EquityCurvePoint[];
   initialCapital: number;
   height?: number;
+  strategyLabel?: string;
+  strategyShortLabel?: string;
 }
 
 export const EquityCurveChart: React.FC<EquityCurveChartProps> = ({
   equityCurve,
   initialCapital,
   height = 320,
+  strategyLabel,
+  strategyShortLabel,
 }) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
@@ -114,7 +118,7 @@ export const EquityCurveChart: React.FC<EquityCurveChartProps> = ({
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-2 text-xs">
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1.5 font-semibold text-emerald-400">
-            <span className="h-0.5 w-3.5 bg-emerald-400" /> Chiến lược AI (Đo lường OOS)
+            <span className="h-0.5 w-3.5 bg-emerald-400" /> {strategyLabel || "Chiến lược AI (Đo lường OOS)"}
           </span>
           <span className="flex items-center gap-1.5 font-medium text-cyan-400">
             <span className="h-0.5 w-3.5 bg-cyan-400" /> Buy & Hold Benchmark
@@ -264,7 +268,7 @@ export const EquityCurveChart: React.FC<EquityCurveChartProps> = ({
           </span>
           <div className="flex items-center gap-4">
             <span className="font-bold text-emerald-400">
-              AI: {(hoveredPoint.data.total_equity ?? 0).toLocaleString("vi-VN")} đ (
+              {strategyShortLabel || "AI"}: {(hoveredPoint.data.total_equity ?? 0).toLocaleString("vi-VN")} đ (
               {(
                 (((hoveredPoint.data.total_equity ?? initialCapital) - initialCapital) /
                   (initialCapital || 1)) *

@@ -739,6 +739,442 @@ def test_backtest_symbol_oos_and_all_symbols():
         assert "Sharpe" in df_summary.columns
 
 
+# ===========================================================================
+# CÁC TEST CASE CHUYÊN SÂU CẤP ĐỘ UNIT (UNIT-LEVEL TEST SUITE FOR BACKTESTING)
+# ===========================================================================
+
+
+def test_slippage_rate_impact():
+    """Kiểm tra tác động của trượt giá (Slippage): mua đắt hơn, bán rẻ hơn và giảm lợi nhuận ròng."""
+    df = _create_sample_market_df(n_bars=6, start_price=100.0)
+    signals = np.array([2, 1, 0, 1, 1, 1])
+
+    # 1. Chạy không trượt giá (slippage = 0.0)
+    m_no_slip, _, tr_no_slip = simulate_vietnam_trading(
+        df=df,
+        signals=signals,
+        initial_capital=10_000_000,
+        slippage_rate=0.0,
+        close_at_end=False,
+    )
+    buy_no_slip = tr_no_slip[tr_no_slip["order_type"] == "BUY"].iloc[0]
+    sell_no_slip = tr_no_slip[tr_no_slip["order_type"] == "SELL"].iloc[0]
+
+    # 2. Chạy có trượt giá 0.5% (slippage = 0.005)
+    m_with_slip, _, tr_with_slip = simulate_vietnam_trading(
+        df=df,
+        signals=signals,
+        initial_capital=10_000_000,
+        slippage_rate=0.005,
+        close_at_end=False,
+    )
+    buy_with_slip = tr_with_slip[tr_with_slip["order_type"] == "BUY"].iloc[0]
+    sell_with_slip = tr_with_slip[tr_with_slip["order_type"] == "SELL"].iloc[0]
+
+    # Giá mua có trượt giá phải cao hơn giá cơ sở: Open * (1 + 0.005)
+    assert buy_with_slip["exec_price"] > buy_no_slip["exec_price"]
+    assert pytest.approx(buy_with_slip["exec_price"], 0.01) == (buy_no_slip["exec_price"] * 1.005)
+
+    # Giá bán có trượt giá phải thấp hơn giá cơ sở: Open * (1 - 0.005)
+    assert sell_with_slip["exec_price"] < sell_no_slip["exec_price"]
+    assert pytest.approx(sell_with_slip["exec_price"], 0.01) == (sell_no_slip["exec_price"] * 0.995)
+
+    # Hiệu suất tài chính khi có trượt giá phải kém hơn khi không có trượt giá
+    assert m_with_slip.total_return_pct < m_no_slip.total_return_pct
+    assert m_with_slip.final_equity < m_no_slip.final_equity
+
+
+def test_execution_price_close_vs_open():
+    """Kiểm tra cơ chế khớp lệnh tại giá Close_{t+1} thay vì Open_{t+1}."""
+    dates = pd.date_range("2026-01-01", periods=5, freq="B")
+    df = pd.DataFrame({
+        "Date": dates,
+        "Open": [100.0, 102.0, 104.0, 106.0, 108.0],
+        "High": [101.0, 105.0, 107.0, 109.0, 111.0],
+        "Low": [99.0, 101.0, 103.0, 105.0, 107.0],
+        "Close": [101.0, 103.0, 105.0, 107.0, 109.0],
+        "Volume": [1_000_000] * 5,
+    })
+    signals = np.array([2, 1, 1, 1, 1])
+
+    # Khớp tại Close
+    _, _, tr_close = simulate_vietnam_trading(
+        df=df,
+        signals=signals,
+        initial_capital=10_000_000,
+        slippage_rate=0.0,
+        execution_price="close",
+        close_at_end=False,
+    )
+    buy_close = tr_close[tr_close["order_type"] == "BUY"].iloc[0]
+    # Ngày 1 Close = 103.0 (trong khi Open = 102.0)
+    assert buy_close["exec_price"] == 103.0
+
+
+def test_insufficient_cash_for_minimum_lot():
+    """Kiểm tra khi tiền mặt không đủ mua tối thiểu 1 lô 100 cổ phiếu thì hệ thống từ chối lệnh."""
+    # Giá 100k/cp -> 1 lô 100 cp cần 10,000k = 10,000,000 đ
+    df = _create_sample_market_df(n_bars=5, start_price=100.0)
+    signals = np.array([2, 1, 1, 1, 1])
+
+    # Vốn ban đầu chỉ có 5,000 đ (nhỏ hơn nhiều so với 10 triệu đ cần thiết)
+    metrics, _, trades_df = simulate_vietnam_trading(
+        df=df,
+        signals=signals,
+        initial_capital=5_000.0,
+        lot_size=100,
+        close_at_end=False,
+    )
+
+    # Không có lệnh giao dịch nào được thực thi
+    assert len(trades_df) == 0
+    assert metrics.total_trades == 0
+    assert metrics.final_equity == 5_000.0
+
+
+def test_partial_settlement_unsettled_lots_retained():
+    """Kiểm tra nguyên tắc bảo toàn lô chưa về: chỉ bán lô đã về T+2 và giữ lại lô chưa về."""
+    # Kiểm tra trực tiếp cấu trúc PositionLot và logic phân loại tại thời điểm khớp lệnh
+    lot_settled = PositionLot(
+        shares=100,
+        buy_price=50.0,
+        cost_basis=5007.5,
+        buy_idx=1,
+        buy_date="2026-01-02",
+        settled_idx=3,
+        highest_price=50.0,
+    )
+    lot_unsettled = PositionLot(
+        shares=200,
+        buy_price=52.0,
+        cost_basis=10415.6,
+        buy_idx=2,
+        buy_date="2026-01-05",
+        settled_idx=4,
+        highest_price=52.0,
+    )
+    inventory = [lot_settled, lot_unsettled]
+
+    # Tại exec_idx = 3 (ngày Lô 1 về, Lô 2 chưa về)
+    exec_idx = 3
+    settled_lots = [lot for lot in inventory if lot.settled_idx <= exec_idx]
+    unsettled_lots = [lot for lot in inventory if lot.settled_idx > exec_idx]
+
+    assert len(settled_lots) == 1
+    assert settled_lots[0].shares == 100
+    assert len(unsettled_lots) == 1
+    assert unsettled_lots[0].shares == 200
+
+    # Sau khi bán lô settled, inventory chỉ còn lô unsettled
+    inventory = unsettled_lots
+    assert len(inventory) == 1
+    assert inventory[0].shares == 200
+    assert inventory[0].settled_idx == 4
+
+
+def test_take_profit_mechanism_execution():
+    """Kiểm tra cơ chế Chốt lời (Take Profit): kích hoạt bán khi giá tăng >= take_profit_pct sau T+2."""
+    dates = pd.date_range("2026-01-01", periods=6, freq="B")
+    df = pd.DataFrame({
+        "Date": dates,
+        "Open": [100.0, 100.0, 105.0, 118.0, 120.0, 122.0],
+        "High": [101.0, 101.0, 106.0, 119.0, 121.0, 123.0],
+        "Low": [99.0, 99.0, 104.0, 117.0, 119.0, 121.0],
+        "Close": [100.0, 100.0, 105.0, 118.0, 120.0, 122.0],
+        "Volume": [1_000_000] * 6,
+    })
+    signals = np.array([2, 1, 1, 1, 1, 1])
+
+    res = run_backtest(
+        df=df,
+        signals=signals,
+        symbol="FPT",
+        initial_capital=50_000_000,
+        take_profit_pct=0.15,  # Chốt lời 15%
+        close_at_end=False,
+    )
+
+    sell_trades = res.trades_df[res.trades_df["order_type"] == "SELL"]
+    assert len(sell_trades) == 1
+    assert sell_trades.iloc[0]["reason"] == "TAKE_PROFIT"
+    assert sell_trades.iloc[0]["exec_price"] >= 115.0
+    assert sell_trades.iloc[0]["realized_pnl"] > 0
+
+
+def test_trailing_stop_mechanism_execution():
+    """Kiểm tra cơ chế Trailing Stop: theo dõi đỉnh cao nhất và bán khi giá sụt giảm >= trailing_stop_pct."""
+    dates = pd.date_range("2026-01-01", periods=7, freq="B")
+    df = pd.DataFrame({
+        "Date": dates,
+        "Open": [100.0, 100.0, 110.0, 125.0, 114.0, 110.0, 108.0],
+        "High": [101.0, 101.0, 111.0, 126.0, 115.0, 111.0, 109.0],
+        "Low": [99.0, 99.0, 109.0, 124.0, 113.0, 109.0, 107.0],
+        "Close": [100.0, 100.0, 110.0, 125.0, 114.0, 110.0, 108.0],
+        "Volume": [1_000_000] * 7,
+    })
+    signals = np.array([2, 1, 1, 1, 1, 1, 1])
+
+    res = run_backtest(
+        df=df,
+        signals=signals,
+        symbol="VIC",
+        initial_capital=50_000_000,
+        trailing_stop_pct=0.08,  # Trailing Stop 8%
+        close_at_end=False,
+    )
+
+    sell_trades = res.trades_df[res.trades_df["order_type"] == "SELL"]
+    assert len(sell_trades) == 1
+    assert sell_trades.iloc[0]["reason"] == "TRAILING_STOP"
+    assert sell_trades.iloc[0]["exec_date"] == df.iloc[4]["Date"].strftime("%Y-%m-%d")
+
+
+def test_close_at_end_true_vs_false():
+    """Kiểm tra tham số close_at_end: thanh lý cưỡng bức ở phiên cuối vs giữ nguyên vị thế mở."""
+    df = _create_sample_market_df(n_bars=6, start_price=50.0)
+    signals = np.array([2, 1, 1, 1, 1, 1])
+
+    # 1. close_at_end = True -> Phải có lệnh bán FINAL_LIQUIDATION ở phiên cuối
+    _, _, tr_true = simulate_vietnam_trading(
+        df=df,
+        signals=signals,
+        initial_capital=20_000_000,
+        close_at_end=True,
+    )
+    assert len(tr_true[tr_true["order_type"] == "SELL"]) == 1
+    assert tr_true.iloc[-1]["reason"] == "FINAL_LIQUIDATION"
+
+    # 2. close_at_end = False -> Không có lệnh bán nào được sinh ra vì AI không phát tín hiệu SELL
+    _, _, tr_false = simulate_vietnam_trading(
+        df=df,
+        signals=signals,
+        initial_capital=20_000_000,
+        close_at_end=False,
+    )
+    assert len(tr_false[tr_false["order_type"] == "SELL"]) == 0
+
+
+def test_custom_settlement_delays():
+    """Kiểm tra linh hoạt các chu kỳ thanh toán khác nhau: T+0, T+1 và T+2."""
+    df = _create_sample_market_df(n_bars=5, start_price=50.0)
+    signals = np.array([2, 0, 1, 1, 1])
+
+    # Với T+0 (settlement_delay = 0): Mua ngày 1, bán được ngay tại ngày 1 hoặc ngày 2
+    _, _, tr_t0 = simulate_vietnam_trading(
+        df=df,
+        signals=signals,
+        initial_capital=20_000_000,
+        settlement_delay=0,
+        close_at_end=False,
+    )
+    sell_t0 = tr_t0[tr_t0["order_type"] == "SELL"]
+    assert len(sell_t0) == 1
+    assert sell_t0.iloc[0]["exec_date"] == df.iloc[2]["Date"].strftime("%Y-%m-%d")
+
+    # Với T+2 (settlement_delay = 2): Mua ngày 1, ngày 2 đòi bán -> BỊ TỪ CHỐI, không khớp!
+    _, _, tr_t2 = simulate_vietnam_trading(
+        df=df,
+        signals=signals,
+        initial_capital=20_000_000,
+        settlement_delay=2,
+        close_at_end=False,
+    )
+    sell_t2 = tr_t2[tr_t2["order_type"] == "SELL"]
+    assert len(sell_t2) == 0
+
+
+def test_calculate_financial_metrics_cagr_and_calmar():
+    """Kiểm tra công thức CAGR cho các khoảng thời gian khác nhau và tỷ số Calmar."""
+    # 252 ngày giao dịch (1 năm): Vốn tăng từ 100 lên 120 -> CAGR = 20%
+    eq_1y = pd.Series(np.linspace(100.0, 120.0, 252))
+    m_1y = calculate_financial_metrics(eq_1y, initial_capital=100.0, trades=[])
+    assert pytest.approx(m_1y.cagr_pct, 0.1) == 20.0
+    assert m_1y.total_return_pct == 20.0
+
+    # 504 ngày giao dịch (2 năm): Vốn tăng từ 100 lên 144 -> CAGR = sqrt(1.44) - 1 = 20%
+    eq_2y = pd.Series(np.linspace(100.0, 144.0, 504))
+    m_2y = calculate_financial_metrics(eq_2y, initial_capital=100.0, trades=[])
+    assert pytest.approx(m_2y.cagr_pct, 0.1) == 20.0
+
+    # Khi tài khoản bị cháy (final_equity <= 0)
+    eq_ruin = pd.Series([100.0, 50.0, 0.0])
+    m_ruin = calculate_financial_metrics(eq_ruin, initial_capital=100.0, trades=[])
+    assert m_ruin.cagr_pct == -100.0
+
+
+def test_calculate_financial_metrics_var_and_cvar():
+    """Kiểm tra giá trị chịu rủi ro VaR 95% và CVaR 95% (Expected Shortfall)."""
+    np.random.seed(42)
+    daily_rets = np.random.normal(0.001, 0.02, 100)
+    eq_series = pd.Series(100.0 * np.cumprod(1 + daily_rets))
+
+    metrics = calculate_financial_metrics(eq_series, initial_capital=100.0, trades=[])
+    assert metrics.var_95_pct > 0.0
+    assert metrics.cvar_95_pct >= metrics.var_95_pct
+
+
+def test_calculate_financial_metrics_profit_factor_pure_win():
+    """Kiểm tra khi toàn bộ lệnh đều có lãi (gross_loss = 0) thì profit_factor = 999.0."""
+    trade_win = TradeRecord(
+        trade_id=1,
+        symbol="VIC",
+        order_type="SELL",
+        signal_date="2026-01-01",
+        exec_date="2026-01-03",
+        exec_price=110.0,
+        shares=100,
+        gross_value=11000.0,
+        fee=15.0,
+        tax=10.0,
+        net_cash_flow=10975.0,
+        cash_after=10975.0,
+        realized_pnl=975.0,
+        realized_return_pct=9.75,
+        holding_days=2.0,
+    )
+    eq = pd.Series([100.0, 105.0, 110.0])
+    metrics = calculate_financial_metrics(eq, initial_capital=100.0, trades=[trade_win])
+
+    assert metrics.winning_trades == 1
+    assert metrics.losing_trades == 0
+    assert metrics.win_rate_pct == 100.0
+    assert metrics.profit_factor == 999.0
+
+
+def test_run_random_baseline_deterministic_seed():
+    """Kiểm tra tính nhất quán của hàm run_random_baseline khi cố định seed."""
+    df = _create_sample_market_df(n_bars=10, start_price=50.0)
+
+    res1 = run_random_baseline(df, symbol="VIC", initial_capital=20_000_000, seed=123)
+    res2 = run_random_baseline(df, symbol="VIC", initial_capital=20_000_000, seed=123)
+
+    assert res1.metrics.total_return_pct == res2.metrics.total_return_pct
+    assert res1.metrics.final_equity == res2.metrics.final_equity
+    assert res1.metrics.equity_curve == res2.metrics.equity_curve
+
+
+def test_prepare_backtest_df_all_technical_features():
+    """Kiểm tra prepare_backtest_df tính toán đầy đủ tất cả các chỉ báo kỹ thuật tài chính."""
+    df = _create_sample_market_df(n_bars=40, start_price=50.0)
+    df_prep = prepare_backtest_df(df)
+
+    expected_cols = [
+        "SMA5", "SMA10", "SMA20", "SMA50", "SMA100", "SMA200",
+        "EMA5", "EMA10", "EMA12", "EMA20", "EMA26", "EMA50",
+        "RSI", "MACD", "MACD_Signal",
+        "BB_Upper", "BB_Lower",
+        "Vol_SMA5", "Vol_SMA10", "Vol_SMA20",
+        "ADX", "RS",
+    ]
+    for col in expected_cols:
+        assert col in df_prep.columns
+
+
+def test_evaluate_strategy_signals_ma_down_cross_and_below():
+    """Kiểm tra toán tử 'Cắt xuống' và 'Nằm dưới' trong evaluate_strategy_signals."""
+    dates = pd.date_range("2026-01-01", periods=20, freq="B")
+    # Giá giảm dần từ 100 về 80
+    prices = [100.0 - i * 1.0 for i in range(20)]
+    df = pd.DataFrame({
+        "Date": dates,
+        "Open": prices,
+        "High": [p + 0.5 for p in prices],
+        "Low": [p - 0.5 for p in prices],
+        "Close": prices,
+        "Volume": [1_000_000] * 20,
+    })
+    df_prep = prepare_backtest_df(df)
+
+    # Bán khi MA10 nằm dưới MA20
+    sell_rules_below = {
+        "use_ma": True,
+        "ma_left": "MA 10",
+        "ma_operator": "Nằm dưới",
+        "ma_right": "MA 20",
+    }
+    signals_below = evaluate_strategy_signals(df_prep, sell_rules=sell_rules_below)
+    assert any(s == 0 for s in signals_below)
+
+    # Bán khi MA10 cắt xuống MA20
+    sell_rules_cross = {
+        "use_ma": True,
+        "ma_left": "MA 10",
+        "ma_operator": "Cắt xuống",
+        "ma_right": "MA 20",
+    }
+    signals_cross = evaluate_strategy_signals(df_prep, sell_rules=sell_rules_cross)
+    assert len(signals_cross) == len(df_prep)
+
+
+def test_evaluate_strategy_signals_foreign_and_prop_rules():
+    """Kiểm tra bộ lọc giao dịch khối ngoại (nước ngoài) và tự doanh trong evaluate_strategy_signals."""
+    df = _create_sample_market_df(n_bars=10, start_price=50.0)
+    df_prep = prepare_backtest_df(df)
+
+    # Thêm dữ liệu khối ngoại và tự doanh
+    df_prep["Foreign_Buy_Val"] = [10.0] * 10
+    df_prep["Foreign_Sell_Val"] = [5.0] * 10  # Mua ròng 5 tỷ
+    df_prep["Foreign_Buy_Vol"] = [2.0] * 10
+    df_prep["Foreign_Sell_Vol"] = [1.0] * 10  # Mua ròng 1 tr cp
+    df_prep["Prop_Buy_Val"] = [8.0] * 10
+    df_prep["Prop_Sell_Val"] = [3.0] * 10  # Tự doanh mua ròng 5 tỷ
+    df_prep["Prop_Buy_Vol"] = [1.5] * 10
+    df_prep["Prop_Sell_Vol"] = [0.5] * 10
+
+    buy_rules_foreign = {
+        "condition_logic": "AND",
+        "foreign_net_buy": True,
+        "foreign_net_buy_val": True,
+        "min_foreign_buy_val": 2.0,
+        "foreign_net_buy_vol": True,
+        "min_foreign_buy_vol": 0.5,
+        "prop_net_buy_val": True,
+        "min_prop_buy_val": 2.0,
+        "prop_net_buy_vol": True,
+        "min_prop_buy_vol": 0.5,
+    }
+
+    signals = evaluate_strategy_signals(df_prep, buy_rules=buy_rules_foreign)
+    # Tất cả các phiên đều thỏa mãn điều kiện mua ròng khối ngoại & tự doanh
+    assert all(s == 2 for s in signals)
+
+
+def test_position_lot_and_trade_record_dataclass_contracts():
+    """Kiểm tra hợp đồng dữ liệu của PositionLot, TradeRecord và to_dict()."""
+    lot = PositionLot(
+        shares=500,
+        buy_price=50.0,
+        cost_basis=25037.5,
+        buy_idx=1,
+        buy_date="2026-01-02",
+        settled_idx=3,
+        highest_price=52.0,
+    )
+    assert lot.shares == 500
+    assert lot.settled_idx == 3
+    assert lot.highest_price == 52.0
+
+    tr = TradeRecord(
+        trade_id=1,
+        symbol="VIC",
+        order_type="BUY",
+        signal_date="2026-01-01",
+        exec_date="2026-01-02",
+        exec_price=50.0,
+        shares=500,
+        gross_value=25000.0,
+        fee=37.5,
+        tax=0.0,
+        net_cash_flow=-25037.5,
+        cash_after=74962.5,
+        reason="SIGNAL_BUY",
+    )
+    assert tr.net_cash_flow == -25037.5
+    assert tr.fee == 37.5
+    assert tr.tax == 0.0
+
+
+
 
 
 

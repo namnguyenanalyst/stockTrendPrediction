@@ -513,17 +513,17 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
 
     const currentMetrics = metrics
       ? {
-          roi_pct: metrics.total_return_pct,
-          bh_roi_pct: metrics.buy_and_hold_return_pct,
-          excess_pct: metrics.excess_return_pct,
-          sharpe: metrics.sharpe_ratio,
-          mdd_pct: metrics.max_drawdown_pct,
-          win_rate_pct: metrics.win_rate_pct,
-          trades: metrics.total_trades,
-          max_gain_pct: metrics.max_gain_pct,
-          max_loss_pct: metrics.max_loss_pct,
-          reward_risk_ratio: metrics.reward_risk_ratio,
-        }
+        roi_pct: metrics.total_return_pct,
+        bh_roi_pct: metrics.buy_and_hold_return_pct,
+        excess_pct: metrics.excess_return_pct,
+        sharpe: metrics.sharpe_ratio,
+        mdd_pct: metrics.max_drawdown_pct,
+        win_rate_pct: metrics.win_rate_pct,
+        trades: metrics.total_trades,
+        max_gain_pct: metrics.max_gain_pct,
+        max_loss_pct: metrics.max_loss_pct,
+        reward_risk_ratio: metrics.reward_risk_ratio,
+      }
       : undefined;
 
     let updatedList: SavedStrategyItem[];
@@ -656,8 +656,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
     }
 
     setSavedToast(
-      `Chiến lược "${targetName}" đã chuyển sang: ${
-        nextStatus === "active" ? "Triển khai (Đang theo dõi)" : "Chưa triển khai (Bản nháp)"
+      `Chiến lược "${targetName}" đã chuyển sang: ${nextStatus === "active" ? "Triển khai (Đang theo dõi)" : "Chưa triển khai (Bản nháp)"
       }`
     );
     setTimeout(() => setSavedToast(null), 3500);
@@ -767,11 +766,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
               setActiveSubtab("my_strategy");
               setStrategyViewMode("manager");
             }}
-            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${
-              activeSubtab === "my_strategy" && strategyViewMode === "manager"
-                ? "bg-slate-800 text-emerald-400 border border-slate-700 shadow-md shadow-emerald-500/10"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
-            }`}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${activeSubtab === "my_strategy" && strategyViewMode === "manager"
+              ? "bg-slate-800 text-emerald-400 border border-slate-700 shadow-md shadow-emerald-500/10"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+              }`}
           >
             <FolderOpen className="h-4 w-4" />
             <span>Quản lý chiến thuật ({savedStrategies.length})</span>
@@ -784,11 +782,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
               setActiveSubtab("my_strategy");
               setStrategyViewMode("builder");
             }}
-            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${
-              activeSubtab === "my_strategy" && strategyViewMode === "builder"
-                ? "bg-slate-800 text-emerald-400 border border-slate-700 shadow-md shadow-emerald-500/10"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
-            }`}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${activeSubtab === "my_strategy" && strategyViewMode === "builder"
+              ? "bg-slate-800 text-emerald-400 border border-slate-700 shadow-md shadow-emerald-500/10"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+              }`}
           >
             <Sliders className="h-4 w-4" />
             <span>Phòng Lab Kiểm thử</span>
@@ -798,11 +795,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
           <button
             type="button"
             onClick={() => setActiveSubtab("presets")}
-            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${
-              activeSubtab === "presets"
-                ? "bg-slate-800 text-purple-400 border border-slate-700 shadow-md shadow-purple-500/10"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
-            }`}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${activeSubtab === "presets"
+              ? "bg-slate-800 text-purple-400 border border-slate-700 shadow-md shadow-purple-500/10"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+              }`}
           >
             <Sparkles className="h-4 w-4" />
             <span>Chiến thuật mẫu</span>
@@ -927,21 +923,21 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                   </div>
                 </div>
 
-            {/* Scope Selector: Rổ chỉ số, Cổ phiếu, Danh mục, Ngành */}
-            <ScopeSelector
-              scopeType={scopeType}
-              onChangeScopeType={setScopeType}
-              selectedSymbol={selectedSymbol}
-              onChangeSymbol={onSelectSymbol}
-              selectedIndex={selectedIndex}
-              onChangeIndex={setSelectedIndex}
-              selectedSector={selectedSector}
-              onChangeSector={setSelectedSector}
-              portfolioSymbols={portfolioSymbols}
-              onChangePortfolioSymbols={setPortfolioSymbols}
-              symbols={availableSymbols}
-              sectors={availableSectors}
-            />
+                {/* Scope Selector: Rổ chỉ số, Cổ phiếu, Danh mục, Ngành */}
+                <ScopeSelector
+                  scopeType={scopeType}
+                  onChangeScopeType={setScopeType}
+                  selectedSymbol={selectedSymbol}
+                  onChangeSymbol={onSelectSymbol}
+                  selectedIndex={selectedIndex}
+                  onChangeIndex={setSelectedIndex}
+                  selectedSector={selectedSector}
+                  onChangeSector={setSelectedSector}
+                  portfolioSymbols={portfolioSymbols}
+                  onChangePortfolioSymbols={setPortfolioSymbols}
+                  symbols={availableSymbols}
+                  sectors={availableSectors}
+                />
 
                 {/* Accordion Điều kiện Mua & Điều kiện Bán (Chuẩn giao diện DNSE) */}
                 <div className="space-y-3">
@@ -1030,18 +1026,16 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
 
                 {/* Collapsible Cài đặt nâng cao (Vốn, AI Model, Slippage) */}
                 <div
-                  className={`rounded-xl border transition-all ${
-                    useAdvancedSettings
-                      ? "border-emerald-500/50 bg-slate-950/80 shadow-[0_0_15px_rgba(16,185,129,0.08)]"
-                      : "border-slate-800/80 bg-slate-950/50"
-                  } overflow-hidden`}
+                  className={`rounded-xl border transition-all ${useAdvancedSettings
+                    ? "border-emerald-500/50 bg-slate-950/80 shadow-[0_0_15px_rgba(16,185,129,0.08)]"
+                    : "border-slate-800/80 bg-slate-950/50"
+                    } overflow-hidden`}
                 >
                   <div className="flex items-center justify-between p-2.5 text-xs">
                     <div className="flex items-center gap-2">
                       <Settings2
-                        className={`h-4 w-4 ${
-                          useAdvancedSettings ? "text-emerald-400" : "text-slate-400"
-                        }`}
+                        className={`h-4 w-4 ${useAdvancedSettings ? "text-emerald-400" : "text-slate-400"
+                          }`}
                       />
                       <div>
                         <div className="font-semibold text-slate-200 flex items-center gap-1.5">
@@ -1058,7 +1052,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                               Vốn {(initialCapital / 1e6).toFixed(0)}tr • {modelType === "lightgbm" ? "LightGBM" : "LSTM"} • Trượt giá {(slippageRate * 100).toFixed(2)}%
                             </span>
                           ) : (
-                            <span>Đang tắt: Chuẩn DNSE (Vốn 100tr • Trượt giá 0% • 100% theo quy tắc)</span>
+                            <span>Đang tắt: Chuẩn DNSE (Không trượt giá • 100% theo quy tắc)</span>
                           )}
                         </div>
                       </div>
@@ -1098,21 +1092,21 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                       {!useAdvancedSettings ? (
                         <div className="rounded-lg border border-slate-800/90 bg-slate-900/60 p-2.5 text-[11px] text-slate-400 leading-relaxed">
                           <p className="font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
-                            <span className="text-emerald-400">⚡</span> Chế độ kiểm thử chuẩn DNSE đang kích hoạt:
+                            <span className="text-emerald-400"></span> Cài đặt nâng cao đang kích hoạt:
                           </p>
                           <ul className="list-disc pl-4 space-y-1 text-[10px] text-slate-400">
                             <li>
                               Khớp lệnh <strong className="text-slate-200">100% theo bộ điều kiện Mua & Bán</strong> bạn cài đặt phía trên.
                             </li>
                             <li>
-                              <strong className="text-slate-200">Không tính trượt giá (0.00%)</strong>: Lệnh khớp đúng giá thị trường lý tưởng giống hệ thống DNSE.
+                              <strong className="text-slate-200">Không tính trượt giá (0.00%)</strong>: Lệnh khớp đúng giá thị trường lý tưởng.
                             </li>
                             <li>
                               <strong className="text-slate-200">Không có mô hình AI can thiệp</strong>: Bảo đảm chiến lược vận hành thuần túy theo quy tắc kỹ thuật định sẵn.
                             </li>
                           </ul>
                           <div className="mt-2 text-[10px] text-emerald-400 font-medium">
-                            💡 Gạt công tắc bên phải phía trên nếu bạn muốn kích hoạt Vốn tùy chỉnh, Mô hình AI hoặc đo kiểm Trượt giá.
+                            Gạt công tắc bên phải phía trên nếu bạn muốn kích hoạt Vốn tùy chỉnh, Mô hình AI hoặc đo kiểm Trượt giá.
                           </div>
                         </div>
                       ) : (
@@ -1202,52 +1196,57 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
             {/* CỘT PHẢI: DASHBOARD KẾT QUẢ ĐỊNH LƯỢNG (KHÔNG CẦN CUỘN TRANG) */}
             <div className="space-y-4 xl:col-span-7 min-w-0">
 
-          {/* ===================================================================== */}
-          {/* KHU VỰC HIỂN THỊ KẾT QUẢ ĐỊNH LƯỢNG */}
-          {/* ===================================================================== */}
+              {/* ===================================================================== */}
+              {/* KHU VỰC HIỂN THỊ KẾT QUẢ ĐỊNH LƯỢNG */}
+              {/* ===================================================================== */}
 
-          {/* Trường hợp chưa chạy kiểm thử: Hiển thị Mascot và lời nhắc chuẩn DNSE ảnh 1 */}
-          {!portfolioResult && !backtestResult && !isLoading && (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/40 p-12 text-center backdrop-blur-sm min-h-[360px]">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-800 text-emerald-400 border border-slate-700 shadow-xl mb-4">
-                <Bot className="h-8 w-8 animate-pulse" />
-              </div>
-              <h4 className="text-base font-bold text-slate-200">
-                Lựa chọn điều kiện để chạy chiến lược.
-              </h4>
-              <p className="mt-1 max-w-md text-xs text-slate-400">
-                Chọn Rổ chỉ số (VN30/VN100), Nhóm ngành hoặc Cổ phiếu mục tiêu, thiết lập điều kiện
-                Mua/Bán và nhấn <strong>&ldquo;CHẠY KIỂM THỬ&rdquo;</strong> để bắt đầu mô phỏng thực tế.
-              </p>
-            </div>
-          )}
-
-          {/* Khi có kết quả: Hiển thị Banner tổng hợp & Lưới chỉ số + Biểu đồ */}
-          {(portfolioResult || backtestResult) && (
-            <div className="space-y-4 animate-fade-in">
-              {/* Banner tóm tắt phạm vi đã kiểm thử */}
-              {portfolioResult && (
-                <div className="flex flex-col gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 sm:flex-row sm:items-center sm:justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-slate-950 font-bold">
-                      ✓
-                    </span>
-                    <div>
-                      <span className="font-bold text-emerald-400 text-sm">
-                        {portfolioResult.scope_target}
-                      </span>
-                      <span className="text-slate-300 ml-2">
-                        ({portfolioResult.symbols_count} cổ phiếu thành phần)
-                      </span>
-                    </div>
+              {/* Trường hợp chưa chạy kiểm thử: Hiển thị Mascot và lời nhắc chuẩn DNSE ảnh 1 */}
+              {!portfolioResult && !backtestResult && !isLoading && (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/40 p-12 text-center backdrop-blur-sm min-h-[360px]">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-800 text-emerald-400 border border-slate-700 shadow-xl mb-4">
+                    <Bot className="h-8 w-8 animate-pulse" />
                   </div>
-                  <div className="text-slate-300 font-mono text-[11px]">
-                    Dải ngày: <strong>{portfolioResult.start_date}</strong> →{" "}
-                    <strong>{portfolioResult.end_date}</strong> • Vốn:{" "}
-                    <strong>{portfolioResult.aggregate_metrics.initial_capital.toLocaleString("vi-VN")} đ</strong>
-                  </div>
+                  <h4 className="text-base font-bold text-slate-200">
+                    Lựa chọn điều kiện để chạy chiến lược.
+                  </h4>
+                  <p className="mt-1 max-w-md text-xs text-slate-400">
+                    Chọn Rổ chỉ số (VN30/VN100), Nhóm ngành hoặc Cổ phiếu mục tiêu, thiết lập điều kiện
+                    Mua/Bán và nhấn <strong>&ldquo;CHẠY KIỂM THỬ&rdquo;</strong> để bắt đầu mô phỏng thực tế.
+                  </p>
                 </div>
               )}
+
+              {/* Khi có kết quả: Hiển thị Banner tổng hợp & Lưới chỉ số + Biểu đồ */}
+              {(portfolioResult || backtestResult) && (
+                <div className="space-y-4 animate-fade-in">
+                  {/* Banner tóm tắt phạm vi đã kiểm thử */}
+                  {portfolioResult && (
+                    <div className="flex flex-col gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 sm:flex-row sm:items-center sm:justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-slate-950 font-bold">
+                          ✓
+                        </span>
+                        <div>
+                          <span className="font-bold text-emerald-400 text-sm">
+                            {portfolioResult.scope_target}
+                          </span>
+                          <span className="text-slate-300 ml-2">
+                            ({portfolioResult.symbols_count} cổ phiếu thành phần)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-slate-300 font-mono text-[11px]">
+                        Dải ngày: <strong>{portfolioResult.start_date}</strong> →{" "}
+                        <strong>{portfolioResult.end_date}</strong>
+                        {useAdvancedSettings && (
+                          <span>
+                            {" "}• Vốn:{" "}
+                            <strong>{portfolioResult.aggregate_metrics.initial_capital.toLocaleString("vi-VN")} đ</strong>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* THẺ TỔNG QUAN HIỆU QUẢ GIAO DỊCH & BIỂU ĐỒ DONUT WIN/LOSS CHUẨN DNSE ENTRADE X */}
                   <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 backdrop-blur-sm">
@@ -1372,7 +1371,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                     {/* 1. ROI */}
                     <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
                       <div className="flex items-center justify-between text-slate-400 text-[11px] font-medium">
-                        <span>ROI Danh mục AI</span>
+                        <span>{useAdvancedSettings ? "ROI Danh mục AI" : "ROI Danh mục"}</span>
                         {(metrics?.total_return_pct ?? 0) >= 0 ? (
                           <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
                         ) : (
@@ -1437,7 +1436,9 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                         {metrics ? `${(metrics.total_costs / 1000).toLocaleString("vi-VN")} k` : "---"}
                       </div>
                       <p className="mt-0.5 text-[10px] text-slate-500">
-                        Tác động: {metrics ? `${metrics.cost_impact_pct.toFixed(2)}%` : "---"} vốn
+                        {useAdvancedSettings
+                          ? `Tác động: ${metrics ? `${metrics.cost_impact_pct.toFixed(2)}%` : "---"} vốn`
+                          : `Tỷ lệ chi phí: ${metrics ? `${metrics.cost_impact_pct.toFixed(2)}%` : "---"}`}
                       </p>
                     </div>
                   </div>
@@ -1533,10 +1534,12 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                         initialCapital={
                           detailSymbol
                             ? portfolioResult?.individual_results?.[detailSymbol]?.metrics?.initial_capital ||
-                              initialCapital / (portfolioResult?.symbols_count || 1)
+                            initialCapital / (portfolioResult?.symbols_count || 1)
                             : initialCapital
                         }
                         height={320}
+                        strategyLabel={useAdvancedSettings ? "Chiến lược AI (Đo lường OOS)" : "Chiến lược (Quy tắc lọc)"}
+                        strategyShortLabel={useAdvancedSettings ? "AI" : "Chiến lược"}
                       />
                       <DrawdownChart
                         equityCurve={
@@ -1559,133 +1562,133 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                     />
                   )}
 
-              {/* Tab 2: Bảng Phân rã chi tiết từng mã thành phần */}
-              {resultsTab === "breakdown" && portfolioResult && (
-                <PortfolioBreakdownTable
-                  items={portfolioResult.symbols_breakdown}
-                  selectedSymbol={detailSymbol}
-                  onSelectSymbol={(sym) => {
-                    setDetailSymbol(sym);
-                    setResultsTab("portfolio");
-                  }}
-                />
-              )}
+                  {/* Tab 2: Bảng Phân rã chi tiết từng mã thành phần */}
+                  {resultsTab === "breakdown" && portfolioResult && (
+                    <PortfolioBreakdownTable
+                      items={portfolioResult.symbols_breakdown}
+                      selectedSymbol={detailSymbol}
+                      onSelectSymbol={(sym) => {
+                        setDetailSymbol(sym);
+                        setResultsTab("portfolio");
+                      }}
+                    />
+                  )}
 
-              {/* Tab 3: Bảng Nhật ký Khớp lệnh Thực tế */}
-              {resultsTab === "trades" && (
-                <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur-sm">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-100 sm:text-base">
-                        Nhật ký Giao dịch Khớp lệnh Thực tế (Lưu ký T+2)
-                      </h3>
-                      <p className="text-[11px] text-slate-400">
-                        {detailSymbol
-                          ? `Danh sách lệnh giao dịch riêng của mã ${detailSymbol}`
-                          : "Ghi nhận chi tiết từng vòng mua/bán, phân loại rõ lý do thoát lệnh"}
-                      </p>
-                    </div>
-                    <span className="rounded bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-300">
-                      {trades.length} Giao dịch
-                    </span>
-                  </div>
+                  {/* Tab 3: Bảng Nhật ký Khớp lệnh Thực tế */}
+                  {resultsTab === "trades" && (
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur-sm">
+                      <div className="mb-3 flex items-center justify-between">
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-100 sm:text-base">
+                            Nhật ký Giao dịch Khớp lệnh Thực tế (Lưu ký T+2)
+                          </h3>
+                          <p className="text-[11px] text-slate-400">
+                            {detailSymbol
+                              ? `Danh sách lệnh giao dịch riêng của mã ${detailSymbol}`
+                              : "Ghi nhận chi tiết từng vòng mua/bán, phân loại rõ lý do thoát lệnh"}
+                          </p>
+                        </div>
+                        <span className="rounded bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-300">
+                          {trades.length} Giao dịch
+                        </span>
+                      </div>
 
-                  <div className="max-h-96 overflow-y-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="sticky top-0 border-b border-slate-800 bg-slate-950 text-slate-400">
-                        <tr>
-                          <th className="px-3 py-2 font-semibold">Mã GD</th>
-                          <th className="px-3 py-2 font-semibold">Loại lệnh</th>
-                          <th className="px-3 py-2 font-semibold">Ngày khớp</th>
-                          <th className="px-3 py-2 font-semibold">Giá khớp</th>
-                          <th className="px-3 py-2 font-semibold">Khối lượng</th>
-                          <th className="px-3 py-2 font-semibold">Phí + Thuế</th>
-                          <th className="px-3 py-2 font-semibold">Lãi/Lỗ ròng</th>
-                          <th className="px-3 py-2 font-semibold">Hiệu suất (%)</th>
-                          <th className="px-3 py-2 text-right font-semibold">Lý do</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800/60">
-                        {trades.map((tr) => {
-                          const isBuy = tr.order_type === "BUY";
-                          const isPnlPositive = (tr.realized_pnl ?? 0) >= 0;
-
-                          const isStopLoss = tr.reason === "STOP_LOSS";
-                          const isTakeProfit = tr.reason === "TAKE_PROFIT";
-                          const isTrailing = tr.reason === "TRAILING_STOP";
-
-                          return (
-                            <tr key={tr.trade_id} className="hover:bg-slate-800/30 transition-colors">
-                              <td className="px-3 py-2 font-mono text-slate-400">#{tr.trade_id}</td>
-                              <td className="px-3 py-2">
-                                <span
-                                  className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold ${isBuy
-                                    ? "bg-emerald-500/10 text-emerald-400"
-                                    : "bg-rose-500/10 text-rose-400"
-                                    }`}
-                                >
-                                  {tr.order_type}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 font-mono text-slate-300">{tr.exec_date}</td>
-                              <td className="px-3 py-2 font-semibold text-slate-200">
-                                {(tr.exec_price * 1000).toLocaleString("vi-VN")} đ
-                              </td>
-                              <td className="px-3 py-2 font-mono text-slate-300">
-                                {tr.shares.toLocaleString("vi-VN")} CP
-                              </td>
-                              <td className="px-3 py-2 text-slate-400">
-                                {((tr.fee + tr.tax) / 1000).toLocaleString("vi-VN")} k
-                              </td>
-                              <td className="px-3 py-2 font-semibold">
-                                {tr.realized_pnl !== null ? (
-                                  <span className={isPnlPositive ? "text-emerald-400" : "text-rose-400"}>
-                                    {isPnlPositive ? "+" : ""}
-                                    {tr.realized_pnl.toLocaleString("vi-VN")} đ
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-500">---</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 font-semibold">
-                                {tr.realized_return_pct !== null ? (
-                                  <span className={isPnlPositive ? "text-emerald-400" : "text-rose-400"}>
-                                    {isPnlPositive ? "+" : ""}
-                                    {tr.realized_return_pct.toFixed(2)}%
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-500">---</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                {isStopLoss ? (
-                                  <span className="rounded bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-300 border border-rose-500/30">
-                                    Cắt lỗ (Stop Loss)
-                                  </span>
-                                ) : isTakeProfit ? (
-                                  <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/30">
-                                    Chốt lời (Take Profit)
-                                  </span>
-                                ) : isTrailing ? (
-                                  <span className="rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30">
-                                    Trailing Stop
-                                  </span>
-                                ) : (
-                                  <span className="font-mono text-[11px] text-slate-400">
-                                    {tr.reason}
-                                  </span>
-                                )}
-                              </td>
+                      <div className="max-h-96 overflow-y-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="sticky top-0 border-b border-slate-800 bg-slate-950 text-slate-400">
+                            <tr>
+                              <th className="px-3 py-2 font-semibold">Mã GD</th>
+                              <th className="px-3 py-2 font-semibold">Loại lệnh</th>
+                              <th className="px-3 py-2 font-semibold">Ngày khớp</th>
+                              <th className="px-3 py-2 font-semibold">Giá khớp</th>
+                              <th className="px-3 py-2 font-semibold">Khối lượng</th>
+                              <th className="px-3 py-2 font-semibold">Phí + Thuế</th>
+                              <th className="px-3 py-2 font-semibold">Lãi/Lỗ ròng</th>
+                              <th className="px-3 py-2 font-semibold">Hiệu suất (%)</th>
+                              <th className="px-3 py-2 text-right font-semibold">Lý do</th>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/60">
+                            {trades.map((tr) => {
+                              const isBuy = tr.order_type === "BUY";
+                              const isPnlPositive = (tr.realized_pnl ?? 0) >= 0;
+
+                              const isStopLoss = tr.reason === "STOP_LOSS";
+                              const isTakeProfit = tr.reason === "TAKE_PROFIT";
+                              const isTrailing = tr.reason === "TRAILING_STOP";
+
+                              return (
+                                <tr key={tr.trade_id} className="hover:bg-slate-800/30 transition-colors">
+                                  <td className="px-3 py-2 font-mono text-slate-400">#{tr.trade_id}</td>
+                                  <td className="px-3 py-2">
+                                    <span
+                                      className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold ${isBuy
+                                        ? "bg-emerald-500/10 text-emerald-400"
+                                        : "bg-rose-500/10 text-rose-400"
+                                        }`}
+                                    >
+                                      {tr.order_type}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2 font-mono text-slate-300">{tr.exec_date}</td>
+                                  <td className="px-3 py-2 font-semibold text-slate-200">
+                                    {(tr.exec_price * 1000).toLocaleString("vi-VN")} đ
+                                  </td>
+                                  <td className="px-3 py-2 font-mono text-slate-300">
+                                    {tr.shares.toLocaleString("vi-VN")} CP
+                                  </td>
+                                  <td className="px-3 py-2 text-slate-400">
+                                    {((tr.fee + tr.tax) / 1000).toLocaleString("vi-VN")} k
+                                  </td>
+                                  <td className="px-3 py-2 font-semibold">
+                                    {tr.realized_pnl !== null ? (
+                                      <span className={isPnlPositive ? "text-emerald-400" : "text-rose-400"}>
+                                        {isPnlPositive ? "+" : ""}
+                                        {tr.realized_pnl.toLocaleString("vi-VN")} đ
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-500">---</span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 font-semibold">
+                                    {tr.realized_return_pct !== null ? (
+                                      <span className={isPnlPositive ? "text-emerald-400" : "text-rose-400"}>
+                                        {isPnlPositive ? "+" : ""}
+                                        {tr.realized_return_pct.toFixed(2)}%
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-500">---</span>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 text-right">
+                                    {isStopLoss ? (
+                                      <span className="rounded bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-300 border border-rose-500/30">
+                                        Cắt lỗ (Stop Loss)
+                                      </span>
+                                    ) : isTakeProfit ? (
+                                      <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/30">
+                                        Chốt lời (Take Profit)
+                                      </span>
+                                    ) : isTrailing ? (
+                                      <span className="rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30">
+                                        Trailing Stop
+                                      </span>
+                                    ) : (
+                                      <span className="font-mono text-[11px] text-slate-400">
+                                        {tr.reason}
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
             </div>
           </div>
         </div>
