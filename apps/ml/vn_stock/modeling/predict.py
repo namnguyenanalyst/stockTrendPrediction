@@ -145,7 +145,27 @@ def prepare_inference_features(
     # 1. Hỗ trợ nạp chỉ số thị trường (VNINDEX, VN30, HNX30, ...)
     if clean_sym in SUPPORTED_INDICES:
         idx_df = load_local_data(clean_sym)
-        if idx_df is None or len(idx_df) < 50:
+        if idx_df is not None:
+            # Chuẩn hóa cột giá đóng cửa cho chỉ số nếu chỉ có VNINDEX_Close
+            for c in idx_df.columns:
+                if "Close" in c and c != "Close":
+                    idx_df["Close"] = idx_df[c]
+            if "Close" in idx_df.columns:
+                if "Open" not in idx_df.columns:
+                    idx_df["Open"] = idx_df["Close"]
+                if "High" not in idx_df.columns:
+                    idx_df["High"] = idx_df["Close"]
+                if "Low" not in idx_df.columns:
+                    idx_df["Low"] = idx_df["Close"]
+                if "Volume" not in idx_df.columns:
+                    idx_df["Volume"] = 10_000_000.0
+                if "Symbol" not in idx_df.columns:
+                    idx_df["Symbol"] = clean_sym
+                if "VNINDEX_Return_1d" not in idx_df.columns:
+                    idx_df["VNINDEX_Return_1d"] = idx_df["Close"].pct_change().fillna(0.0)
+                df_raw = idx_df
+
+        if df_raw is None or len(df_raw) < 50:
             try:
                 raw_idx = fetch_daily_index(clean_sym)
                 c_col = [c for c in raw_idx.columns if "Close" in c][0]
@@ -155,14 +175,12 @@ def prepare_inference_features(
                 idx_df["Open"] = idx_df["Close"]
                 idx_df["High"] = idx_df["Close"]
                 idx_df["Low"] = idx_df["Close"]
-                idx_df["Volume"] = 10000000
+                idx_df["Volume"] = 10_000_000.0
                 idx_df["Symbol"] = clean_sym
+                idx_df["VNINDEX_Return_1d"] = idx_df["Close"].pct_change().fillna(0.0)
+                df_raw = idx_df
             except Exception as e:
                 logger.warning("Không thể nạp chỉ số %s: %s", clean_sym, e)
-
-        if idx_df is not None:
-            idx_df["VNINDEX_Return_1d"] = idx_df["Close"].pct_change().fillna(0.0)
-            df_raw = idx_df
 
     target_date_str = get_target_market_date()
     target_dt = pd.to_datetime(target_date_str)

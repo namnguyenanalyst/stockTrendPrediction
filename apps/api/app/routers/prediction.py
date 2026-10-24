@@ -111,6 +111,7 @@ class RetrainRequest(BaseModel):
     horizon: int = Field(default=3, description="Chân trời dự báo (mặc định 3 phiên T+3)")
     threshold: float = Field(default=0.02, description="Ngưỡng biến động giá (mặc định 2.0%)")
     val_buffer_days: int = Field(default=40, description="Số phiên đệm validation Early Stopping")
+    scope: str = Field(default="VN30", description="Phạm vi danh mục ('VN30' toàn bộ 30 mã)")
 
 
 @router.post(
@@ -126,6 +127,7 @@ async def retrain_model_endpoint(
         horizon=request.horizon,
         threshold=request.threshold,
         val_buffer_days=request.val_buffer_days,
+        scope=request.scope,
     )
 
 

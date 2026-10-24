@@ -451,7 +451,7 @@ def train_walk_forward_pipeline(
 
 
 def train_production_model(
-    symbols: list[str] | None = None,
+    symbols: list[str] | str | None = None,
     horizon: int = 3,
     threshold: float = 0.02,
     val_buffer_days: int = 40,
@@ -463,15 +463,29 @@ def train_production_model(
     """
     Huấn luyện mô hình thực chiến (Production Model) phục vụ dự báo trực tuyến:
     1. Tự động đồng bộ và nạp dữ liệu tới phiên T-1 (hoặc T nếu đã qua 15:00 ATC).
-    2. Sử dụng 100% dữ liệu lịch sử tích lũy từ STUDY_START_DATE tới phiên gần nhất có nhãn.
+    2. Hỗ trợ huấn luyện trên 5 mã cốt lõi (CORE) hoặc toàn bộ 30 mã VN30 (VN30).
     3. Tạo nhãn xu hướng đa phiên (mặc định T+3 với ngưỡng +-2.0%).
     4. Trích 40 phiên gần nhất làm Validation Buffer để Early Stopping chống overfitting.
     5. Huấn luyện LightGBM và PyTorch Global LSTM trên toàn bộ mẫu.
     6. Lưu trữ artifacts sản xuất và cập nhật mô hình mặc định.
     """
+    from vn_stock.config import DEFAULT_SYMBOLS, VN30_SYMBOLS
+
+    if isinstance(symbols, str) and symbols.upper() == "VN30":
+        target_symbols = list(VN30_SYMBOLS)
+        scope_name = "VN30"
+    elif isinstance(symbols, list):
+        target_symbols = symbols
+        scope_name = "VN30" if len(symbols) >= 20 else "CUSTOM"
+    else:
+        target_symbols = list(DEFAULT_SYMBOLS)
+        scope_name = "CORE"
+
     logger.info("=== BẮT ĐẦU HUẤN LUYỆN MÔ HÌNH THỰC CHIẾN (PRODUCTION MODEL) ===")
     logger.info(
-        "Cấu hình: Horizon=T+%d, Ngưỡng=%.1f%%, ValBuffer=%d phiên",
+        "Cấu hình: Phạm vi=%s (%d mã), Horizon=T+%d, Ngưỡng=%.1f%%, ValBuffer=%d phiên",
+        scope_name,
+        len(target_symbols),
         horizon,
         threshold * 100,
         val_buffer_days,
@@ -481,11 +495,11 @@ def train_production_model(
     from vn_stock.data_ingestion import sync_latest_market_data
 
     try:
-        sync_latest_market_data(symbols=symbols, force=False)
+        sync_latest_market_data(symbols=target_symbols, force=False)
     except Exception as sync_exc:
         logger.warning("Không thể tự động đồng bộ nến mới trước khi huấn luyện: %s", sync_exc)
 
-    raw_panel = build_panel_dataset(symbols=symbols, force_refresh=False)
+    raw_panel = build_panel_dataset(symbols=target_symbols, force_refresh=False)
     feat_df = compute_features_per_symbol(raw_panel, drop_na=True)
     study_df = apply_study_window(feat_df)
 
@@ -616,6 +630,9 @@ def train_production_model(
     summary = {
         "status": "success",
         "timestamp": datetime.now().isoformat(),
+        "scope": scope_name,
+        "symbols_count": len(target_symbols),
+        "symbols": target_symbols,
         "horizon": f"T+{horizon}",
         "horizon_days": horizon,
         "threshold": threshold,

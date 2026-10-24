@@ -68,18 +68,23 @@ SYMBOL_METADATA = {
     "HDB": {"name": "Ngân hàng TMCP Phát triển TP.HCM", "exchange": "HOSE", "is_core": False, "sector": "Ngân hàng"},
     "SSB": {"name": "Ngân hàng TMCP Đông Nam Á", "exchange": "HOSE", "is_core": False, "sector": "Ngân hàng"},
     "VJC": {"name": "CTCP Hàng không VietJet", "exchange": "HOSE", "is_core": False, "sector": "Hàng không & Vận tải"},
+    "VNINDEX": {"name": "Chỉ số VN-Index (Toàn sàn HOSE)", "exchange": "HOSE", "is_core": False, "sector": "Chỉ số thị trường"},
+    "VN30": {"name": "Chỉ số VN30 (Top 30 cổ phiếu dẫn dắt)", "exchange": "HOSE", "is_core": False, "sector": "Chỉ số thị trường"},
 }
 
 
 def get_available_symbols() -> list[StockSymbolInfo]:
     """Lấy danh sách các mã cổ phiếu được hỗ trợ trong hệ thống."""
+    from vn_stock.config import VN30_SYMBOLS
+    vn30_set = set(VN30_SYMBOLS)
+
     # Quét thêm các file parquet trong raw để bổ sung mã người dùng vừa tải
     symbols_dict = dict(SYMBOL_METADATA)
     raw_dir = settings.DATA_DIR / "raw"
     if raw_dir.exists():
         for p in raw_dir.glob("*.parquet"):
             sym = p.stem.upper()
-            if sym not in symbols_dict and not sym.startswith("_") and sym not in ["VNINDEX", "VN30"]:
+            if sym not in symbols_dict and not sym.startswith("_"):
                 symbols_dict[sym] = {
                     "name": f"Công ty Cổ phần {sym}",
                     "exchange": "HOSE",
@@ -94,6 +99,7 @@ def get_available_symbols() -> list[StockSymbolInfo]:
             exchange=info["exchange"],
             is_core=info["is_core"],
             sector=info.get("sector", "Đa ngành"),
+            is_vn30=sym in vn30_set,
         )
         for sym, info in symbols_dict.items()
     ]

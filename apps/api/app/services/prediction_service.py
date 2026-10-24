@@ -150,17 +150,20 @@ def retrain_production_system(
     horizon: int = 3,
     threshold: float = 0.02,
     val_buffer_days: int = 40,
+    scope: str = "VN30",
 ) -> dict:
     """
     Kích hoạt quy trình huấn luyện lại mô hình thực chiến T+horizon:
     - Thu thập dữ liệu nến mới nhất tới phiên T-1 (hoặc T sau 15:00)
-    - Tự động huấn luyện lại LightGBM và LSTM trên 100% dữ liệu lịch sử
+    - Tự động huấn luyện lại LightGBM và LSTM trên toàn bộ rổ VN30 (30 mã)
     - Cập nhật artifacts models/
     """
     try:
         from vn_stock.modeling.train import train_production_model
 
+        symbols_arg = "VN30" if scope.upper() != "CORE" else None
         summary = train_production_model(
+            symbols=symbols_arg,
             horizon=horizon,
             threshold=threshold,
             val_buffer_days=val_buffer_days,

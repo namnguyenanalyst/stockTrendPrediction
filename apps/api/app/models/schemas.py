@@ -34,6 +34,7 @@ class StockSymbolInfo(BaseModel):
         default=False, description="Có thuộc 5 mã trọng tâm nghiên cứu hay không"
     )
     sector: str = Field(default="Đa ngành", description="Nhóm ngành nghề")
+    is_vn30: bool = Field(default=False, description="Có thuộc rổ chỉ số VN30 hay không")
 
 
 class StockBar(BaseModel):
