@@ -358,60 +358,126 @@ export interface BacktestConditionFilter {
   condition_logic?: "AND" | "OR";
   market_condition?: "all" | "uptrend" | "sideways" | "downtrend";
 
-  // 1. Thông tin Cổ phiếu
+  // 1. Thông tin Cổ phiếu & Khối lượng
   use_stock_price?: boolean;
   min_stock_price?: number;
+  max_stock_price?: number;
   use_market_cap?: boolean;
   min_market_cap?: number;
+  max_market_cap?: number;
   use_avg_trading_val?: boolean;
+  avg_trading_val_period?: number; // 5, 10, 20 phiên
   min_avg_trading_val?: number;
+  max_avg_trading_val?: number;
   use_volume_spike?: boolean;
+  vol_spike_period?: number; // 5, 10, 20 phiên
+  min_vol_spike_pct?: number; // e.g. -100% đến 19900%
+  max_vol_spike_pct?: number;
 
   // 2. Chỉ số kỹ thuật Cổ phiếu
   use_ma?: boolean;
   ma_type?: string;
+  ma_left?: string; // "MA 10", "MA 20", "MA 50", "MA 100", "Giá đóng cửa"
+  ma_operator?: string; // "Cắt lên" | "Cắt xuống" | "Nằm trên" | "Nằm dưới"
+  ma_right?: string; // "MA 10", "MA 20", "MA 50", "MA 100", "Giá đóng cửa"
   use_adx?: boolean;
+  min_adx?: number;
+  max_adx?: number;
   use_rs?: boolean;
+  min_rs?: number;
+  max_rs?: number;
   use_rsi?: boolean;
-  rsi_threshold?: number;
+  rsi_threshold?: number; // legacy backward compatibility
+  rsi_min?: number;
+  rsi_max?: number;
   rsi_sell_threshold?: number;
   use_price_cross?: boolean;
+  price_cross_operator?: string; // "Cắt lên" | "Cắt xuống" | "Nằm trên" | "Nằm dưới"
+  price_cross_target?: string; // "MA 10", "MA 20", "EMA 20", "BB Trên", "BB Dưới"
   use_price_increase?: boolean;
+  price_t0_field?: string; // "Giá đóng cửa T0", "Giá mở cửa T0", "Giá cao nhất T0"
+  price_t0_operator?: string; // ">", "<", "=", ">=", "<="
+  price_t1_field?: string; // "Giá đóng cửa T-1", "Giá mở cửa T-1", "Giá cao nhất T-1"
   use_ema?: boolean;
+  ema_left?: string; // "EMA 10", "EMA 12", "EMA 20", "EMA 26", "EMA 50"
+  ema_operator?: string; // "Cắt lên" | "Cắt xuống" | "Nằm trên" | "Nằm dưới"
+  ema_right?: string; // "EMA 10", "EMA 20", "EMA 50", "Giá đóng cửa"
   use_macd?: boolean;
+  macd_operator?: string; // "Cắt lên" | "Cắt xuống" | "Nằm trên" | "Nằm dưới"
+  macd_target?: string; // "Đường tín hiệu" | "Đường 0"
   use_bb?: boolean;
 
   // 3. Kết quả kinh doanh
   growth_rev_latest?: boolean;
+  min_growth_rev_latest?: number;
+  max_growth_rev_latest?: number;
   growth_rev_prev?: boolean;
+  min_growth_rev_prev?: number;
+  max_growth_rev_prev?: number;
   growth_rev_ttm?: boolean;
+  min_growth_rev_ttm?: number;
+  max_growth_rev_ttm?: number;
   growth_np_latest?: boolean;
+  min_growth_np_latest?: number;
+  max_growth_np_latest?: number;
   growth_np_prev?: boolean;
+  min_growth_np_prev?: number;
+  max_growth_np_prev?: number;
   growth_np_ttm?: boolean;
+  min_growth_np_ttm?: number;
+  max_growth_np_ttm?: number;
 
   // 4. Định giá
-  max_pe?: number | null;
   use_pe?: boolean;
-  max_pb?: number | null;
+  min_pe?: number | null;
+  max_pe?: number | null;
   use_pb?: boolean;
-  max_ps?: number | null;
+  min_pb?: number | null;
+  max_pb?: number | null;
   use_ps?: boolean;
-  min_roa?: number | null;
+  min_ps?: number | null;
+  max_ps?: number | null;
   use_roa?: boolean;
-  min_roe?: number | null;
+  min_roa?: number | null;
+  max_roa?: number | null;
   use_roe?: boolean;
-  min_eps?: number | null;
+  min_roe?: number | null;
+  max_roe?: number | null;
   use_eps?: boolean;
+  min_eps?: number | null;
+  max_eps?: number | null;
   growth_eps?: boolean;
+  min_growth_eps?: number | null;
+  max_growth_eps?: number | null;
 
   // 5. Dòng tiền Cổ phiếu
   foreign_net_buy?: boolean;
   foreign_net_val?: boolean;
+  min_foreign_val?: number;
+  max_foreign_val?: number;
   foreign_net_vol?: boolean;
+  min_foreign_vol?: number;
+  max_foreign_vol?: number;
   prop_net_buy?: boolean;
   prop_net_val?: boolean;
+  min_prop_val?: number;
+  max_prop_val?: number;
   prop_net_vol?: boolean;
+  min_prop_vol?: number;
+  max_prop_vol?: number;
   foreign_net_sell?: boolean;
+  foreign_net_sell_val?: boolean;
+  min_foreign_sell_val?: number;
+  max_foreign_sell_val?: number;
+  foreign_net_sell_vol?: boolean;
+  min_foreign_sell_vol?: number;
+  max_foreign_sell_vol?: number;
+  prop_net_sell_val?: boolean;
+  min_prop_sell_val?: number;
+  max_prop_sell_val?: number;
+  prop_net_sell_vol?: boolean;
+  min_prop_sell_vol?: number;
+  max_prop_sell_vol?: number;
 
   // Quản trị vị thế & Bán
   take_profit_pct?: number | null;
@@ -429,10 +495,11 @@ export interface AdvancedBacktestRequest {
   start_date: string;
   end_date: string;
   initial_capital: number;
-  model_type: "lightgbm" | "lstm";
+  model_type: "lightgbm" | "lstm" | "none";
   slippage_rate?: number;
   buy_conditions?: BacktestConditionFilter;
   sell_conditions?: BacktestConditionFilter;
+  use_advanced_settings?: boolean;
 }
 
 export interface SymbolBreakdownItem {
@@ -487,8 +554,9 @@ export interface SavedStrategyItem {
   start_date: string;
   end_date: string;
   initial_capital: number;
-  model_type: "lightgbm" | "lstm";
+  model_type: "lightgbm" | "lstm" | "none";
   slippage_rate?: number;
+  use_advanced_settings?: boolean;
   buy_conditions: BacktestConditionFilter;
   sell_conditions: BacktestConditionFilter;
   last_metrics?: {
