@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Activity,
   Brain,
@@ -17,12 +17,13 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { retrainProductionModel, syncLivePrediction } from "@/lib/api";
-import { BatchPredictionResponse, PredictionResponse } from "@/lib/types";
+import { getStockHistory, retrainProductionModel, syncLivePrediction } from "@/lib/api";
+import { BatchPredictionResponse, PredictionResponse, StockBar } from "@/lib/types";
 import {
   FinancialDetailModal,
   FinancialItemContext,
 } from "@/components/market/FinancialDetailModal";
+import { FireAntTrajectoryChart } from "@/components/charts/FireAntTrajectoryChart";
 
 export interface PredictionHistoryItem {
   id: string;
@@ -39,9 +40,45 @@ export interface PredictionHistoryItem {
   horizon: string;
 }
 
+const MODEL_SPECIFICATIONS = {
+  lightgbm: {
+    title: "LightGBM — Chuyên gia Bắt nhịp Ngắn hạn",
+    badge: "Phù hợp khi thị trường Đi ngang (Sideway) & Lướt sóng T+3",
+    overview:
+      "Như một chuyên gia phân tích kỹ thuật soi kính lúp vào phiên hôm nay: đo lường xem nến hôm nay đóng cửa ở đâu, RSI có đang quá mua/quá bán không, dòng tiền ngắn hạn vào hay ra để phản xạ tức thì.",
+    purpose:
+      "Dự đoán xem trong 1–3 phiên tiếp theo (chu kỳ T+3), cổ phiếu sẽ BẬT TĂNG, CHỈNH GIẢM hay tiếp tục GIẰNG CO theo các mốc hỗ trợ và kháng cự kỹ thuật.",
+    whenToUse:
+      "LÚC NÊN CHỌN: Thị trường hoặc cổ phiếu đang ĐI NGANG (lình xình không rõ sóng), giá biến động trong biên độ hẹp và bạn muốn lướt sóng nhanh bắt nhịp hồi T+3.",
+    signsTitle: "Dấu hiệu trên bảng điện để bạn chọn mô hình này:",
+    signs: [
+      "Giá cổ phiếu dập dìu trong vùng giá quen thuộc, chưa vượt được đỉnh cũ hay thủng đáy cũ.",
+      "Chỉ báo RSI rơi vào vùng Quá bán (< 30 - canh bắt nhịp nảy hồi) hoặc Quá mua (> 70 - canh chốt lời).",
+      "Thị trường phân hóa mạnh, dòng tiền đánh nhanh rút gọn, không tạo thành sóng ngành kéo dài.",
+    ],
+  },
+  lstm: {
+    title: "LSTM Network — Chuyên gia Bám sóng Quán tính",
+    badge: "Phù hợp khi cổ phiếu Vào Sóng Lớn (Trend)",
+    overview:
+      "Khác với LightGBM chỉ nhìn 1 phiên, mô hình này có 'trí nhớ' chuỗi thời gian: nó xem trọn vẹn cả cuộn phim 20 ngày giao dịch liên tục (~1 tháng) để giải mã xem quán tính của con sóng và lực gom hàng của dòng tiền lớn đang mạnh hay yếu.",
+    purpose:
+      "Đo lường sức đẩy quán tính của chuỗi ngày qua để dự phóng xem đà tăng/giảm này còn đủ lực kéo tiếp trong 3 phiên tới hay sắp cạn kiệt.",
+    whenToUse:
+      "LÚC NÊN CHỌN: Cổ phiếu hoặc thị trường đang VÀO SÓNG TĂNG/GIẢM MẠNH (Uptrend/Downtrend), có dòng tiền lớn dẫn dắt và bạn muốn đầu tư bám theo xu hướng lớn (Trend Following).",
+    signsTitle: "Dấu hiệu trên bảng điện để bạn chọn mô hình này:",
+    signs: [
+      "Cổ phiếu có 3–5 phiên tăng liên tục hoặc vừa có phiên nổ khối lượng bứt phá đỉnh cũ (Breakout).",
+      "Khối lượng giao dịch (Volume) tăng đột biến gấp 1.5 - 2 lần bình thường (dòng tiền tổ chức tham gia).",
+      "Thị trường xuất hiện sóng ngành dẫn dắt rõ rệt (cả họ cổ phiếu cùng tăng mạnh), giá bám sát đà dốc đi lên.",
+    ],
+  },
+};
+
 interface AIPredictionTabProps {
   selectedSymbol: string;
   onSelectSymbol: (symbol: string) => void;
+  bars?: StockBar[];
   prediction: PredictionResponse | null;
   batchPrediction?: BatchPredictionResponse | null;
   modelType: "lightgbm" | "lstm";
@@ -52,6 +89,7 @@ interface AIPredictionTabProps {
 export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   selectedSymbol,
   onSelectSymbol,
+  bars,
   prediction,
   modelType,
   onChangeModelType,
@@ -59,8 +97,25 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
 }) => {
   const [showInfo, setShowInfo] = useState(false);
   const [localPrediction, setLocalPrediction] = useState<PredictionResponse | null>(null);
+  const [fallbackBars, setFallbackBars] = useState<StockBar[]>([]);
+  const chartBars = bars && bars.length > 0 ? bars : fallbackBars;
   const [isRetraining, setIsRetraining] = useState(false);
   const [retrainMsg, setRetrainMsg] = useState<string | null>(null);
+
+  // Tải nến dự phòng nếu không nhận được bars từ props
+  useEffect(() => {
+    if (!bars || bars.length === 0) {
+      let ignore = false;
+      getStockHistory(selectedSymbol)
+        .then((res) => {
+          if (!ignore && res && res.bars) setFallbackBars(res.bars);
+        })
+        .catch((err) => console.warn("Lỗi tải nến biểu đồ:", err));
+      return () => {
+        ignore = true;
+      };
+    }
+  }, [bars, selectedSymbol]);
   const [detailModalItem, setDetailModalItem] = useState<FinancialItemContext | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [history, setHistory] = useState<PredictionHistoryItem[]>(() => {
@@ -73,6 +128,40 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
       return [];
     }
   });
+
+  // Trạng thái hover 3 giây hiển thị đặc tả mô hình
+  const [hoveredModel, setHoveredModel] = useState<"lightgbm" | "lstm" | null>(null);
+  const [activeTooltipModel, setActiveTooltipModel] = useState<"lightgbm" | "lstm" | null>(null);
+  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startHoverTimer = (m: "lightgbm" | "lstm") => {
+    setHoveredModel(m);
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      setActiveTooltipModel(m);
+      setHoveredModel(null);
+    }, 3000);
+  };
+
+  const cancelHoverTimer = () => {
+    setHoveredModel(null);
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+  };
+
+  // Lắng nghe phím Escape để đóng modal đặc tả mô hình
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && activeTooltipModel) {
+        setActiveTooltipModel(null);
+        setHoveredModel(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeTooltipModel]);
 
   // Hiển thị localPrediction nếu vừa đồng bộ Live, ngược lại hiển thị prediction từ props
   const activePred = localPrediction && localPrediction.symbol === selectedSymbol
@@ -161,12 +250,12 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   const isSell = signal.includes("BÁN") || signal.includes("SELL");
 
 
-  // Handler huấn luyện lại mô hình thực chiến T+3
+  // Handler huấn luyện lại mô hình thực chiến T+3 trên toàn bộ rổ VN30
   const handleRetrain = async () => {
     try {
       setIsRetraining(true);
       setRetrainMsg(null);
-      const res = await retrainProductionModel(3, 0.02, 40);
+      const res = await retrainProductionModel(3, 0.02, 40, "VN30");
       const lgbF1 =
         res.lightgbm_metrics?.macro_f1 != null
           ? (res.lightgbm_metrics.macro_f1 * 100).toFixed(1)
@@ -176,7 +265,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           ? (res.lstm_metrics.macro_f1 * 100).toFixed(1)
           : "0.0";
       setRetrainMsg(
-        `Huấn luyện thành công! Nến chốt: ${res.latest_market_date} | LGB Macro F1: ${lgbF1}% | LSTM Macro F1: ${lstmF1}%`
+        `Huấn luyện thành công toàn bộ rổ VN30! Nến chốt: ${res.latest_market_date} | Mẫu train: ${res.train_samples?.toLocaleString() || 0} | LGB Macro F1: ${lgbF1}% | LSTM Macro F1: ${lstmF1}%`
       );
       const updated = await syncLivePrediction(selectedSymbol, modelType);
       setLocalPrediction(updated);
@@ -208,7 +297,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
 
         {/* Nút hành động Live Sync, Retrain & Chuyển đổi Model */}
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          {/* Nút Huấn luyện lại mô hình Thực chiến T+3 */}
+          {/* Nút Huấn luyện lại mô hình Thực chiến T+3 trên toàn bộ rổ VN30 */}
           <button
             onClick={handleRetrain}
             disabled={isRetraining || loading}
@@ -216,41 +305,72 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
               : "border-indigo-500/40 bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-500/30"
               }`}
-            title="Tự động nạp nến mới nhất tới phiên T-1/T và huấn luyện lại LightGBM & LSTM"
+            title="Tự động nạp nến mới nhất và huấn luyện lại LightGBM & LSTM trên toàn bộ 30 mã rổ VN30"
           >
             <Sparkles className={`h-3.5 w-3.5 ${isRetraining ? "animate-spin" : ""}`} />
-            <span>{isRetraining ? "Đang huấn luyện T+3..." : "Huấn luyện lại T+3"}</span>
+            <span>{isRetraining ? "Đang huấn luyện VN30..." : "Huấn luyện lại T+3"}</span>
           </button>
 
 
-          {/* Bộ chọn Mô hình */}
-          <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 p-1">
+          {/* Bộ chọn Mô hình kèm Cơ chế Hover 3 Giây Thả Đặc Tả */}
+          <div className="relative flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 p-1">
             <button
               onClick={() => {
                 setLocalPrediction(null);
                 onChangeModelType("lightgbm");
               }}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${modelType === "lightgbm"
+              onMouseEnter={() => startHoverTimer("lightgbm")}
+              onMouseLeave={cancelHoverTimer}
+              className={`relative flex items-center gap-1.5 overflow-hidden rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${modelType === "lightgbm"
                 ? "bg-purple-600 text-white shadow-sm shadow-purple-500/40"
                 : "text-slate-400 hover:text-slate-200"
                 }`}
+              title="Giữ chuột 3 giây để xem cửa sổ đặc tả mô hình LightGBM"
             >
               <Cpu className="h-3.5 w-3.5" />
               <span>LightGBM</span>
+              {/* Thanh đếm giờ 3 giây trực quan */}
+              {hoveredModel === "lightgbm" && activeTooltipModel !== "lightgbm" && (
+                <span
+                  className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-purple-400 to-indigo-300"
+                  style={{
+                    animation: "fillProgress 3s linear forwards",
+                  }}
+                />
+              )}
             </button>
             <button
               onClick={() => {
                 setLocalPrediction(null);
                 onChangeModelType("lstm");
               }}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${modelType === "lstm"
+              onMouseEnter={() => startHoverTimer("lstm")}
+              onMouseLeave={cancelHoverTimer}
+              className={`relative flex items-center gap-1.5 overflow-hidden rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${modelType === "lstm"
                 ? "bg-purple-600 text-white shadow-sm shadow-purple-500/40"
                 : "text-slate-400 hover:text-slate-200"
                 }`}
+              title="Giữ chuột 3 giây để xem cửa sổ đặc tả mô hình PyTorch LSTM"
             >
               <Brain className="h-3.5 w-3.5" />
               <span>LSTM Network</span>
+              {/* Thanh đếm giờ 3 giây trực quan */}
+              {hoveredModel === "lstm" && activeTooltipModel !== "lstm" && (
+                <span
+                  className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-sky-400 to-indigo-300"
+                  style={{
+                    animation: "fillProgress 3s linear forwards",
+                  }}
+                />
+              )}
             </button>
+
+            <style>{`
+              @keyframes fillProgress {
+                from { width: 0%; opacity: 0.7; }
+                to { width: 100%; opacity: 1; }
+              }
+            `}</style>
           </div>
         </div>
       </div>
@@ -391,7 +511,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                  Phân phối xác suất 3 lớp (Softmax Probabilities)
+                  Phân phối xác suất 3 lớp
                 </span>
                 <button
                   onClick={() => setShowInfo(!showInfo)}
@@ -400,7 +520,6 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                   <HelpCircle className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <span className="text-[11px] text-slate-500">∑ P = 100%</span>
             </div>
 
             {showInfo && (
@@ -483,7 +602,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           <div className="flex items-center gap-2">
             <Activity className="h-5 w-5 text-purple-400" />
             <h3 className="text-sm font-bold text-slate-100 sm:text-base">
-              Quỹ đạo Dự phóng Xu hướng 3 Phiên T+1 → T+3 (Trend Trajectory)
+              Dự báo xu hướng 3 phiên tiếp theo.
             </h3>
           </div>
         </div>
@@ -605,6 +724,15 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
             </div>
           </div>
         )}
+
+        {/* Biểu đồ Nến Kỹ thuật & Quỹ đạo Dự phóng Xu hướng T+1 -> T+3 chuẩn FireAnt */}
+        <FireAntTrajectoryChart
+          symbol={selectedSymbol}
+          bars={chartBars}
+          prediction={activePred}
+          modelType={modelType}
+          height={460}
+        />
       </div>
 
       {/* 3. Bảng Nhật ký Lịch sử Dự báo & Tín hiệu Mô hình */}
@@ -624,6 +752,11 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           <div className="flex items-center gap-2">
             <span className="rounded bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-300">
               {history.length} bản ghi
+              {history.length > 10 && (
+                <span className="ml-1 text-[10px] font-normal text-purple-400">
+                  • Cuộn xem thêm
+                </span>
+              )}
             </span>
             {history.length > 0 && (
               <button
@@ -638,9 +771,9 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[515px] rounded-lg border border-slate-800/80 [scrollbar-width:thin] [scrollbar-color:#334155_#090d16]">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-slate-800 bg-slate-950 text-slate-400">
+            <thead className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/95 backdrop-blur-md text-slate-400 shadow-sm">
               <tr>
                 <th className="px-3 py-2.5 font-semibold">Thời điểm</th>
                 <th className="px-3 py-2.5 font-semibold">Mã CP</th>
@@ -663,11 +796,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                   return (
                     <tr
                       key={item.id}
-                      className={`transition-colors hover:bg-slate-800/40 ${
-                        selectedSymbol === item.symbol && modelType === item.model_type
-                          ? "bg-slate-800/30"
-                          : ""
-                      }`}
+                      className={`transition-colors hover:bg-slate-800/40 ${selectedSymbol === item.symbol && modelType === item.model_type
+                        ? "bg-slate-800/30"
+                        : ""
+                        }`}
                     >
                       <td className="px-3 py-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
@@ -690,11 +822,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold border ${
-                            item.model_type === "lightgbm"
-                              ? "border-purple-500/30 bg-purple-500/10 text-purple-300"
-                              : "border-sky-500/30 bg-sky-500/10 text-sky-300"
-                          }`}
+                          className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold border ${item.model_type === "lightgbm"
+                            ? "border-purple-500/30 bg-purple-500/10 text-purple-300"
+                            : "border-sky-500/30 bg-sky-500/10 text-sky-300"
+                            }`}
                         >
                           {item.model_type === "lightgbm" ? (
                             <Cpu className="h-2.5 w-2.5" />
@@ -712,13 +843,12 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold ${
-                            isItemBuy
-                              ? "bg-emerald-500/10 text-emerald-400"
-                              : isItemSell
-                                ? "bg-rose-500/10 text-rose-400"
-                                : "bg-amber-500/10 text-amber-400"
-                          }`}
+                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold ${isItemBuy
+                            ? "bg-emerald-500/10 text-emerald-400"
+                            : isItemSell
+                              ? "bg-rose-500/10 text-rose-400"
+                              : "bg-amber-500/10 text-amber-400"
+                            }`}
                         >
                           {isItemBuy ? (
                             <TrendingUp className="h-3 w-3" />
@@ -791,6 +921,166 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Cửa sổ Modal Đặc tả Mô hình Định lượng (Nền tối & mờ, hiển thị chính diện trước mặt người dùng) */}
+      {activeTooltipModel && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => {
+            setActiveTooltipModel(null);
+            setHoveredModel(null);
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-xl max-h-[90vh] flex flex-col rounded-2xl border border-slate-700/80 bg-slate-900/98 shadow-2xl shadow-purple-950/40 backdrop-blur-xl animate-in zoom-in-95 duration-200 overflow-hidden"
+          >
+            {/* Header Modal */}
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/60">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-inner ${activeTooltipModel === "lightgbm"
+                    ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                    : "bg-sky-500/20 text-sky-400 border border-sky-500/30"
+                    }`}
+                >
+                  {activeTooltipModel === "lightgbm" ? (
+                    <Cpu className="h-5 w-5" />
+                  ) : (
+                    <Brain className="h-5 w-5" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-100 text-base leading-tight">
+                    {MODEL_SPECIFICATIONS[activeTooltipModel].title}
+                  </h3>
+                  <span className="inline-block mt-1 rounded px-2.5 py-0.5 text-[11px] font-semibold border border-slate-700 bg-slate-800 text-slate-300">
+                    {MODEL_SPECIFICATIONS[activeTooltipModel].badge}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setActiveTooltipModel(null);
+                  setHoveredModel(null);
+                }}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors"
+                title="Đóng cửa sổ (hoặc bấm Esc / bấm vùng ngoài)"
+              >
+                <span className="text-xl font-bold leading-none">&times;</span>
+              </button>
+            </div>
+
+            {/* Body Modal (Cuộn mượt mà nếu màn hình nhỏ) */}
+            <div className="p-6 space-y-4 overflow-y-auto max-h-[calc(90vh-140px)] text-xs text-slate-200">
+              {/* 1. Mô hình này là mô hình gì? */}
+              <div className="rounded-xl border border-slate-800/80 bg-slate-950/40 p-3.5">
+                <div className="flex items-center gap-2 font-bold text-slate-100 mb-1.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-500/20 text-xs text-purple-300 font-mono font-bold">
+                    1
+                  </span>
+                  <span className="text-sm">Mô hình này là gì? (Cách hiểu đơn giản)</span>
+                </div>
+                <p className="text-xs leading-relaxed text-slate-300 pl-7">
+                  {MODEL_SPECIFICATIONS[activeTooltipModel].overview}
+                </p>
+              </div>
+
+              {/* 2. Tác dụng ngắn gọn */}
+              <div className="rounded-xl border border-slate-800/80 bg-slate-950/40 p-3.5">
+                <div className="flex items-center gap-2 font-bold text-slate-100 mb-1.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500/20 text-xs text-indigo-300 font-mono font-bold">
+                    2
+                  </span>
+                  <span className="text-sm">Tác dụng ngắn gọn của mô hình:</span>
+                </div>
+                <p className="text-xs leading-relaxed text-slate-300 pl-7">
+                  {MODEL_SPECIFICATIONS[activeTooltipModel].purpose}
+                </p>
+              </div>
+
+              {/* 3. Khi nào nên chọn mô hình này? */}
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-3.5">
+                <div className="flex items-center gap-2 font-bold text-emerald-400 mb-1.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/30 text-xs text-emerald-300 font-mono font-bold">
+                    3
+                  </span>
+                  <span className="text-sm">Lúc nào bạn nên chọn mô hình này?</span>
+                </div>
+                <p className="text-xs leading-relaxed text-emerald-200 pl-7 font-medium">
+                  {MODEL_SPECIFICATIONS[activeTooltipModel].whenToUse}
+                </p>
+              </div>
+
+              {/* 4. Dấu hiệu thực tế nhận biết trên bảng điện */}
+              <div className="rounded-xl border border-slate-800/80 bg-slate-950/40 p-3.5">
+                <div className="flex items-center gap-2 font-bold text-amber-300 mb-2">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/20 text-xs text-amber-400 font-mono font-bold">
+                    4
+                  </span>
+                  <span className="text-sm">{MODEL_SPECIFICATIONS[activeTooltipModel].signsTitle}</span>
+                </div>
+                <div className="space-y-2 pl-7">
+                  {MODEL_SPECIFICATIONS[activeTooltipModel].signs.map((sign, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-start gap-2 text-xs text-slate-300 bg-slate-900/90 border border-slate-800 rounded-lg p-2.5"
+                    >
+                      <span className="text-amber-400 font-bold shrink-0 mt-0.5">✔</span>
+                      <span className="leading-relaxed">{sign}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick Tip Footer Box */}
+              <div className="rounded-lg border border-purple-500/20 bg-purple-950/20 p-3 text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+                <span className="font-semibold text-purple-200">💡 Quy tắc ghi nhớ nhanh:</span>
+                <span className="font-medium text-slate-300">
+                  Thị trường Sideway / Lướt ngắn ➔ <strong className="text-purple-300">LightGBM</strong> | Vào Sóng mạnh / Trend ➔ <strong className="text-sky-300">LSTM</strong>
+                </span>
+              </div>
+            </div>
+
+            {/* Footer Modal với các nút hành động */}
+            <div className="border-t border-slate-800 bg-slate-950/80 px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+              <span className="text-[11px] text-slate-500 italic">
+                Bấm phím Esc hoặc bấm ra ngoài màn hình để đóng
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setActiveTooltipModel(null);
+                    setHoveredModel(null);
+                  }}
+                  className="rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                >
+                  Đã hiểu & Đóng
+                </button>
+                {modelType !== activeTooltipModel ? (
+                  <button
+                    onClick={() => {
+                      setLocalPrediction(null);
+                      onChangeModelType(activeTooltipModel);
+                      setActiveTooltipModel(null);
+                      setHoveredModel(null);
+                    }}
+                    className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-xs font-bold text-white hover:bg-purple-500 transition-colors shadow-lg shadow-purple-600/30"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Chuyển sang dùng mô hình này</span>
+                  </button>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-xs text-purple-400 font-semibold px-2">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Đang áp dụng mô hình này
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal chi tiết kỹ thuật chuẩn hóa */}
       <FinancialDetailModal

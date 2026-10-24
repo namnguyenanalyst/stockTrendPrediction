@@ -185,6 +185,7 @@ export default function DashboardPage() {
             <AIPredictionTab
               selectedSymbol={selectedSymbol}
               onSelectSymbol={setSelectedSymbol}
+              bars={bars}
               prediction={prediction}
               batchPrediction={batchPrediction}
               modelType={modelType}
