@@ -16,7 +16,6 @@ import {
 import {
   ArrowDownRight,
   ArrowUpRight,
-  Maximize2,
   Minus,
   Sparkles,
 } from "lucide-react";
@@ -529,16 +528,6 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
               </button>
             ))}
           </div>
-
-          {/* Nút Đặt lại góc nhìn Fit Content */}
-          <button
-            onClick={() => chartRef.current?.timeScale().fitContent()}
-            className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/80 px-2 py-1 text-[11px] font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
-            title="Căn chỉnh toàn bộ biểu đồ về vừa khung nhìn"
-          >
-            <Maximize2 className="h-3 w-3" />
-            <span className="hidden sm:inline">Vừa màn hình</span>
-          </button>
         </div>
       </div>
 

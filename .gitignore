@@ -125,3 +125,6 @@ docs/
 
 # AI Assistant Local Workspaces & Skills
 .agents/
+
+.archify/
+skills-lock.json

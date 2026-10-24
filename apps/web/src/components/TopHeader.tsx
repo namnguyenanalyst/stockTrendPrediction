@@ -123,8 +123,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
   const CATEGORY_TABS = [
     { id: "ALL", label: "Tất cả" },
-    { id: "VN30", label: "⭐ VN30" },
-    { id: "INDEX", label: "📈 Chỉ số" },
+    { id: "VN30", label: "VN30" },
+    { id: "INDEX", label: "Chỉ số" },
     { id: "BANK", label: "Ngân hàng" },
     { id: "REALESTATE", label: "BĐS" },
     { id: "STEEL", label: "Thép" },
@@ -186,9 +186,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             {isSearchOpen && (
               <div className="absolute right-0 mt-1 max-h-80 w-80 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-2 shadow-2xl backdrop-blur-xl z-50">
                 {/* Header gợi ý */}
-                <div className="px-1.5 py-1 text-[10px] font-semibold text-slate-400 border-b border-slate-800/80 mb-1.5 flex items-center justify-between">
+                <div className="px-1.5 py-1 text-[10px] font-semibold text-slate-400 border-b border-slate-800/80 mb-1.5">
                   <span>Gợi ý mã giao dịch</span>
-                  <span className="text-emerald-400 font-mono text-[9px]">Enter để chọn bất kỳ</span>
                 </div>
 
                 {/* Thanh phân loại Category Chips */}
@@ -226,11 +225,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                       >
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="font-bold text-slate-100">{item.symbol}</span>
-                          {item.is_vn30 && (
-                            <span className="rounded bg-amber-500/15 border border-amber-500/30 px-1 py-0.2 text-[9px] font-bold text-amber-400">
-                              VN30
-                            </span>
-                          )}
                           {item.exchange === "INDEX" && (
                             <span className="rounded bg-sky-500/15 border border-sky-500/30 px-1 py-0.2 text-[9px] font-bold text-sky-400">
                               CHỈ SỐ
