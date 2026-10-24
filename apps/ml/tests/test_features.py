@@ -166,3 +166,54 @@ def test_create_multivariate_sequences_insufficient_length_guard():
     assert len(ys) == 0
     assert xs.shape == (0, 10, 1)
 
+
+def test_compute_features_missing_symbol_column_raises_value_error():
+    """Kiểm tra ngoại lệ ValueError khi DataFrame thiếu cột 'Symbol'."""
+    df_no_sym = pd.DataFrame({
+        "Date": pd.date_range("2024-01-01", periods=3),
+        "Open": [10.0, 11.0, 12.0],
+        "High": [10.5, 11.5, 12.5],
+        "Low": [9.5, 10.5, 11.5],
+        "Close": [10.0, 11.0, 12.0],
+        "Volume": [1000, 1000, 1000],
+    })
+    with pytest.raises(ValueError, match="DataFrame phải chứa cột 'Symbol'"):
+        compute_features_per_symbol(df_no_sym)
+
+
+def test_compute_features_missing_vnindex_defaults_to_zero():
+    """Kiểm tra tự động gán VNINDEX_Return_1d = 0.0 nếu DataFrame đầu vào chưa có cột này."""
+    df = pd.DataFrame({
+        "Date": pd.date_range("2024-01-01", periods=3),
+        "Symbol": ["VIC"] * 3,
+        "Open": [10.0, 11.0, 12.0],
+        "High": [10.5, 11.5, 12.5],
+        "Low": [9.5, 10.5, 11.5],
+        "Close": [10.0, 11.0, 12.0],
+        "Volume": [1000, 1000, 1000],
+    })
+    res = compute_features_per_symbol(df, drop_na=False)
+    assert "VNINDEX_Return_1d" in res.columns
+    assert (res["VNINDEX_Return_1d"] == 0.0).all()
+
+
+def test_compute_features_drop_na_removes_rolling_nans():
+    """Kiểm tra drop_na=True loại bỏ các dòng ban đầu chứa NaN do cửa sổ rolling."""
+    # 250 phiên để có đầy đủ rolling 200 ngày
+    dates = pd.date_range("2023-01-01", periods=250, freq="B")
+    prices = np.linspace(20.0, 50.0, 250)
+    df = pd.DataFrame({
+        "Date": dates,
+        "Symbol": ["VIC"] * 250,
+        "Open": prices,
+        "High": prices + 1.0,
+        "Low": prices - 1.0,
+        "Close": prices,
+        "Volume": [10000] * 250,
+        "VNINDEX_Return_1d": [0.001] * 250,
+    })
+    res_dropped = compute_features_per_symbol(df, drop_na=True)
+    assert not res_dropped[FEATURE_COLS].isna().any().any()
+    assert len(res_dropped) < len(df)
+
+

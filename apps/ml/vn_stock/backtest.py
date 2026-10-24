@@ -1974,11 +1974,23 @@ def run_portfolio_backtest(
                 for t_row in trades_df.to_dict(orient="records"):
                     trades_list.append(t_row)
 
+            sym_equity_curve = []
+            for r in eq_df[
+                ["Date", "Total_Equity", "Benchmark_Equity", "Drawdown_Pct", "Daily_Return"]
+            ].to_dict(orient="records"):
+                sym_equity_curve.append(
+                    {
+                        "date": str(r["Date"]),
+                        "total_equity": round(float(r["Total_Equity"]), 2),
+                        "benchmark_equity": round(float(r["Benchmark_Equity"]), 2),
+                        "drawdown_pct": round(float(r["Drawdown_Pct"]), 2),
+                        "daily_return": round(float(r["Daily_Return"]), 2),
+                    }
+                )
+
             individual_results[sym] = {
                 "metrics": metrics.__dict__,
-                "equity_curve": eq_df[
-                    ["Date", "Total_Equity", "Benchmark_Equity", "Drawdown_Pct", "Daily_Return"]
-                ].to_dict(orient="records"),
+                "equity_curve": sym_equity_curve,
                 "trades": trades_list,
             }
         except Exception as sym_err:

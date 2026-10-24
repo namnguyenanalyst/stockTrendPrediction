@@ -9,10 +9,12 @@ from vn_stock.features import ALL_FEATURE_COLS, FEATURE_COLS, create_multivariat
 from vn_stock.splitting_data import (
     apply_study_window,
     create_labels_per_symbol,
+    create_multi_day_labels,
     drop_ignored_labels,
     generate_walk_forward_windows,
     get_warmup_tail,
     prepare_all_windows,
+    prepare_production_training_data,
     scale_window,
 )
 
@@ -450,5 +452,79 @@ def test_apply_study_window_preserves_features_and_truncates():
     study_first_val = df_study[df_study["Date"] == pd.to_datetime("2023-01-04")]["SMA_10"].values[0]
     assert orig_first_val == study_first_val
     assert not np.isnan(study_first_val)
+
+
+def test_create_multi_day_labels():
+    """Kiểm tra gán nhãn đa phiên (T+3): Tăng >= 2% -> 2, Giảm <= -2% -> 0, Đi ngang -> 1."""
+    dates = pd.date_range("2024-01-01", periods=10)
+    # Giá: 100 -> 100 -> 100 -> 105 (+5% -> Tăng) -> 100 -> 95 (-5% -> Giảm) -> ...
+    df = pd.DataFrame({
+        "Date": dates,
+        "Symbol": ["VIC"] * 10,
+        "Close": [100.0, 100.0, 100.0, 105.0, 100.0, 95.0, 100.0, 100.0, 100.0, 100.0],
+    })
+
+    labeled_df = create_multi_day_labels(df, horizon=3, threshold=0.02)
+    # 10 dòng trừ 3 dòng cuối = 7 dòng
+    assert len(labeled_df) == 7
+    assert "Label" in labeled_df.columns
+    assert "Target_Return" in labeled_df.columns
+
+    # Tại index 0: giá 100 -> 3 ngày sau (index 3) giá là 105 (+5%) >= 2% -> Nhãn 2 (TĂNG)
+    assert labeled_df.iloc[0]["Label"] == 2
+    assert pytest.approx(labeled_df.iloc[0]["Target_Return"]) == 0.05
+
+    # Tại index 2: giá 100 -> 3 ngày sau (index 5) giá là 95 (-5%) <= -2% -> Nhãn 0 (GIẢM)
+    assert labeled_df.iloc[2]["Label"] == 0
+
+
+def test_create_multi_day_labels_validation_errors():
+    """Kiểm tra bắt lỗi cột bắt buộc khi tạo nhãn đa phiên."""
+    df_no_close = pd.DataFrame({"Date": ["2024-01-01"], "Symbol": ["VIC"]})
+    with pytest.raises(ValueError, match="chứa cột giá đóng cửa"):
+        create_multi_day_labels(df_no_close)
+
+    df_no_sym = pd.DataFrame({"Date": ["2024-01-01"], "Close": [100.0]})
+    with pytest.raises(ValueError, match="chứa cột 'Symbol'"):
+        create_multi_day_labels(df_no_sym)
+
+
+def test_prepare_production_training_data(dummy_panel_data):
+    """Kiểm tra quy trình chuẩn bị dữ liệu huấn luyện sản xuất (Production Retraining)."""
+    # dummy_panel_data có 200 ngày
+    res = prepare_production_training_data(
+        dummy_panel_data,
+        val_buffer_days=40,
+        seq_length=10,
+    )
+
+    assert "train" in res
+    assert "val" in res
+    assert "val_warmup" in res
+    assert "scaler" in res
+
+    # 200 ngày - 40 ngày buffer = 160 ngày train, 40 ngày val
+    unique_train_dates = res["train"]["Date"].nunique()
+    unique_val_dates = res["val"]["Date"].nunique()
+    assert unique_train_dates == 160
+    assert unique_val_dates == 40
+
+    # Kiểm tra val_warmup có đủ seq_length - 1 = 9 phiên cho mỗi mã
+    assert len(res["val_warmup"]) == 3 * 9
+
+
+def test_prepare_production_training_data_insufficient_dates():
+    """Kiểm tra báo lỗi khi tổng số ngày không đủ tạo validation buffer."""
+    df_short = pd.DataFrame({
+        "Date": pd.date_range("2024-01-01", periods=10),
+        "Symbol": ["VIC"] * 10,
+        "Close": [100.0] * 10,
+    })
+    for col in FEATURE_COLS:
+        df_short[col] = 1.0
+
+    with pytest.raises(ValueError, match="không đủ để tạo validation buffer"):
+        prepare_production_training_data(df_short, val_buffer_days=40)
+
 
 

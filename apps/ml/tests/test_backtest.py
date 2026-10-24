@@ -17,10 +17,17 @@ import pytest
 from vn_stock.backtest import (
     PositionLot,
     TradeRecord,
+    backtest_all_symbols,
+    backtest_symbol_oos,
     calculate_financial_metrics,
+    evaluate_strategy_signals,
+    get_recent_strategy_signals,
+    get_strategy_presets,
+    prepare_backtest_df,
     run_backtest,
     run_buy_and_hold,
     run_monte_carlo_random_test,
+    run_portfolio_backtest,
     run_random_baseline,
     run_simple_backtest,
     simulate_vietnam_trading,
@@ -380,6 +387,15 @@ def test_run_portfolio_backtest():
     assert "portfolio_equity_curve" in res
     assert "symbols_breakdown" in res
     assert "individual_results" in res
+    for sym, ind in res["individual_results"].items():
+        assert "equity_curve" in ind
+        if len(ind["equity_curve"]) > 0:
+            first_pt = ind["equity_curve"][0]
+            assert "date" in first_pt
+            assert "total_equity" in first_pt
+            assert "benchmark_equity" in first_pt
+            assert "drawdown_pct" in first_pt
+            assert "daily_return" in first_pt
 
     agg = res["aggregate_metrics"]
     assert agg["initial_capital"] == 100_000_000
@@ -493,6 +509,237 @@ def test_fine_tuned_sell_parameters_impact():
     sig_or = evaluate_strategy_signals(df_prepared, sell_rules=sell_rules_or)
     sig_and = evaluate_strategy_signals(df_prepared, sell_rules=sell_rules_and)
     assert np.sum(sig_or == 0) >= np.sum(sig_and == 0)
+
+
+def test_evaluate_strategy_signals_comprehensive_indicators():
+    """Kiểm tra toàn diện tất cả các nhóm điều kiện chỉ báo kỹ thuật trong evaluate_strategy_signals."""
+    df = _create_sample_market_df(n_bars=30, start_price=50.0)
+    df_prepared = prepare_backtest_df(df)
+
+    # 1. Test rỗng
+    sig_empty = evaluate_strategy_signals(pd.DataFrame())
+    assert len(sig_empty) == 0
+
+    # 2. Test các điều kiện Mua: MA ("Cắt lên", "Cắt xuống", "Nằm trên"), RSI, Volume Spike, P/B, Market Cap
+    buy_rules_all = {
+        "condition_logic": "OR",
+        "use_volume_spike": True,
+        "vol_spike_period": 10,
+        "min_vol_spike_pct": -50.0,
+        "max_vol_spike_pct": 500.0,
+        "use_pb": True,
+        "min_pb": 0.5,
+        "max_pb": 3.0,
+        "use_stock_price": True,
+        "min_stock_price": 10.0,
+        "max_stock_price": 200.0,
+        "use_market_cap": True,
+        "min_market_cap": 1000.0,
+        "max_market_cap": 50000.0,
+        "use_avg_trading_val": True,
+        "min_avg_trading_val": 0.0,
+        "max_avg_trading_val": 1000.0,
+        "use_ma": True,
+        "ma_left": "Giá đóng cửa",
+        "ma_right": "MA 20",
+        "ma_operator": "Nằm trên",
+        "use_rsi": True,
+        "rsi_min": 20.0,
+        "rsi_max": 80.0,
+        "use_price_increase": True,
+        "price_t0_field": "Giá đóng cửa T0",
+        "price_t1_field": "Giá đóng cửa T-1",
+        "price_t0_operator": ">",
+        "use_ema": True,
+        "ema_left": "EMA 10",
+        "ema_right": "EMA 20",
+        "ema_operator": "Nằm trên",
+        "use_macd": True,
+        "macd_operator": "Nằm trên",
+        "use_bb": True,
+        "bb_operator": "Nằm trên",
+    }
+    signals = evaluate_strategy_signals(
+        df_prepared,
+        buy_rules=buy_rules_all,
+        symbol_meta={"pb": 1.5, "market_cap": 20000.0},
+    )
+    assert len(signals) == len(df_prepared)
+    # Có ít nhất 1 phiên phát tín hiệu MUA (2)
+    assert np.any(signals == 2)
+
+
+def test_get_strategy_presets_and_recent_signals():
+    """Kiểm tra danh mục 8 chiến thuật mẫu chuẩn DNSE và bảng tín hiệu mới nhất."""
+    presets = get_strategy_presets()
+    assert len(presets) == 8
+    for p in presets:
+        assert "id" in p
+        assert "name" in p
+        assert "category" in p
+        assert "win_rate_pct" in p
+        assert "take_profit_pct" in p
+        assert "stop_loss_pct" in p
+
+    signals = get_recent_strategy_signals()
+    assert isinstance(signals, list)
+    assert len(signals) >= 5
+    first_sig = signals[0]
+    assert "symbol" in first_sig
+    assert "action" in first_sig
+    assert "strategy_name" in first_sig
+
+
+def test_calculate_financial_metrics_edge_cases():
+    """Kiểm tra hàm calculate_financial_metrics trong các tình huống biên: không có giao dịch, vốn không đổi."""
+    # 1. Đường vốn hoàn toàn không đổi
+    eq_flat = pd.Series([100.0] * 10)
+    m_flat = calculate_financial_metrics(
+        equity_series=eq_flat,
+        trades=[],
+        initial_capital=100.0,
+    )
+    assert m_flat.total_return_pct == 0.0
+    assert m_flat.sharpe_ratio == 0.0
+    # Khi vốn đứng yên, lợi suất thấp hơn lãi suất phi rủi ro rf_daily -> Sortino < 0 (-sqrt(252))
+    assert m_flat.sortino_ratio < 0.0
+    assert m_flat.max_drawdown_pct == 0.0
+    assert m_flat.total_trades == 0
+    assert m_flat.win_rate_pct == 0.0
+    assert m_flat.profit_factor == 0.0
+
+    # 2. Toàn bộ lệnh đều lỗ
+    trades_loss = [
+        TradeRecord(
+            trade_id=1,
+            symbol="VIC",
+            order_type="SELL",
+            signal_date="2026-01-01",
+            exec_date="2026-01-02",
+            exec_price=90.0,
+            shares=100,
+            gross_value=9000.0,
+            fee=15.0,
+            tax=10.0,
+            net_cash_flow=8975.0,
+            cash_after=8975.0,
+            realized_pnl=-1025.0,
+            realized_return_pct=-10.25,
+            holding_days=3.0,
+        )
+    ]
+    eq_down = pd.Series([100.0, 95.0, 90.0, 88.0])
+    m_loss = calculate_financial_metrics(
+        equity_series=eq_down,
+        trades=trades_loss,
+        initial_capital=100.0,
+    )
+    assert m_loss.total_return_pct < 0.0
+    assert m_loss.winning_trades == 0
+    assert m_loss.losing_trades == 1
+    assert m_loss.win_rate_pct == 0.0
+    assert m_loss.profit_factor == 0.0
+
+
+def test_run_portfolio_backtest_sample():
+    """Kiểm tra hàm run_portfolio_backtest mô phỏng danh mục đa tài sản (Equal-weight)."""
+    from unittest.mock import patch
+
+    # Mock load_local_data để trả về dữ liệu mẫu có nến OHLCV
+    dates = pd.date_range("2024-01-01", periods=60, freq="B")
+    prices_vic = np.linspace(40.0, 60.0, 60)
+    prices_hpg = np.linspace(20.0, 30.0, 60)
+
+    df_vic = pd.DataFrame({
+        "Date": dates,
+        "Symbol": ["VIC"] * 60,
+        "Open": prices_vic,
+        "High": prices_vic + 1.0,
+        "Low": prices_vic - 1.0,
+        "Close": prices_vic,
+        "Volume": [1000000] * 60,
+    })
+    df_hpg = pd.DataFrame({
+        "Date": dates,
+        "Symbol": ["HPG"] * 60,
+        "Open": prices_hpg,
+        "High": prices_hpg + 1.0,
+        "Low": prices_hpg - 1.0,
+        "Close": prices_hpg,
+        "Volume": [2000000] * 60,
+    })
+
+    def mock_load(symbol, **kwargs):
+        return df_vic if symbol == "VIC" else df_hpg
+
+    with patch("vn_stock.data_ingestion.load_local_data", side_effect=mock_load):
+        res = run_portfolio_backtest(
+            symbols=["VIC", "HPG"],
+            start_date="2024-01-01",
+            end_date="2024-03-31",
+            initial_capital=100_000_000.0,
+            model_type="none",
+            buy_rules={"use_rsi": True, "rsi_min": 10.0, "rsi_max": 90.0},
+            sell_rules={"take_profit_pct": 0.15, "stop_loss_pct": 0.07},
+            symbol_metadata={
+                "VIC": {"name": "Tập đoàn Vingroup", "sector": "Bất động sản"},
+                "HPG": {"name": "Tập đoàn Hòa Phát", "sector": "Thép"},
+            },
+        )
+
+        assert "aggregate_metrics" in res
+        assert "portfolio_equity_curve" in res
+        assert "symbols_breakdown" in res
+        assert len(res["symbols_breakdown"]) == 2
+        assert len(res["portfolio_equity_curve"]) > 0
+        assert res["aggregate_metrics"]["initial_capital"] == 100_000_000.0
+
+
+def test_backtest_symbol_oos_and_all_symbols():
+    """Kiểm tra backtest_symbol_oos và backtest_all_symbols với mock test window."""
+    from unittest.mock import patch
+    from vn_stock.features import FEATURE_COLS
+
+    dates = pd.date_range("2024-01-01", periods=20, freq="B")
+    records = []
+    for d in dates:
+        row = {
+            "Date": d,
+            "Symbol": "VIC",
+            "Open": 50.0,
+            "High": 52.0,
+            "Low": 48.0,
+            "Close": 51.0,
+            "Volume": 1000000,
+            "Symbol_Code": 0,
+        }
+        for f in FEATURE_COLS:
+            row[f] = 0.05
+        records.append(row)
+    mock_test_df = pd.DataFrame(records)
+
+    mock_windows = [{}, {}, {"test_df": mock_test_df}]
+
+    with (
+        patch("vn_stock.data_ingestion.load_panel_dataset", return_value=pd.DataFrame()),
+        patch("vn_stock.features.compute_features_per_symbol", return_value=pd.DataFrame()),
+        patch("vn_stock.splitting_data.apply_study_window", return_value=pd.DataFrame()),
+        patch("vn_stock.splitting_data.create_labels_per_symbol", return_value=pd.DataFrame()),
+        patch("vn_stock.splitting_data.generate_walk_forward_windows", return_value=mock_windows),
+    ):
+        res_vic = backtest_symbol_oos(symbol="VIC", model_type="lightgbm")
+        assert res_vic.symbol == "VIC"
+        assert res_vic.metrics is not None
+        assert res_vic.metrics.total_return_pct is not None
+
+        df_summary = backtest_all_symbols(symbols=["VIC"], model_type="lightgbm")
+        assert len(df_summary) == 1
+        assert df_summary.iloc[0]["Symbol"] == "VIC"
+        assert "ROI %" in df_summary.columns
+        assert "Sharpe" in df_summary.columns
+
+
+
 
 
 
