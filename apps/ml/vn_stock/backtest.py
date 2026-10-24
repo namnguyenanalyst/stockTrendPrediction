@@ -1076,8 +1076,12 @@ def prepare_backtest_df(df: pd.DataFrame) -> pd.DataFrame:
     # MA & EMA
     df_clean["SMA20"] = close.rolling(20, min_periods=1).mean()
     df_clean["SMA50"] = close.rolling(50, min_periods=1).mean()
+    df_clean["EMA10"] = close.ewm(span=10, adjust=False).mean()
     df_clean["EMA12"] = close.ewm(span=12, adjust=False).mean()
+    df_clean["EMA20"] = close.ewm(span=20, adjust=False).mean()
     df_clean["EMA26"] = close.ewm(span=26, adjust=False).mean()
+    df_clean["EMA50"] = close.ewm(span=50, adjust=False).mean()
+    df_clean["EMA200"] = close.ewm(span=200, adjust=False).mean()
 
     # MACD (12, 26, 9)
     df_clean["MACD"] = df_clean["EMA12"] - df_clean["EMA26"]
@@ -1098,6 +1102,21 @@ def prepare_backtest_df(df: pd.DataFrame) -> pd.DataFrame:
     # Volume SMA20
     df_clean["Vol_SMA20"] = volume.rolling(20, min_periods=1).mean()
 
+    # ADX (14)
+    tr1 = high - low
+    tr2 = (high - close.shift(1)).abs()
+    tr3 = (low - close.shift(1)).abs()
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr14 = tr.rolling(14, min_periods=1).mean()
+    up_move = high - high.shift(1)
+    down_move = low.shift(1) - low
+    plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+    minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
+    plus_di = 100.0 * (pd.Series(plus_dm).rolling(14, min_periods=1).mean() / (atr14 + 1e-9))
+    minus_di = 100.0 * (pd.Series(minus_dm).rolling(14, min_periods=1).mean() / (atr14 + 1e-9))
+    dx = 100.0 * (plus_di - minus_di).abs() / (plus_di + minus_di + 1e-9)
+    df_clean["ADX"] = dx.rolling(14, min_periods=1).mean().fillna(20.0)
+
     return df_clean
 
 
@@ -1109,7 +1128,7 @@ def evaluate_strategy_signals(
 ) -> np.ndarray:
     """
     Sinh tín hiệu MUA (2), BÁN (0), NẮM GIỮ (1) dựa trên bộ điều kiện Mua/Bán chuẩn DNSE
-    kết hợp hoặc độc lập với tín hiệu dự báo từ mô hình AI.
+    hỗ trợ toán tử logic VÀ (AND) / HOẶC (OR) kết hợp hoặc độc lập với mô hình AI.
     """
     n_bars = len(df)
     signals = np.ones(n_bars, dtype=int)
@@ -1118,6 +1137,9 @@ def evaluate_strategy_signals(
 
     buy_rules = buy_rules or {}
     sell_rules = sell_rules or {}
+
+    buy_logic = str(buy_rules.get("condition_logic", "AND")).upper()
+    sell_logic = str(sell_rules.get("condition_logic", "OR")).upper()
 
     has_custom_buy = any(
         buy_rules.get(k)
@@ -1129,6 +1151,9 @@ def evaluate_strategy_signals(
             "use_bb",
             "use_volume_spike",
             "use_price_increase",
+            "use_adx",
+            "use_price_cross",
+            "use_stock_price",
             "foreign_net_buy",
         ]
     )
@@ -1136,6 +1161,7 @@ def evaluate_strategy_signals(
         sell_rules.get(k)
         for k in [
             "use_ma",
+            "use_ema",
             "use_macd",
             "use_rsi",
             "use_bb",
@@ -1147,28 +1173,83 @@ def evaluate_strategy_signals(
         # 1. Đánh giá điều kiện MUA
         buy_cond = True
         if has_custom_buy:
-            if buy_rules.get("use_ma") and not (df["Close"].iloc[i] > df["SMA20"].iloc[i]):
-                buy_cond = False
-            if buy_rules.get("use_ema") and not (df["EMA12"].iloc[i] > df["EMA26"].iloc[i]):
-                buy_cond = False
-            if buy_rules.get("use_macd") and not (df["MACD"].iloc[i] > df["MACD_Signal"].iloc[i]):
-                buy_cond = False
+            active_buy_flags: list[bool] = []
+
+            if buy_rules.get("use_ma"):
+                active_buy_flags.append(bool(df["Close"].iloc[i] > df["SMA20"].iloc[i]))
+
+            if buy_rules.get("use_ema"):
+                active_buy_flags.append(
+                    bool(
+                        (df["EMA12"].iloc[i] > df["EMA26"].iloc[i])
+                        or (df["Close"].iloc[i] > df["EMA20"].iloc[i])
+                    )
+                )
+
+            if buy_rules.get("use_macd"):
+                active_buy_flags.append(bool(df["MACD"].iloc[i] > df["MACD_Signal"].iloc[i]))
+
             if buy_rules.get("use_rsi"):
                 thresh = float(buy_rules.get("rsi_threshold", 45.0) or 45.0)
-                if not (
-                    df["RSI"].iloc[i] <= thresh
-                    or (i > 0 and df["RSI"].iloc[i - 1] < thresh and df["RSI"].iloc[i] >= thresh)
-                ):
-                    buy_cond = False
-            if buy_rules.get("use_bb") and not (df["Close"].iloc[i] <= df["BB_Lower"].iloc[i] * 1.02):
-                buy_cond = False
-            if buy_rules.get("use_volume_spike") and not (
-                df["Volume"].iloc[i] > 1.2 * df["Vol_SMA20"].iloc[i]
-            ):
-                buy_cond = False
-            if buy_rules.get("use_price_increase") and i > 0 and not (
-                df["Close"].iloc[i] > df["Close"].iloc[i - 1]
-            ):
+                if thresh >= 60.0:
+                    active_buy_flags.append(bool(df["RSI"].iloc[i] >= thresh))
+                else:
+                    active_buy_flags.append(
+                        bool(
+                            df["RSI"].iloc[i] <= thresh
+                            or (
+                                i > 0
+                                and df["RSI"].iloc[i - 1] < thresh
+                                and df["RSI"].iloc[i] >= thresh
+                            )
+                        )
+                    )
+
+            if buy_rules.get("use_bb"):
+                active_buy_flags.append(
+                    bool(
+                        (df["Close"].iloc[i] <= df["BB_Lower"].iloc[i] * 1.02)
+                        or (df["Close"].iloc[i] >= df["BB_Upper"].iloc[i] * 0.98)
+                    )
+                )
+
+            if buy_rules.get("use_volume_spike"):
+                active_buy_flags.append(
+                    bool(df["Volume"].iloc[i] > 1.2 * df["Vol_SMA20"].iloc[i])
+                )
+
+            if buy_rules.get("use_price_increase"):
+                active_buy_flags.append(
+                    bool(i > 0 and (df["Close"].iloc[i] > df["Close"].iloc[i - 1]))
+                )
+
+            if buy_rules.get("use_adx"):
+                active_buy_flags.append(
+                    bool(df["ADX"].iloc[i] <= 25.0 or df["ADX"].iloc[i] >= 20.0)
+                )
+
+            if buy_rules.get("use_price_cross"):
+                active_buy_flags.append(
+                    bool(
+                        (
+                            i > 0
+                            and df["Close"].iloc[i - 1] <= df["EMA20"].iloc[i - 1]
+                            and df["Close"].iloc[i] > df["EMA20"].iloc[i]
+                        )
+                        or (df["Close"].iloc[i] > df["EMA200"].iloc[i])
+                    )
+                )
+
+            if buy_rules.get("use_stock_price"):
+                min_p = float(buy_rules.get("min_stock_price", 10.0) or 10.0)
+                active_buy_flags.append(bool(df["Close"].iloc[i] >= min_p))
+
+            if active_buy_flags:
+                if buy_logic == "OR":
+                    buy_cond = any(active_buy_flags)
+                else:
+                    buy_cond = all(active_buy_flags)
+            else:
                 buy_cond = False
         elif ai_signals is not None and len(ai_signals) == n_bars:
             buy_cond = ai_signals[i] == 2
@@ -1179,14 +1260,36 @@ def evaluate_strategy_signals(
         # 2. Đánh giá điều kiện BÁN
         sell_cond = False
         if has_custom_sell:
-            if sell_rules.get("use_rsi") and (
-                df["RSI"].iloc[i] >= float(sell_rules.get("rsi_sell_threshold", 70.0) or 70.0)
-            ):
-                sell_cond = True
-            if sell_rules.get("use_macd") and (df["MACD"].iloc[i] < df["MACD_Signal"].iloc[i]):
-                sell_cond = True
-            if sell_rules.get("use_ma") and (df["Close"].iloc[i] < df["SMA20"].iloc[i]):
-                sell_cond = True
+            active_sell_flags: list[bool] = []
+
+            if sell_rules.get("use_rsi"):
+                s_thresh = float(sell_rules.get("rsi_sell_threshold", 70.0) or 70.0)
+                active_sell_flags.append(bool(df["RSI"].iloc[i] >= s_thresh))
+
+            if sell_rules.get("use_macd"):
+                active_sell_flags.append(bool(df["MACD"].iloc[i] < df["MACD_Signal"].iloc[i]))
+
+            if sell_rules.get("use_ma"):
+                active_sell_flags.append(bool(df["Close"].iloc[i] < df["SMA20"].iloc[i]))
+
+            if sell_rules.get("use_ema"):
+                active_sell_flags.append(
+                    bool(
+                        (df["Close"].iloc[i] < df["EMA10"].iloc[i])
+                        or (df["EMA20"].iloc[i] < df["EMA50"].iloc[i])
+                    )
+                )
+
+            if sell_rules.get("use_bb"):
+                active_sell_flags.append(bool(df["Close"].iloc[i] >= df["BB_Upper"].iloc[i]))
+
+            if active_sell_flags:
+                if sell_logic == "AND":
+                    sell_cond = all(active_sell_flags)
+                else:
+                    sell_cond = any(active_sell_flags)
+            else:
+                sell_cond = False
         elif ai_signals is not None and len(ai_signals) == n_bars:
             sell_cond = ai_signals[i] == 0
         else:
@@ -1443,6 +1546,26 @@ def run_portfolio_backtest(
         float(np.mean([b["win_rate_pct"] for b in breakdown_list])) if breakdown_list else 0.0
     )
 
+    all_realized_returns: list[float] = []
+    for ind in individual_results.values():
+        for t in ind.get("trades", []):
+            ret = t.get("realized_return_pct")
+            if ret is not None and not np.isnan(ret):
+                all_realized_returns.append(float(ret))
+
+    if all_realized_returns:
+        max_gain = float(np.max(all_realized_returns))
+        max_loss = float(np.min(all_realized_returns))
+        win_returns = [r for r in all_realized_returns if r > 0]
+        loss_returns = [r for r in all_realized_returns if r < 0]
+        avg_win = float(np.mean(win_returns)) if win_returns else 0.0
+        avg_loss = abs(float(np.mean(loss_returns))) if loss_returns else 0.0
+        rr_ratio = round(avg_win / avg_loss, 2) if avg_loss > 1e-4 else (round(avg_win, 2) if avg_win > 0 else 0.0)
+    else:
+        max_gain = 0.0
+        max_loss = 0.0
+        rr_ratio = 0.0
+
     aggregate_metrics = {
         "initial_capital": tot_init,
         "final_equity": tot_final,
@@ -1480,6 +1603,9 @@ def run_portfolio_backtest(
         "total_taxes_paid": round(total_costs * 0.4, 0),
         "total_costs": round(total_costs, 0),
         "cost_impact_pct": round(total_costs / tot_init * 100.0, 2),
+        "max_gain_pct": round(max_gain, 2),
+        "max_loss_pct": round(max_loss, 2),
+        "reward_risk_ratio": rr_ratio,
     }
 
     return {

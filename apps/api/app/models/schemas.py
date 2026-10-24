@@ -263,6 +263,9 @@ class BacktestMetricsSchema(BaseModel):
     total_taxes_paid: float = Field(..., description="Tổng thuế chuyển nhượng đã nộp (VNĐ)")
     total_costs: float = Field(..., description="Tổng chi phí thuế phí (VNĐ)")
     cost_impact_pct: float = Field(..., description="Tác động chi phí trên vốn ban đầu (%)")
+    max_gain_pct: float = Field(default=0.0, description="Tỷ lệ % deal lãi cao nhất (%)")
+    max_loss_pct: float = Field(default=0.0, description="Tỷ lệ % deal lỗ sâu nhất (%)")
+    reward_risk_ratio: float = Field(default=0.0, description="Tỷ lệ Lợi nhuận / Rủi ro")
 
 
 class EquityCurvePoint(BaseModel):
@@ -374,26 +377,69 @@ class BacktestScopeType(str, Enum):
 
 
 class BacktestConditionFilter(BaseModel):
+    condition_logic: str = Field(default="AND", description="Toán tử logic kết nối ('AND' hoặc 'OR')")
     market_condition: str | None = Field(default="all", description="Điều kiện VN-Index ('all', 'uptrend', 'sideways', 'downtrend')")
+    
+    # 1. Thông tin Cổ phiếu
+    use_stock_price: bool = Field(default=False, description="Giá cổ phiếu")
+    min_stock_price: float | None = Field(default=None, description="Giá tối thiểu")
+    use_market_cap: bool = Field(default=False, description="Vốn hóa (Tỷ)")
+    min_market_cap: float | None = Field(default=None, description="Vốn hóa tối thiểu (Tỷ)")
+    use_avg_trading_val: bool = Field(default=False, description="GTGD trung bình (Tỷ)")
+    min_avg_trading_val: float | None = Field(default=None, description="GTGD trung bình tối thiểu")
+    use_volume_spike: bool = Field(default=False, description="Khối lượng đột biến > 1.2x SMA20 Volume")
+
+    # 2. Chỉ số kỹ thuật Cổ phiếu
     use_ma: bool = Field(default=False, description="Điều kiện MA (Close > SMA20)")
     ma_type: str = Field(default="SMA20", description="Loại đường MA")
-    use_ema: bool = Field(default=False, description="Điều kiện EMA (EMA12 > EMA26)")
-    use_macd: bool = Field(default=False, description="Điều kiện MACD (MACD > Signal)")
+    use_adx: bool = Field(default=False, description="ADX (14) >= 25")
+    use_rs: bool = Field(default=False, description="RS Relative Strength so với VN-Index")
     use_rsi: bool = Field(default=False, description="Điều kiện RSI")
     rsi_threshold: float = Field(default=45.0, description="Ngưỡng RSI mua (<=)")
     rsi_sell_threshold: float = Field(default=70.0, description="Ngưỡng RSI bán (>=)")
-    use_bb: bool = Field(default=False, description="Điều kiện chạm dải dưới Bollinger Bands")
-    use_volume_spike: bool = Field(default=False, description="Khối lượng đột biến > 1.2x SMA20 Volume")
+    use_price_cross: bool = Field(default=False, description="Giá cắt đường MA/EMA/BB")
     use_price_increase: bool = Field(default=False, description="Giá T0 > T-1")
+    use_ema: bool = Field(default=False, description="Điều kiện EMA (EMA12 > EMA26)")
+    use_macd: bool = Field(default=False, description="Điều kiện MACD (MACD > Signal)")
+    use_bb: bool = Field(default=False, description="Điều kiện chạm dải dưới Bollinger Bands")
+
+    # 3. Kết quả kinh doanh
+    growth_rev_latest: bool = Field(default=False, description="Tăng trưởng doanh thu quý gần nhất (YoY)")
+    growth_rev_prev: bool = Field(default=False, description="Tăng trưởng doanh thu quý liền trước (YoY)")
+    growth_rev_ttm: bool = Field(default=False, description="Tăng trưởng doanh thu quý trượt 12 tháng (YoY)")
+    growth_np_latest: bool = Field(default=False, description="Tăng trưởng LNST quý gần nhất (YoY)")
+    growth_np_prev: bool = Field(default=False, description="Tăng trưởng LNST quý liền trước (YoY)")
+    growth_np_ttm: bool = Field(default=False, description="Tăng trưởng LNST quý trượt 12 tháng (YoY)")
+
+    # 4. Định giá
     max_pe: float | None = Field(default=None, description="P/E tối đa")
+    use_pe: bool = Field(default=False, description="Lọc theo P/E")
     max_pb: float | None = Field(default=None, description="P/B tối đa")
+    use_pb: bool = Field(default=False, description="Lọc theo P/B")
+    max_ps: float | None = Field(default=None, description="P/S tối đa")
+    use_ps: bool = Field(default=False, description="Lọc theo P/S")
+    min_roa: float | None = Field(default=None, description="ROA tối thiểu (%)")
+    use_roa: bool = Field(default=False, description="Lọc theo ROA")
     min_roe: float | None = Field(default=None, description="ROE tối thiểu (%)")
+    use_roe: bool = Field(default=False, description="Lọc theo ROE")
+    min_eps: float | None = Field(default=None, description="EPS tối thiểu")
+    use_eps: bool = Field(default=False, description="Lọc theo EPS")
+    growth_eps: bool = Field(default=False, description="Tăng trưởng EPS (YoY)")
+
+    # 5. Dòng tiền Cổ phiếu
     foreign_net_buy: bool = Field(default=False, description="Khối ngoại mua ròng")
-    foreign_net_sell: bool = Field(default=False, description="Khối ngoại bán ròng")
+    foreign_net_val: bool = Field(default=False, description="GTGD nước ngoài mua ròng (Tỷ)")
+    foreign_net_vol: bool = Field(default=False, description="KLGD nước ngoài mua ròng")
     prop_net_buy: bool = Field(default=False, description="Tự doanh mua ròng")
+    prop_net_val: bool = Field(default=False, description="GTGD tự doanh mua ròng (Tỷ)")
+    prop_net_vol: bool = Field(default=False, description="KLGD tự doanh mua ròng")
+    foreign_net_sell: bool = Field(default=False, description="Khối ngoại bán ròng")
+
+    # Quản trị vị thế & Bán
     take_profit_pct: float | None = Field(default=None, description="Chốt lời (%)")
     stop_loss_pct: float | None = Field(default=None, description="Cắt lỗ (%)")
     trailing_stop_pct: float | None = Field(default=None, description="Trailing Stop (%)")
+
 
 
 class AdvancedBacktestRequest(BaseModel):

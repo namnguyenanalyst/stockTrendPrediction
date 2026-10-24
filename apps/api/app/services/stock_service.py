@@ -129,7 +129,11 @@ def get_index_constituents(index_name: str = "VN30") -> list[str]:
     if clean_idx in ["VN30", "VNINDEX"]:
         return vn30_list
     elif clean_idx == "VN100":
-        return [s.symbol for s in get_available_symbols()]
+        return [
+            s.symbol
+            for s in get_available_symbols()
+            if s.symbol not in ("VNINDEX", "VN30")
+        ]
     return vn30_list
 
 

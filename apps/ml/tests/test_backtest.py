@@ -326,8 +326,45 @@ def test_evaluate_strategy_signals():
     assert set(signals).issubset({0, 1, 2})
 
 
+def test_evaluate_strategy_signals_and_or_logic():
+    """Kiểm tra sự khác biệt giữa toán tử logic AND và OR khi đánh giá điều kiện Mua."""
+    from vn_stock.backtest import evaluate_strategy_signals, prepare_backtest_df
+
+    dates = pd.date_range("2026-01-01", periods=20, freq="B")
+    prices = [50.0 + i * 0.2 for i in range(20)]
+    df = pd.DataFrame({
+        "Date": dates,
+        "Open": prices,
+        "High": [p + 0.5 for p in prices],
+        "Low": [p - 0.5 for p in prices],
+        "Close": prices,
+        "Volume": [1_000_000] * 20,
+    })
+    df_prepared = prepare_backtest_df(df)
+
+    # 1. Logic AND: Cả use_ma và use_rsi (ngưỡng cực thấp 10.0 không bao giờ đạt) -> Không có tín hiệu MUA
+    buy_rules_and = {
+        "condition_logic": "AND",
+        "use_ma": True,
+        "use_rsi": True,
+        "rsi_threshold": 10.0,
+    }
+    signals_and = evaluate_strategy_signals(df_prepared, buy_rules=buy_rules_and)
+    assert not any(s == 2 for s in signals_and)
+
+    # 2. Logic OR: Chỉ cần use_ma thỏa mãn (Close > SMA20) là sinh tín hiệu MUA
+    buy_rules_or = {
+        "condition_logic": "OR",
+        "use_ma": True,
+        "use_rsi": True,
+        "rsi_threshold": 10.0,
+    }
+    signals_or = evaluate_strategy_signals(df_prepared, buy_rules=buy_rules_or)
+    assert any(s == 2 for s in signals_or)
+
+
 def test_run_portfolio_backtest():
-    """Kiểm tra chạy Backtest danh mục đa mã (Equal-Weighted Portfolio)."""
+    """Kiểm tra chạy Backtest danh mục đa mã và các chỉ số Deal thực chiến (Max Gain, Max Loss, R:R)."""
     from vn_stock.backtest import run_portfolio_backtest
 
     res = run_portfolio_backtest(
@@ -335,8 +372,8 @@ def test_run_portfolio_backtest():
         start_date="2024-01-01",
         end_date="2024-06-30",
         initial_capital=100_000_000,
-        buy_rules={"use_ma": True},
-        sell_rules={"take_profit_pct": 0.15, "stop_loss_pct": 0.07},
+        buy_rules={"use_ma": True, "condition_logic": "AND"},
+        sell_rules={"take_profit_pct": 0.15, "stop_loss_pct": 0.07, "condition_logic": "OR"},
     )
 
     assert "aggregate_metrics" in res
@@ -348,4 +385,9 @@ def test_run_portfolio_backtest():
     assert agg["initial_capital"] == 100_000_000
     assert len(res["symbols_breakdown"]) >= 1
     assert len(res["portfolio_equity_curve"]) > 0
+    assert "max_gain_pct" in agg
+    assert "max_loss_pct" in agg
+    assert "reward_risk_ratio" in agg
+    assert isinstance(agg["max_gain_pct"], float)
+    assert isinstance(agg["max_loss_pct"], float)
 
