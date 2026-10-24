@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Crown, Layers, PieChart, TrendingUp, X } from "lucide-react";
+import { X } from "lucide-react";
 import { BacktestScopeType, SectorItem, StockSymbolInfo } from "@/lib/types";
 
 interface ScopeSelectorProps {
@@ -62,7 +62,6 @@ export const ScopeSelector: React.FC<ScopeSelectorProps> = ({
             onChange={() => onChangeScopeType("index")}
             className="accent-emerald-500 h-3.5 w-3.5 cursor-pointer"
           />
-          <Layers className="h-3.5 w-3.5 text-emerald-400" />
           <span>Rổ chỉ số</span>
         </label>
 
@@ -81,7 +80,6 @@ export const ScopeSelector: React.FC<ScopeSelectorProps> = ({
             onChange={() => onChangeScopeType("stock")}
             className="accent-emerald-500 h-3.5 w-3.5 cursor-pointer"
           />
-          <TrendingUp className="h-3.5 w-3.5 text-cyan-400" />
           <span>Cổ phiếu</span>
         </label>
 
@@ -100,15 +98,14 @@ export const ScopeSelector: React.FC<ScopeSelectorProps> = ({
             onChange={() => onChangeScopeType("portfolio")}
             className="accent-emerald-500 h-3.5 w-3.5 cursor-pointer"
           />
-          <PieChart className="h-3.5 w-3.5 text-purple-400" />
           <span>Danh mục</span>
         </label>
 
-        {/* 4. Ngành (Vương miện DNSE) */}
+        {/* 4. Ngành */}
         <label
           className={`flex items-center gap-2 cursor-pointer rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
             scopeType === "sector"
-              ? "border-amber-500 bg-amber-500/10 text-amber-400 shadow-sm shadow-amber-500/10"
+              ? "border-emerald-500 bg-emerald-500/10 text-emerald-400 shadow-sm shadow-emerald-500/10"
               : "border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700 hover:text-slate-200"
           }`}
         >
@@ -117,9 +114,8 @@ export const ScopeSelector: React.FC<ScopeSelectorProps> = ({
             name="scope_type"
             checked={scopeType === "sector"}
             onChange={() => onChangeScopeType("sector")}
-            className="accent-amber-500 h-3.5 w-3.5 cursor-pointer"
+            className="accent-emerald-500 h-3.5 w-3.5 cursor-pointer"
           />
-          <Crown className="h-3.5 w-3.5 text-amber-400" />
           <span>Ngành</span>
         </label>
       </div>
@@ -170,7 +166,7 @@ export const ScopeSelector: React.FC<ScopeSelectorProps> = ({
             <select
               value={selectedSector}
               onChange={(e) => onChangeSector(e.target.value)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-100 focus:border-amber-500 focus:outline-none"
+              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-100 focus:border-emerald-500 focus:outline-none"
             >
               {sectors.map((sec) => (
                 <option key={sec.sector} value={sec.sector}>

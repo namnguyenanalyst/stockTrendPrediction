@@ -59,7 +59,43 @@ export const SellConditionModal: React.FC<SellConditionModalProps> = ({
         </div>
 
         {/* Modal Body (Scrollable) */}
-        <div className="flex-1 space-y-6 overflow-y-auto px-6 py-4 text-xs text-slate-300">
+        <div className="flex-1 space-y-5 overflow-y-auto px-6 py-4 text-xs text-slate-300">
+          {/* Thanh chọn logic kết nối điều kiện Bán: HOẶC (OR - mặc định) vs VÀ (AND) */}
+          <div className="flex flex-col gap-2 rounded-xl border border-slate-800 bg-slate-950/80 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-200">Logic kết nối điều kiện Bán:</span>
+              <span className="text-[11px] text-slate-400">
+                {local.condition_logic === "AND"
+                  ? "Bán khi thỏa mãn ĐỒNG THỜI tất cả điều kiện"
+                  : "Bán ngay khi vi phạm BẤT KỲ điều kiện nào (Khuyến nghị)"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 rounded-lg bg-slate-900 p-1 border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setLocal({ ...local, condition_logic: "OR" })}
+                className={`rounded-md px-3 py-1 text-xs font-bold transition-all ${
+                  (!local.condition_logic || local.condition_logic === "OR")
+                    ? "bg-rose-500 text-slate-100 shadow-md shadow-rose-500/20"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                HOẶC (OR)
+              </button>
+              <button
+                type="button"
+                onClick={() => setLocal({ ...local, condition_logic: "AND" })}
+                className={`rounded-md px-3 py-1 text-xs font-bold transition-all ${
+                  local.condition_logic === "AND"
+                    ? "bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                VÀ (AND)
+              </button>
+            </div>
+          </div>
+
           {/* 1. Chọn điều kiện VNIndex (Không bắt buộc) */}
           <div className="space-y-2">
             <h4 className="font-semibold text-slate-200">

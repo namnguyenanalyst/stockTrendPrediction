@@ -255,6 +255,9 @@ export interface BacktestMetricsSchema {
   total_taxes_paid: number;
   total_costs: number;
   cost_impact_pct: number;
+  max_gain_pct?: number;
+  max_loss_pct?: number;
+  reward_risk_ratio?: string | number;
 }
 
 export interface EquityCurvePoint {
@@ -352,27 +355,70 @@ export interface RecentSignalsResponse {
 export type BacktestScopeType = "stock" | "index" | "sector" | "portfolio";
 
 export interface BacktestConditionFilter {
+  condition_logic?: "AND" | "OR";
   market_condition?: "all" | "uptrend" | "sideways" | "downtrend";
+
+  // 1. Thông tin Cổ phiếu
+  use_stock_price?: boolean;
+  min_stock_price?: number;
+  use_market_cap?: boolean;
+  min_market_cap?: number;
+  use_avg_trading_val?: boolean;
+  min_avg_trading_val?: number;
+  use_volume_spike?: boolean;
+
+  // 2. Chỉ số kỹ thuật Cổ phiếu
   use_ma?: boolean;
   ma_type?: string;
-  use_ema?: boolean;
-  use_macd?: boolean;
+  use_adx?: boolean;
+  use_rs?: boolean;
   use_rsi?: boolean;
   rsi_threshold?: number;
   rsi_sell_threshold?: number;
-  use_bb?: boolean;
-  use_volume_spike?: boolean;
+  use_price_cross?: boolean;
   use_price_increase?: boolean;
+  use_ema?: boolean;
+  use_macd?: boolean;
+  use_bb?: boolean;
+
+  // 3. Kết quả kinh doanh
+  growth_rev_latest?: boolean;
+  growth_rev_prev?: boolean;
+  growth_rev_ttm?: boolean;
+  growth_np_latest?: boolean;
+  growth_np_prev?: boolean;
+  growth_np_ttm?: boolean;
+
+  // 4. Định giá
   max_pe?: number | null;
+  use_pe?: boolean;
   max_pb?: number | null;
+  use_pb?: boolean;
+  max_ps?: number | null;
+  use_ps?: boolean;
+  min_roa?: number | null;
+  use_roa?: boolean;
   min_roe?: number | null;
+  use_roe?: boolean;
+  min_eps?: number | null;
+  use_eps?: boolean;
+  growth_eps?: boolean;
+
+  // 5. Dòng tiền Cổ phiếu
   foreign_net_buy?: boolean;
-  foreign_net_sell?: boolean;
+  foreign_net_val?: boolean;
+  foreign_net_vol?: boolean;
   prop_net_buy?: boolean;
+  prop_net_val?: boolean;
+  prop_net_vol?: boolean;
+  foreign_net_sell?: boolean;
+
+  // Quản trị vị thế & Bán
   take_profit_pct?: number | null;
   stop_loss_pct?: number | null;
   trailing_stop_pct?: number | null;
 }
+
 
 export interface AdvancedBacktestRequest {
   scope_type: BacktestScopeType;
@@ -426,4 +472,37 @@ export interface SectorItem {
   symbols: string[];
   count: number;
 }
+
+export interface SavedStrategyItem {
+  id: string;
+  name: string;
+  status: "active" | "draft"; // "active" = Triển khai (theo dõi tín hiệu realtime), "draft" = Chưa triển khai (bản nháp)
+  created_at: string;
+  updated_at: string;
+  scope_type: BacktestScopeType;
+  symbol?: string;
+  index_name?: string;
+  sector_name?: string;
+  portfolio_symbols?: string[];
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
+  model_type: "lightgbm" | "lstm";
+  slippage_rate?: number;
+  buy_conditions: BacktestConditionFilter;
+  sell_conditions: BacktestConditionFilter;
+  last_metrics?: {
+    roi_pct: number;
+    bh_roi_pct: number;
+    excess_pct: number;
+    sharpe: number;
+    mdd_pct: number;
+    win_rate_pct: number;
+    trades: number;
+    max_gain_pct?: number;
+    max_loss_pct?: number;
+    reward_risk_ratio?: string | number;
+  };
+}
+
 

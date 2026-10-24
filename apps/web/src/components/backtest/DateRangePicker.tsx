@@ -1,13 +1,18 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Calendar, AlertCircle } from "lucide-react";
+import { Calendar, AlertCircle, RefreshCw } from "lucide-react";
 
 interface DateRangePickerProps {
   startDate: string;
   endDate: string;
   onChangeStartDate: (date: string) => void;
   onChangeEndDate: (date: string) => void;
+  latestSessionDate?: string;
+  sessionLabel?: string;
+  onResetLatest?: () => void;
+  onSyncMarket?: () => void;
+  isSyncing?: boolean;
 }
 
 export const DateRangePicker: React.FC<DateRangePickerProps> = ({
@@ -15,6 +20,11 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   endDate,
   onChangeStartDate,
   onChangeEndDate,
+  latestSessionDate,
+  sessionLabel,
+  onResetLatest,
+  onSyncMarket,
+  isSyncing = false,
 }) => {
   // Tính khoảng cách giữa 2 ngày (ngày)
   const diffDays = useMemo(() => {
@@ -32,7 +42,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   const isInvalid = diffDays < 0;
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
       {/* Date Range Inputs Box */}
       <div className="relative flex items-center rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-slate-200 shadow-inner">
         <Calendar className="mr-2 h-4 w-4 text-emerald-400 shrink-0" />
@@ -63,6 +73,41 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
           </div>
         )}
       </div>
+
+      {/* Nút / Badge thông tin phiên mới nhất & Tự động đồng bộ */}
+      {latestSessionDate && (
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onResetLatest}
+            title={sessionLabel || `Dữ liệu chốt phiên gần nhất: ${latestSessionDate}. Nhấn để đặt nhanh dải ngày 1 năm tới phiên này.`}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-all ${
+              endDate === latestSessionDate
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                : "border-slate-700 bg-slate-900 text-slate-300 hover:border-emerald-500 hover:text-emerald-400"
+            }`}
+          >
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span>Chốt phiên: <strong className="font-semibold text-white">{latestSessionDate}</strong></span>
+          </button>
+
+          {onSyncMarket && (
+            <button
+              type="button"
+              onClick={onSyncMarket}
+              disabled={isSyncing}
+              title="Cập nhật / kiểm tra dữ liệu nến phiên mới nhất từ thị trường"
+              className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 px-2 py-1.5 text-[11px] text-slate-400 hover:border-emerald-500/50 hover:text-emerald-400 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3 w-3 ${isSyncing ? "animate-spin text-emerald-400" : ""}`} />
+              <span className="hidden sm:inline">{isSyncing ? "Đang đồng bộ..." : "Đồng bộ nến"}</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Badge Thời gian nến */}
       <div className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-400">
