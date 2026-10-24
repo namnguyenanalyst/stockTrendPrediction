@@ -391,3 +391,108 @@ def test_run_portfolio_backtest():
     assert isinstance(agg["max_gain_pct"], float)
     assert isinstance(agg["max_loss_pct"], float)
 
+
+def test_fine_tuned_parameters_impact():
+    """Kiểm tra các thông số tinh chỉnh (RSI min/max, MA cross, Volume spike) thực sự thay đổi kết quả kiểm thử."""
+    from vn_stock.backtest import prepare_backtest_df, evaluate_strategy_signals
+
+    df = _create_sample_market_df(n_bars=30, start_price=30.0)
+    df_prepared = prepare_backtest_df(df)
+
+    # 1. Tinh chỉnh khoảng RSI: [0, 40] vs [40, 100]
+    rules_rsi_low = {
+        "use_rsi": True,
+        "rsi_min": 0.0,
+        "rsi_max": 40.0,
+    }
+    rules_rsi_high = {
+        "use_rsi": True,
+        "rsi_min": 40.0,
+        "rsi_max": 100.0,
+    }
+    sig_low = evaluate_strategy_signals(df_prepared, buy_rules=rules_rsi_low)
+    sig_high = evaluate_strategy_signals(df_prepared, buy_rules=rules_rsi_high)
+    assert np.sum(sig_high == 2) >= np.sum(sig_low == 2)
+
+    # 2. Tinh chỉnh MA operator: "Cắt lên" vs "Nằm trên"
+    rules_ma_cross = {
+        "use_ma": True,
+        "ma_left": "MA 10",
+        "ma_operator": "Cắt lên",
+        "ma_right": "MA 20",
+    }
+    rules_ma_above = {
+        "use_ma": True,
+        "ma_left": "MA 10",
+        "ma_operator": "Nằm trên",
+        "ma_right": "MA 20",
+    }
+    sig_cross = evaluate_strategy_signals(df_prepared, buy_rules=rules_ma_cross)
+    sig_above = evaluate_strategy_signals(df_prepared, buy_rules=rules_ma_above)
+    assert np.sum(sig_above == 2) >= np.sum(sig_cross == 2)
+
+    # 3. Tinh chỉnh Volume Spike: min 200% threshold vs min -100% threshold
+    rules_vol_strict = {
+        "use_volume_spike": True,
+        "vol_spike_period": 10,
+        "min_vol_spike_pct": 200.0,
+        "max_vol_spike_pct": 1000.0,
+    }
+    rules_vol_loose = {
+        "use_volume_spike": True,
+        "vol_spike_period": 10,
+        "min_vol_spike_pct": -100.0,
+        "max_vol_spike_pct": 1000.0,
+    }
+    sig_vol_strict = evaluate_strategy_signals(df_prepared, buy_rules=rules_vol_strict)
+    sig_vol_loose = evaluate_strategy_signals(df_prepared, buy_rules=rules_vol_loose)
+    assert np.sum(sig_vol_loose == 2) > np.sum(sig_vol_strict == 2)
+
+
+def test_fine_tuned_sell_parameters_impact():
+    """Kiểm tra các thông số tinh chỉnh điều kiện bán (RSI sell min/max, logic AND/OR, MA sell) thực sự thay đổi tín hiệu Bán."""
+    from vn_stock.backtest import prepare_backtest_df, evaluate_strategy_signals
+
+    df = _create_sample_market_df(n_bars=30, start_price=30.0)
+    df_prepared = prepare_backtest_df(df)
+
+    # 1. Tinh chỉnh khoảng RSI bán: bao phủ dải cao [70, 100] vs biên thấp không đạt [10, 30]
+    sell_rsi_loose = {
+        "use_rsi": True,
+        "rsi_min": 70.0,
+        "rsi_max": 100.0,
+    }
+    sell_rsi_strict = {
+        "use_rsi": True,
+        "rsi_min": 10.0,
+        "rsi_max": 30.0,
+    }
+    sig_loose = evaluate_strategy_signals(df_prepared, sell_rules=sell_rsi_loose)
+    sig_strict = evaluate_strategy_signals(df_prepared, sell_rules=sell_rsi_strict)
+    assert np.sum(sig_loose == 0) > np.sum(sig_strict == 0)
+
+    # 2. Kiểm tra logic HOẶC (OR) vs VÀ (AND) trong điều kiện Bán
+    sell_rules_or = {
+        "condition_logic": "OR",
+        "use_rsi": True,
+        "rsi_min": 40.0,
+        "rsi_max": 100.0,
+        "use_adx": True,
+        "min_adx": 80.0,
+        "max_adx": 100.0,
+    }
+    sell_rules_and = {
+        "condition_logic": "AND",
+        "use_rsi": True,
+        "rsi_min": 40.0,
+        "rsi_max": 100.0,
+        "use_adx": True,
+        "min_adx": 80.0,
+        "max_adx": 100.0,
+    }
+    sig_or = evaluate_strategy_signals(df_prepared, sell_rules=sell_rules_or)
+    sig_and = evaluate_strategy_signals(df_prepared, sell_rules=sell_rules_and)
+    assert np.sum(sig_or == 0) >= np.sum(sig_and == 0)
+
+
+

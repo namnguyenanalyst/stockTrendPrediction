@@ -1073,15 +1073,13 @@ def prepare_backtest_df(df: pd.DataFrame) -> pd.DataFrame:
         else pd.Series(0.0, index=df_clean.index)
     )
 
-    # MA & EMA
-    df_clean["SMA20"] = close.rolling(20, min_periods=1).mean()
-    df_clean["SMA50"] = close.rolling(50, min_periods=1).mean()
-    df_clean["EMA10"] = close.ewm(span=10, adjust=False).mean()
-    df_clean["EMA12"] = close.ewm(span=12, adjust=False).mean()
-    df_clean["EMA20"] = close.ewm(span=20, adjust=False).mean()
-    df_clean["EMA26"] = close.ewm(span=26, adjust=False).mean()
-    df_clean["EMA50"] = close.ewm(span=50, adjust=False).mean()
-    df_clean["EMA200"] = close.ewm(span=200, adjust=False).mean()
+    # MA Series đa chu kỳ (SMA 5, 10, 20, 50, 100, 200)
+    for span in [5, 10, 20, 50, 100, 200]:
+        df_clean[f"SMA{span}"] = close.rolling(span, min_periods=1).mean()
+
+    # EMA Series đa chu kỳ (EMA 5, 10, 12, 20, 26, 50, 100, 200)
+    for span in [5, 10, 12, 20, 26, 50, 100, 200]:
+        df_clean[f"EMA{span}"] = close.ewm(span=span, adjust=False).mean()
 
     # MACD (12, 26, 9)
     df_clean["MACD"] = df_clean["EMA12"] - df_clean["EMA26"]
@@ -1099,8 +1097,14 @@ def prepare_backtest_df(df: pd.DataFrame) -> pd.DataFrame:
     df_clean["BB_Upper"] = df_clean["SMA20"] + 2.0 * std20
     df_clean["BB_Lower"] = df_clean["SMA20"] - 2.0 * std20
 
-    # Volume SMA20
-    df_clean["Vol_SMA20"] = volume.rolling(20, min_periods=1).mean()
+    # Volume SMAs (5, 10, 20)
+    for span in [5, 10, 20]:
+        df_clean[f"Vol_SMA{span}"] = volume.rolling(span, min_periods=1).mean()
+
+    # GTGD trung bình (Tỷ VNĐ) theo chu kỳ 5, 10, 20 phiên
+    val_series = (close * volume) / 1e6
+    for span in [5, 10, 20]:
+        df_clean[f"Avg_Trading_Val_{span}"] = val_series.rolling(span, min_periods=1).mean()
 
     # ADX (14)
     tr1 = high - low
@@ -1117,6 +1121,10 @@ def prepare_backtest_df(df: pd.DataFrame) -> pd.DataFrame:
     dx = 100.0 * (plus_di - minus_di).abs() / (plus_di + minus_di + 1e-9)
     df_clean["ADX"] = dx.rolling(14, min_periods=1).mean().fillna(20.0)
 
+    # Relative Strength RS (0 - 99.93)
+    rs_60 = close.pct_change(60).fillna(0.0)
+    df_clean["RS"] = ((rs_60.rank(pct=True)) * 99.93).clip(0.0, 99.93)
+
     return df_clean
 
 
@@ -1125,6 +1133,7 @@ def evaluate_strategy_signals(
     buy_rules: dict[str, Any] | None = None,
     sell_rules: dict[str, Any] | None = None,
     ai_signals: np.ndarray | None = None,
+    symbol_meta: dict[str, Any] | None = None,
 ) -> np.ndarray:
     """
     Sinh tín hiệu MUA (2), BÁN (0), NẮM GIỮ (1) dựa trên bộ điều kiện Mua/Bán chuẩn DNSE
@@ -1141,33 +1150,58 @@ def evaluate_strategy_signals(
     buy_logic = str(buy_rules.get("condition_logic", "AND")).upper()
     sell_logic = str(sell_rules.get("condition_logic", "OR")).upper()
 
-    has_custom_buy = any(
-        buy_rules.get(k)
-        for k in [
-            "use_ma",
-            "use_ema",
-            "use_macd",
-            "use_rsi",
-            "use_bb",
-            "use_volume_spike",
-            "use_price_increase",
-            "use_adx",
-            "use_price_cross",
-            "use_stock_price",
-            "foreign_net_buy",
-        ]
-    )
-    has_custom_sell = any(
-        sell_rules.get(k)
-        for k in [
-            "use_ma",
-            "use_ema",
-            "use_macd",
-            "use_rsi",
-            "use_bb",
-            "foreign_net_sell",
-        ]
-    )
+    buy_rule_keys = [
+        "use_volume_spike",
+        "use_pb",
+        "use_stock_price",
+        "use_market_cap",
+        "use_avg_trading_val",
+        "use_ma",
+        "use_rsi",
+        "use_price_increase",
+        "growth_rev_latest",
+        "growth_np_latest",
+        "use_pe",
+        "use_roa",
+        "growth_eps",
+        "foreign_net_val",
+        "foreign_net_buy",
+        "prop_net_vol",
+        "foreign_net_vol",
+        "use_roe",
+        "growth_np_prev",
+        "growth_rev_prev",
+        "use_adx",
+        "use_ema",
+        "use_macd",
+        "use_rs",
+        "growth_rev_ttm",
+        "growth_np_ttm",
+        "use_ps",
+        "use_eps",
+        "prop_net_val",
+        "prop_net_buy",
+        "use_price_cross",
+        "use_bb",
+    ]
+    has_custom_buy = any(bool(buy_rules.get(k)) for k in buy_rule_keys)
+
+    sell_rule_keys = [
+        "use_ma",
+        "use_price_cross",
+        "use_rsi",
+        "foreign_net_sell_val",
+        "foreign_net_sell",
+        "prop_net_sell_vol",
+        "use_adx",
+        "use_ema",
+        "foreign_net_sell_vol",
+        "use_rs",
+        "use_macd",
+        "prop_net_sell_val",
+        "use_bb",
+    ]
+    has_custom_sell = any(bool(sell_rules.get(k)) for k in sell_rule_keys)
 
     for i in range(n_bars):
         # 1. Đánh giá điều kiện MUA
@@ -1175,74 +1209,343 @@ def evaluate_strategy_signals(
         if has_custom_buy:
             active_buy_flags: list[bool] = []
 
-            if buy_rules.get("use_ma"):
-                active_buy_flags.append(bool(df["Close"].iloc[i] > df["SMA20"].iloc[i]))
-
-            if buy_rules.get("use_ema"):
-                active_buy_flags.append(
-                    bool(
-                        (df["EMA12"].iloc[i] > df["EMA26"].iloc[i])
-                        or (df["Close"].iloc[i] > df["EMA20"].iloc[i])
-                    )
-                )
-
-            if buy_rules.get("use_macd"):
-                active_buy_flags.append(bool(df["MACD"].iloc[i] > df["MACD_Signal"].iloc[i]))
-
-            if buy_rules.get("use_rsi"):
-                thresh = float(buy_rules.get("rsi_threshold", 45.0) or 45.0)
-                if thresh >= 60.0:
-                    active_buy_flags.append(bool(df["RSI"].iloc[i] >= thresh))
-                else:
-                    active_buy_flags.append(
-                        bool(
-                            df["RSI"].iloc[i] <= thresh
-                            or (
-                                i > 0
-                                and df["RSI"].iloc[i - 1] < thresh
-                                and df["RSI"].iloc[i] >= thresh
-                            )
-                        )
-                    )
-
-            if buy_rules.get("use_bb"):
-                active_buy_flags.append(
-                    bool(
-                        (df["Close"].iloc[i] <= df["BB_Lower"].iloc[i] * 1.02)
-                        or (df["Close"].iloc[i] >= df["BB_Upper"].iloc[i] * 0.98)
-                    )
-                )
-
+            # 1. % KLGD đột biến
             if buy_rules.get("use_volume_spike"):
-                active_buy_flags.append(
-                    bool(df["Volume"].iloc[i] > 1.2 * df["Vol_SMA20"].iloc[i])
-                )
+                period = int(buy_rules.get("vol_spike_period") or 10)
+                col = f"Vol_SMA{period}" if f"Vol_SMA{period}" in df else "Vol_SMA20"
+                base_vol = df[col].iloc[i]
+                spike_pct = ((df["Volume"].iloc[i] / (base_vol + 1e-9)) - 1.0) * 100.0
+                min_spike = float(buy_rules.get("min_vol_spike_pct") if buy_rules.get("min_vol_spike_pct") is not None else -100.0)
+                max_spike = float(buy_rules.get("max_vol_spike_pct") if buy_rules.get("max_vol_spike_pct") is not None else 19900.0)
+                active_buy_flags.append(bool(min_spike <= spike_pct <= max_spike))
 
-            if buy_rules.get("use_price_increase"):
-                active_buy_flags.append(
-                    bool(i > 0 and (df["Close"].iloc[i] > df["Close"].iloc[i - 1]))
-                )
+            # 2. P/B
+            if buy_rules.get("use_pb"):
+                min_pb = float(buy_rules.get("min_pb") if buy_rules.get("min_pb") is not None else 0.0)
+                max_pb = float(buy_rules.get("max_pb") if buy_rules.get("max_pb") is not None else 10.0)
+                pb_est = float(symbol_meta.get("pb", 1.2)) if symbol_meta and "pb" in symbol_meta else 1.2
+                active_buy_flags.append(bool(min_pb <= pb_est <= max_pb))
 
-            if buy_rules.get("use_adx"):
-                active_buy_flags.append(
-                    bool(df["ADX"].iloc[i] <= 25.0 or df["ADX"].iloc[i] >= 20.0)
-                )
-
-            if buy_rules.get("use_price_cross"):
-                active_buy_flags.append(
-                    bool(
-                        (
-                            i > 0
-                            and df["Close"].iloc[i - 1] <= df["EMA20"].iloc[i - 1]
-                            and df["Close"].iloc[i] > df["EMA20"].iloc[i]
-                        )
-                        or (df["Close"].iloc[i] > df["EMA200"].iloc[i])
-                    )
-                )
-
+            # 3. Giá cổ phiếu (nghìn đồng)
             if buy_rules.get("use_stock_price"):
-                min_p = float(buy_rules.get("min_stock_price", 10.0) or 10.0)
-                active_buy_flags.append(bool(df["Close"].iloc[i] >= min_p))
+                min_p = float(buy_rules.get("min_stock_price") if buy_rules.get("min_stock_price") is not None else 0.0)
+                max_p = float(buy_rules.get("max_stock_price") if buy_rules.get("max_stock_price") is not None else 999999.0)
+                active_buy_flags.append(bool(min_p <= df["Close"].iloc[i] <= max_p))
+
+            # 4. Vốn hóa (Tỷ)
+            if buy_rules.get("use_market_cap"):
+                min_cap = float(buy_rules.get("min_market_cap") if buy_rules.get("min_market_cap") is not None else 0.0)
+                max_cap = float(buy_rules.get("max_market_cap") if buy_rules.get("max_market_cap") is not None else 1e12)
+                cap_est = float(symbol_meta.get("market_cap", 25000)) if symbol_meta and "market_cap" in symbol_meta else 15000
+                active_buy_flags.append(bool(min_cap <= cap_est <= max_cap))
+
+            # 5. GTGD trung bình (Tỷ)
+            if buy_rules.get("use_avg_trading_val"):
+                period = int(buy_rules.get("avg_trading_val_period") or 10)
+                col = f"Avg_Trading_Val_{period}" if f"Avg_Trading_Val_{period}" in df else "Avg_Trading_Val_10"
+                val = df[col].iloc[i] if col in df else (df["Close"].iloc[i] * df["Volume"].iloc[i] / 1e6)
+                min_val = float(buy_rules.get("min_avg_trading_val") if buy_rules.get("min_avg_trading_val") is not None else 0.0)
+                max_val = float(buy_rules.get("max_avg_trading_val") if buy_rules.get("max_avg_trading_val") is not None else 999999.0)
+                active_buy_flags.append(bool(min_val <= val <= max_val))
+
+            # 6. MA (Đầy đủ toán tử Cắt lên, Cắt xuống, Nằm trên, Nằm dưới)
+            if buy_rules.get("use_ma"):
+                left_key = buy_rules.get("ma_left", "MA 10")
+                right_key = buy_rules.get("ma_right", "MA 20")
+                op = buy_rules.get("ma_operator", "Cắt lên")
+
+                def get_ma_val(key: str, idx: int) -> float:
+                    if "giá" in key.lower():
+                        return float(df["Close"].iloc[idx])
+                    digits = "".join(ch for ch in key if ch.isdigit())
+                    col = f"SMA{digits}" if digits else "SMA20"
+                    if col in df:
+                        return float(df[col].iloc[idx])
+                    return float(df["SMA20"].iloc[idx])
+
+                l_curr = get_ma_val(left_key, i)
+                r_curr = get_ma_val(right_key, i)
+
+                if op == "Cắt lên":
+                    if i > 0:
+                        l_prev = get_ma_val(left_key, i - 1)
+                        r_prev = get_ma_val(right_key, i - 1)
+                        active_buy_flags.append(bool(l_prev <= r_prev and l_curr > r_curr))
+                    else:
+                        active_buy_flags.append(bool(l_curr > r_curr))
+                elif op == "Cắt xuống":
+                    if i > 0:
+                        l_prev = get_ma_val(left_key, i - 1)
+                        r_prev = get_ma_val(right_key, i - 1)
+                        active_buy_flags.append(bool(l_prev >= r_prev and l_curr < r_curr))
+                    else:
+                        active_buy_flags.append(bool(l_curr < r_curr))
+                elif op in ["Nằm trên", ">"]:
+                    active_buy_flags.append(bool(l_curr > r_curr))
+                elif op in ["Nằm dưới", "<"]:
+                    active_buy_flags.append(bool(l_curr < r_curr))
+                else:
+                    active_buy_flags.append(bool(l_curr > r_curr))
+
+            # 7. RSI (14)
+            if buy_rules.get("use_rsi"):
+                min_r = float(buy_rules.get("rsi_min") if buy_rules.get("rsi_min") is not None else 0.0)
+                max_r = float(buy_rules.get("rsi_max") if buy_rules.get("rsi_max") is not None else float(buy_rules.get("rsi_threshold", 45.0) or 45.0))
+                active_buy_flags.append(bool(min_r <= df["RSI"].iloc[i] <= max_r))
+
+            # 8. Giá T0 so với T-1
+            if buy_rules.get("use_price_increase"):
+                if i > 0:
+                    t0_field = buy_rules.get("price_t0_field", "Giá đóng cửa T0")
+                    t1_field = buy_rules.get("price_t1_field", "Giá đóng cửa T-1")
+                    op = buy_rules.get("price_t0_operator", ">")
+
+                    def get_price(fld: str, idx: int) -> float:
+                        low_fld = fld.lower()
+                        if "mở cửa" in low_fld:
+                            return float(df["Open"].iloc[idx])
+                        if "cao nhất" in low_fld:
+                            return float(df["High"].iloc[idx])
+                        if "thấp nhất" in low_fld:
+                            return float(df["Low"].iloc[idx])
+                        return float(df["Close"].iloc[idx])
+
+                    p0 = get_price(t0_field, i)
+                    p1 = get_price(t1_field, i - 1)
+
+                    if op == ">":
+                        active_buy_flags.append(bool(p0 > p1))
+                    elif op == "<":
+                        active_buy_flags.append(bool(p0 < p1))
+                    elif op == ">=":
+                        active_buy_flags.append(bool(p0 >= p1))
+                    elif op == "<=":
+                        active_buy_flags.append(bool(p0 <= p1))
+                    else:
+                        active_buy_flags.append(bool(abs(p0 - p1) < 1e-4))
+                else:
+                    active_buy_flags.append(True)
+
+            # 9. EMA
+            if buy_rules.get("use_ema"):
+                left_key = buy_rules.get("ema_left", "EMA 10")
+                right_key = buy_rules.get("ema_right", "EMA 20")
+                op = buy_rules.get("ema_operator", "Cắt lên")
+
+                def get_ema_val(key: str, idx: int) -> float:
+                    if "giá" in key.lower():
+                        return float(df["Close"].iloc[idx])
+                    digits = "".join(ch for ch in key if ch.isdigit())
+                    col = f"EMA{digits}" if digits else "EMA20"
+                    if col in df:
+                        return float(df[col].iloc[idx])
+                    return float(df["EMA20"].iloc[idx])
+
+                el_curr = get_ema_val(left_key, i)
+                er_curr = get_ema_val(right_key, i)
+
+                if op == "Cắt lên":
+                    if i > 0:
+                        el_prev = get_ema_val(left_key, i - 1)
+                        er_prev = get_ema_val(right_key, i - 1)
+                        active_buy_flags.append(bool(el_prev <= er_prev and el_curr > er_curr))
+                    else:
+                        active_buy_flags.append(bool(el_curr > er_curr))
+                elif op == "Cắt xuống":
+                    if i > 0:
+                        el_prev = get_ema_val(left_key, i - 1)
+                        er_prev = get_ema_val(right_key, i - 1)
+                        active_buy_flags.append(bool(el_prev >= er_prev and el_curr < er_curr))
+                    else:
+                        active_buy_flags.append(bool(el_curr < er_curr))
+                elif op in ["Nằm trên", ">"]:
+                    active_buy_flags.append(bool(el_curr > er_curr))
+                elif op in ["Nằm dưới", "<"]:
+                    active_buy_flags.append(bool(el_curr < er_curr))
+                else:
+                    active_buy_flags.append(bool(el_curr > er_curr))
+
+            # 10. MACD (12,26,9)
+            if buy_rules.get("use_macd"):
+                op = buy_rules.get("macd_operator", "Cắt lên")
+                target = buy_rules.get("macd_target", "Đường tín hiệu")
+                def get_macd_target(idx: int) -> float:
+                    return float(df["MACD_Signal"].iloc[idx]) if "tín hiệu" in target.lower() else 0.0
+
+                m_curr = float(df["MACD"].iloc[i])
+                t_curr = get_macd_target(i)
+                if op == "Cắt lên":
+                    if i > 0:
+                        m_prev = float(df["MACD"].iloc[i - 1])
+                        t_prev = get_macd_target(i - 1)
+                        active_buy_flags.append(bool(m_prev <= t_prev and m_curr > t_curr))
+                    else:
+                        active_buy_flags.append(bool(m_curr > t_curr))
+                elif op == "Cắt xuống":
+                    if i > 0:
+                        m_prev = float(df["MACD"].iloc[i - 1])
+                        t_prev = get_macd_target(i - 1)
+                        active_buy_flags.append(bool(m_prev >= t_prev and m_curr < t_curr))
+                    else:
+                        active_buy_flags.append(bool(m_curr < t_curr))
+                elif op in ["Nằm trên", ">"]:
+                    active_buy_flags.append(bool(m_curr > t_curr))
+                elif op in ["Nằm dưới", "<"]:
+                    active_buy_flags.append(bool(m_curr < t_curr))
+                else:
+                    active_buy_flags.append(bool(m_curr > t_curr))
+
+            # 11. ADX (14)
+            if buy_rules.get("use_adx"):
+                min_adx = float(buy_rules.get("min_adx") if buy_rules.get("min_adx") is not None else 0.0)
+                max_adx = float(buy_rules.get("max_adx") if buy_rules.get("max_adx") is not None else 100.0)
+                active_buy_flags.append(bool(min_adx <= df["ADX"].iloc[i] <= max_adx))
+
+            # 12. RS
+            if buy_rules.get("use_rs"):
+                min_rs = float(buy_rules.get("min_rs") if buy_rules.get("min_rs") is not None else 0.0)
+                max_rs = float(buy_rules.get("max_rs") if buy_rules.get("max_rs") is not None else 100.0)
+                rs_val = float(df["RS"].iloc[i]) if "RS" in df else 50.0
+                active_buy_flags.append(bool(min_rs <= rs_val <= max_rs))
+
+            # 13. Giá cắt đường MA/EMA/BB
+            if buy_rules.get("use_price_cross"):
+                tgt = buy_rules.get("price_cross_target", "MA 10")
+                op = buy_rules.get("price_cross_operator", "Cắt lên")
+
+                def get_cross_target_val(idx: int) -> float:
+                    t_low = tgt.lower()
+                    if "bb trên" in t_low:
+                        return float(df["BB_Upper"].iloc[idx])
+                    if "bb dưới" in t_low:
+                        return float(df["BB_Lower"].iloc[idx])
+                    digits = "".join(ch for ch in tgt if ch.isdigit())
+                    if "ema" in t_low:
+                        col = f"EMA{digits}" if digits else "EMA20"
+                        return float(df[col].iloc[idx]) if col in df else float(df["EMA20"].iloc[idx])
+                    col = f"SMA{digits}" if digits else "SMA10"
+                    return float(df[col].iloc[idx]) if col in df else float(df["SMA20"].iloc[idx])
+
+                c_curr = float(df["Close"].iloc[i])
+                t_curr = get_cross_target_val(i)
+                if op == "Cắt lên":
+                    if i > 0:
+                        c_prev = float(df["Close"].iloc[i - 1])
+                        t_prev = get_cross_target_val(i - 1)
+                        active_buy_flags.append(bool(c_prev <= t_prev and c_curr > t_curr))
+                    else:
+                        active_buy_flags.append(bool(c_curr > t_curr))
+                elif op == "Cắt xuống":
+                    if i > 0:
+                        c_prev = float(df["Close"].iloc[i - 1])
+                        t_prev = get_cross_target_val(i - 1)
+                        active_buy_flags.append(bool(c_prev >= t_prev and c_curr < t_curr))
+                    else:
+                        active_buy_flags.append(bool(c_curr < t_curr))
+                elif op in ["Nằm trên", ">"]:
+                    active_buy_flags.append(bool(c_curr > t_curr))
+                elif op in ["Nằm dưới", "<"]:
+                    active_buy_flags.append(bool(c_curr < t_curr))
+                else:
+                    active_buy_flags.append(bool(c_curr > t_curr))
+
+            # 14. Bollinger Bands
+            if buy_rules.get("use_bb"):
+                active_buy_flags.append(bool(df["Close"].iloc[i] <= df["BB_Lower"].iloc[i] * 1.02))
+
+            # 15. Financial & Fundamental Indicators
+            if buy_rules.get("use_pe"):
+                min_pe = float(buy_rules.get("min_pe") if buy_rules.get("min_pe") is not None else -100.0)
+                max_pe = float(buy_rules.get("max_pe") if buy_rules.get("max_pe") is not None else 150.0)
+                pe_est = float(symbol_meta.get("pe", 14.5)) if symbol_meta and "pe" in symbol_meta else 12.0
+                active_buy_flags.append(bool(min_pe <= pe_est <= max_pe))
+
+            if buy_rules.get("use_ps"):
+                min_ps = float(buy_rules.get("min_ps") if buy_rules.get("min_ps") is not None else 0.0)
+                max_ps = float(buy_rules.get("max_ps") if buy_rules.get("max_ps") is not None else 20.0)
+                ps_est = float(symbol_meta.get("ps", 1.8)) if symbol_meta and "ps" in symbol_meta else 1.5
+                active_buy_flags.append(bool(min_ps <= ps_est <= max_ps))
+
+            if buy_rules.get("use_roa"):
+                min_roa = float(buy_rules.get("min_roa") if buy_rules.get("min_roa") is not None else -50.0)
+                max_roa = float(buy_rules.get("max_roa") if buy_rules.get("max_roa") is not None else 50.0)
+                roa_est = float(symbol_meta.get("roa", 6.5)) if symbol_meta and "roa" in symbol_meta else 5.0
+                active_buy_flags.append(bool(min_roa <= roa_est <= max_roa))
+
+            if buy_rules.get("use_roe"):
+                min_roe = float(buy_rules.get("min_roe") if buy_rules.get("min_roe") is not None else -50.0)
+                max_roe = float(buy_rules.get("max_roe") if buy_rules.get("max_roe") is not None else 60.0)
+                roe_est = float(symbol_meta.get("roe", 15.0)) if symbol_meta and "roe" in symbol_meta else 14.0
+                active_buy_flags.append(bool(min_roe <= roe_est <= max_roe))
+
+            if buy_rules.get("use_eps"):
+                min_eps = float(buy_rules.get("min_eps") if buy_rules.get("min_eps") is not None else -10000.0)
+                max_eps = float(buy_rules.get("max_eps") if buy_rules.get("max_eps") is not None else 50000.0)
+                eps_est = float(symbol_meta.get("eps", 3200)) if symbol_meta and "eps" in symbol_meta else 2500
+                active_buy_flags.append(bool(min_eps <= eps_est <= max_eps))
+
+            if buy_rules.get("growth_eps"):
+                min_geps = float(buy_rules.get("min_growth_eps") if buy_rules.get("min_growth_eps") is not None else -500.0)
+                max_geps = float(buy_rules.get("max_growth_eps") if buy_rules.get("max_growth_eps") is not None else 500.0)
+                geps_est = float(symbol_meta.get("growth_eps", 18.0)) if symbol_meta and "growth_eps" in symbol_meta else 15.0
+                active_buy_flags.append(bool(min_geps <= geps_est <= max_geps))
+
+            if buy_rules.get("growth_rev_latest"):
+                min_gr = float(buy_rules.get("min_growth_rev_latest") if buy_rules.get("min_growth_rev_latest") is not None else -200.0)
+                max_gr = float(buy_rules.get("max_growth_rev_latest") if buy_rules.get("max_growth_rev_latest") is not None else 500.0)
+                gr_est = float(symbol_meta.get("rev_growth", 12.0)) if symbol_meta and "rev_growth" in symbol_meta else 10.0
+                active_buy_flags.append(bool(min_gr <= gr_est <= max_gr))
+
+            if buy_rules.get("growth_np_latest"):
+                min_np = float(buy_rules.get("min_growth_np_latest") if buy_rules.get("min_growth_np_latest") is not None else -500.0)
+                max_np = float(buy_rules.get("max_growth_np_latest") if buy_rules.get("max_growth_np_latest") is not None else 1000.0)
+                np_est = float(symbol_meta.get("np_growth", 15.0)) if symbol_meta and "np_growth" in symbol_meta else 12.0
+                active_buy_flags.append(bool(min_np <= np_est <= max_np))
+
+            if buy_rules.get("growth_rev_prev"):
+                min_grp = float(buy_rules.get("min_growth_rev_prev") if buy_rules.get("min_growth_rev_prev") is not None else -200.0)
+                max_grp = float(buy_rules.get("max_growth_rev_prev") if buy_rules.get("max_growth_rev_prev") is not None else 500.0)
+                active_buy_flags.append(bool(min_grp <= 10.0 <= max_grp))
+
+            if buy_rules.get("growth_np_prev"):
+                min_npp = float(buy_rules.get("min_growth_np_prev") if buy_rules.get("min_growth_np_prev") is not None else -500.0)
+                max_npp = float(buy_rules.get("max_growth_np_prev") if buy_rules.get("max_growth_np_prev") is not None else 1000.0)
+                active_buy_flags.append(bool(min_npp <= 12.0 <= max_npp))
+
+            if buy_rules.get("growth_rev_ttm"):
+                min_grt = float(buy_rules.get("min_growth_rev_ttm") if buy_rules.get("min_growth_rev_ttm") is not None else -200.0)
+                max_grt = float(buy_rules.get("max_growth_rev_ttm") if buy_rules.get("max_growth_rev_ttm") is not None else 500.0)
+                active_buy_flags.append(bool(min_grt <= 8.5 <= max_grt))
+
+            if buy_rules.get("growth_np_ttm"):
+                min_npt = float(buy_rules.get("min_growth_np_ttm") if buy_rules.get("min_growth_np_ttm") is not None else -500.0)
+                max_npt = float(buy_rules.get("max_growth_np_ttm") if buy_rules.get("max_growth_np_ttm") is not None else 1000.0)
+                active_buy_flags.append(bool(min_npt <= 11.0 <= max_npt))
+
+            # Khối ngoại & Tự doanh
+            if buy_rules.get("foreign_net_val") or buy_rules.get("foreign_net_buy"):
+                min_fv = float(buy_rules.get("min_foreign_val") if buy_rules.get("min_foreign_val") is not None else 0.0)
+                max_fv = float(buy_rules.get("max_foreign_val") if buy_rules.get("max_foreign_val") is not None else 20000.0)
+                f_val_est = float(df["Close"].iloc[i] * df["Volume"].iloc[i] * 0.08 / 1e6)
+                active_buy_flags.append(bool(min_fv <= f_val_est <= max_fv))
+
+            if buy_rules.get("foreign_net_vol"):
+                min_fvol = float(buy_rules.get("min_foreign_vol") if buy_rules.get("min_foreign_vol") is not None else 0.0)
+                max_fvol = float(buy_rules.get("max_foreign_vol") if buy_rules.get("max_foreign_vol") is not None else 500.0)
+                f_vol_est = float(df["Volume"].iloc[i] * 0.08 / 1e6)
+                active_buy_flags.append(bool(min_fvol <= f_vol_est <= max_fvol))
+
+            if buy_rules.get("prop_net_val") or buy_rules.get("prop_net_buy"):
+                min_pv = float(buy_rules.get("min_prop_val") if buy_rules.get("min_prop_val") is not None else 0.0)
+                max_pv = float(buy_rules.get("max_prop_val") if buy_rules.get("max_prop_val") is not None else 60000.0)
+                p_val_est = float(df["Close"].iloc[i] * df["Volume"].iloc[i] * 0.05 / 1e6)
+                active_buy_flags.append(bool(min_pv <= p_val_est <= max_pv))
+
+            if buy_rules.get("prop_net_vol"):
+                min_pvol = float(buy_rules.get("min_prop_vol") if buy_rules.get("min_prop_vol") is not None else 0.0)
+                max_pvol = float(buy_rules.get("max_prop_vol") if buy_rules.get("max_prop_vol") is not None else 100.0)
+                p_vol_est = float(df["Volume"].iloc[i] * 0.05 / 1e6)
+                active_buy_flags.append(bool(min_pvol <= p_vol_est <= max_pvol))
 
             if active_buy_flags:
                 if buy_logic == "OR":
@@ -1262,24 +1565,222 @@ def evaluate_strategy_signals(
         if has_custom_sell:
             active_sell_flags: list[bool] = []
 
-            if sell_rules.get("use_rsi"):
-                s_thresh = float(sell_rules.get("rsi_sell_threshold", 70.0) or 70.0)
-                active_sell_flags.append(bool(df["RSI"].iloc[i] >= s_thresh))
-
-            if sell_rules.get("use_macd"):
-                active_sell_flags.append(bool(df["MACD"].iloc[i] < df["MACD_Signal"].iloc[i]))
-
+            # 1. MA (Left, Operator, Right)
             if sell_rules.get("use_ma"):
-                active_sell_flags.append(bool(df["Close"].iloc[i] < df["SMA20"].iloc[i]))
+                l_key = sell_rules.get("ma_left", "MA 10")
+                r_key = sell_rules.get("ma_right", "MA 10")
+                op = sell_rules.get("ma_operator", "Cắt lên")
 
+                def get_sell_ma_val(key: str, idx: int) -> float:
+                    if "giá" in key.lower():
+                        return float(df["Close"].iloc[idx])
+                    digits = "".join(ch for ch in key if ch.isdigit())
+                    col = f"SMA{digits}" if digits else "SMA10"
+                    return float(df[col].iloc[idx]) if col in df else float(df["SMA20"].iloc[idx])
+
+                l_curr = get_sell_ma_val(l_key, i)
+                r_curr = get_sell_ma_val(r_key, i)
+                if op == "Cắt lên":
+                    if i > 0:
+                        l_prev = get_sell_ma_val(l_key, i - 1)
+                        r_prev = get_sell_ma_val(r_key, i - 1)
+                        active_sell_flags.append(bool(l_prev <= r_prev and l_curr > r_curr))
+                    else:
+                        active_sell_flags.append(bool(l_curr > r_curr))
+                elif op == "Cắt xuống":
+                    if i > 0:
+                        l_prev = get_sell_ma_val(l_key, i - 1)
+                        r_prev = get_sell_ma_val(r_key, i - 1)
+                        active_sell_flags.append(bool(l_prev >= r_prev and l_curr < r_curr))
+                    else:
+                        active_sell_flags.append(bool(l_curr < r_curr))
+                elif op in ["Nằm trên", ">"]:
+                    active_sell_flags.append(bool(l_curr > r_curr))
+                elif op in ["Nằm dưới", "<"]:
+                    active_sell_flags.append(bool(l_curr < r_curr))
+                elif op == "=":
+                    active_sell_flags.append(bool(abs(l_curr - r_curr) / (r_curr + 1e-9) < 0.005))
+                else:
+                    active_sell_flags.append(bool(l_curr > r_curr))
+
+            # 2. Giá cắt đường MA/EMA/BB
+            if sell_rules.get("use_price_cross"):
+                tgt = sell_rules.get("price_cross_target", "MA 10")
+                op = sell_rules.get("price_cross_operator", "Cắt lên")
+
+                def get_sell_cross_target_val(idx: int) -> float:
+                    t_low = tgt.lower()
+                    if "bb trên" in t_low:
+                        return float(df["BB_Upper"].iloc[idx])
+                    if "bb dưới" in t_low:
+                        return float(df["BB_Lower"].iloc[idx])
+                    digits = "".join(ch for ch in tgt if ch.isdigit())
+                    if "ema" in t_low:
+                        col = f"EMA{digits}" if digits else "EMA20"
+                        return float(df[col].iloc[idx]) if col in df else float(df["EMA20"].iloc[idx])
+                    col = f"SMA{digits}" if digits else "SMA10"
+                    return float(df[col].iloc[idx]) if col in df else float(df["SMA20"].iloc[idx])
+
+                c_curr = float(df["Close"].iloc[i])
+                t_curr = get_sell_cross_target_val(i)
+                if op == "Cắt lên":
+                    if i > 0:
+                        c_prev = float(df["Close"].iloc[i - 1])
+                        t_prev = get_sell_cross_target_val(i - 1)
+                        active_sell_flags.append(bool(c_prev <= t_prev and c_curr > t_curr))
+                    else:
+                        active_sell_flags.append(bool(c_curr > t_curr))
+                elif op == "Cắt xuống":
+                    if i > 0:
+                        c_prev = float(df["Close"].iloc[i - 1])
+                        t_prev = get_sell_cross_target_val(i - 1)
+                        active_sell_flags.append(bool(c_prev >= t_prev and c_curr < t_curr))
+                    else:
+                        active_sell_flags.append(bool(c_curr < t_curr))
+                elif op in ["Nằm trên", ">"]:
+                    active_sell_flags.append(bool(c_curr > t_curr))
+                elif op in ["Nằm dưới", "<"]:
+                    active_sell_flags.append(bool(c_curr < t_curr))
+                else:
+                    active_sell_flags.append(bool(c_curr > t_curr))
+
+            # 3. RSI (14)
+            if sell_rules.get("use_rsi"):
+                min_r = sell_rules.get("rsi_min")
+                max_r = sell_rules.get("rsi_max")
+                s_thresh = sell_rules.get("rsi_sell_threshold")
+
+                if min_r is not None or max_r is not None:
+                    low = float(min_r) if min_r is not None else 0.0
+                    high = float(max_r) if max_r is not None else 100.0
+                    # Nếu trùm toàn dải [0, 100], chỉ bán nếu vượt ngưỡng quá mua s_thresh (hoặc 70)
+                    if low <= 0.0 and high >= 100.0:
+                        thresh = float(s_thresh) if s_thresh is not None else 70.0
+                        active_sell_flags.append(bool(df["RSI"].iloc[i] >= thresh))
+                    else:
+                        active_sell_flags.append(bool(low <= df["RSI"].iloc[i] <= high))
+                elif s_thresh is not None:
+                    active_sell_flags.append(bool(df["RSI"].iloc[i] >= float(s_thresh)))
+                else:
+                    active_sell_flags.append(bool(df["RSI"].iloc[i] >= 70.0))
+
+            # 4. GTGD nước ngoài bán ròng (Tỷ)
+            if sell_rules.get("foreign_net_sell_val") or sell_rules.get("foreign_net_sell"):
+                min_fv = float(sell_rules.get("min_foreign_sell_val") if sell_rules.get("min_foreign_sell_val") is not None else 0.0)
+                max_fv = float(sell_rules.get("max_foreign_sell_val") if sell_rules.get("max_foreign_sell_val") is not None else 9817.0)
+                if not (min_fv <= 0.0 and max_fv >= 9817.0):
+                    f_val_est = float(df["Close"].iloc[i] * df["Volume"].iloc[i] * 0.08 / 1e6)
+                    active_sell_flags.append(bool(min_fv <= f_val_est <= max_fv))
+
+            # 5. KLGD tự doanh bán ròng (triệu cp)
+            if sell_rules.get("prop_net_sell_vol"):
+                min_pvol = float(sell_rules.get("min_prop_sell_vol") if sell_rules.get("min_prop_sell_vol") is not None else 0.0)
+                max_pvol = float(sell_rules.get("max_prop_sell_vol") if sell_rules.get("max_prop_sell_vol") is not None else 50.0)
+                if not (min_pvol <= 0.0 and max_pvol >= 50.0):
+                    p_vol_est = float(df["Volume"].iloc[i] * 0.05 / 1e6)
+                    active_sell_flags.append(bool(min_pvol <= p_vol_est <= max_pvol))
+
+            # 6. ADX (14)
+            if sell_rules.get("use_adx"):
+                min_adx = float(sell_rules.get("min_adx") if sell_rules.get("min_adx") is not None else 0.0)
+                max_adx = float(sell_rules.get("max_adx") if sell_rules.get("max_adx") is not None else 100.0)
+                if not (min_adx <= 0.0 and max_adx >= 100.0):
+                    active_sell_flags.append(bool(min_adx <= df["ADX"].iloc[i] <= max_adx))
+
+            # 7. EMA
             if sell_rules.get("use_ema"):
-                active_sell_flags.append(
-                    bool(
-                        (df["Close"].iloc[i] < df["EMA10"].iloc[i])
-                        or (df["EMA20"].iloc[i] < df["EMA50"].iloc[i])
-                    )
-                )
+                l_key = sell_rules.get("ema_left", "EMA 10")
+                r_key = sell_rules.get("ema_right", "EMA 10")
+                op = sell_rules.get("ema_operator", "Cắt lên")
 
+                def get_sell_ema_val(key: str, idx: int) -> float:
+                    if "giá" in key.lower():
+                        return float(df["Close"].iloc[idx])
+                    digits = "".join(ch for ch in key if ch.isdigit())
+                    col = f"EMA{digits}" if digits else "EMA10"
+                    return float(df[col].iloc[idx]) if col in df else float(df["EMA20"].iloc[idx])
+
+                l_curr = get_sell_ema_val(l_key, i)
+                r_curr = get_sell_ema_val(r_key, i)
+                if op == "Cắt lên":
+                    if i > 0:
+                        l_prev = get_sell_ema_val(l_key, i - 1)
+                        r_prev = get_sell_ema_val(r_key, i - 1)
+                        active_sell_flags.append(bool(l_prev <= r_prev and l_curr > r_curr))
+                    else:
+                        active_sell_flags.append(bool(l_curr > r_curr))
+                elif op == "Cắt xuống":
+                    if i > 0:
+                        l_prev = get_sell_ema_val(l_key, i - 1)
+                        r_prev = get_sell_ema_val(r_key, i - 1)
+                        active_sell_flags.append(bool(l_prev >= r_prev and l_curr < r_curr))
+                    else:
+                        active_sell_flags.append(bool(l_curr < r_curr))
+                elif op in ["Nằm trên", ">"]:
+                    active_sell_flags.append(bool(l_curr > r_curr))
+                elif op in ["Nằm dưới", "<"]:
+                    active_sell_flags.append(bool(l_curr < r_curr))
+                else:
+                    active_sell_flags.append(bool(l_curr > r_curr))
+
+            # 8. KLGD nước ngoài bán ròng (triệu cp)
+            if sell_rules.get("foreign_net_sell_vol"):
+                min_fvol = float(sell_rules.get("min_foreign_sell_vol") if sell_rules.get("min_foreign_sell_vol") is not None else 0.0)
+                max_fvol = float(sell_rules.get("max_foreign_sell_vol") if sell_rules.get("max_foreign_sell_vol") is not None else 300.0)
+                if not (min_fvol <= 0.0 and max_fvol >= 300.0):
+                    f_vol_est = float(df["Volume"].iloc[i] * 0.08 / 1e6)
+                    active_sell_flags.append(bool(min_fvol <= f_vol_est <= max_fvol))
+
+            # 9. RS
+            if sell_rules.get("use_rs"):
+                min_rs = float(sell_rules.get("min_rs") if sell_rules.get("min_rs") is not None else 0.0)
+                max_rs = float(sell_rules.get("max_rs") if sell_rules.get("max_rs") is not None else 100.0)
+                if not (min_rs <= 0.0 and max_rs >= 99.9):
+                    rs_val = float(df["RS"].iloc[i]) if "RS" in df else 50.0
+                    active_sell_flags.append(bool(min_rs <= rs_val <= max_rs))
+
+            # 10. MACD (12,26,9)
+            if sell_rules.get("use_macd"):
+                op = sell_rules.get("macd_operator", "Cắt lên")
+                tgt = sell_rules.get("macd_target", "Đường tín hiệu")
+
+                def get_sell_macd_target(idx: int) -> float:
+                    if "0" in tgt or "không" in tgt.lower():
+                        return 0.0
+                    return float(df["MACD_Signal"].iloc[idx])
+
+                m_curr = float(df["MACD"].iloc[i])
+                t_curr = get_sell_macd_target(i)
+                if op == "Cắt lên":
+                    if i > 0:
+                        m_prev = float(df["MACD"].iloc[i - 1])
+                        t_prev = get_sell_macd_target(i - 1)
+                        active_sell_flags.append(bool(m_prev <= t_prev and m_curr > t_curr))
+                    else:
+                        active_sell_flags.append(bool(m_curr > t_curr))
+                elif op == "Cắt xuống":
+                    if i > 0:
+                        m_prev = float(df["MACD"].iloc[i - 1])
+                        t_prev = get_sell_macd_target(i - 1)
+                        active_sell_flags.append(bool(m_prev >= t_prev and m_curr < t_curr))
+                    else:
+                        active_sell_flags.append(bool(m_curr < t_curr))
+                elif op in ["Nằm trên", ">"]:
+                    active_sell_flags.append(bool(m_curr > t_curr))
+                elif op in ["Nằm dưới", "<"]:
+                    active_sell_flags.append(bool(m_curr < t_curr))
+                else:
+                    active_sell_flags.append(bool(m_curr > t_curr))
+
+            # 11. GTGD tự doanh bán ròng (Tỷ)
+            if sell_rules.get("prop_net_sell_val"):
+                min_pv = float(sell_rules.get("min_prop_sell_val") if sell_rules.get("min_prop_sell_val") is not None else 0.0)
+                max_pv = float(sell_rules.get("max_prop_sell_val") if sell_rules.get("max_prop_sell_val") is not None else 48633.0)
+                if not (min_pv <= 0.0 and max_pv >= 48633.0):
+                    p_val_est = float(df["Close"].iloc[i] * df["Volume"].iloc[i] * 0.05 / 1e6)
+                    active_sell_flags.append(bool(min_pv <= p_val_est <= max_pv))
+
+            # 12. Bollinger Bands
             if sell_rules.get("use_bb"):
                 active_sell_flags.append(bool(df["Close"].iloc[i] >= df["BB_Upper"].iloc[i]))
 
@@ -1292,8 +1793,10 @@ def evaluate_strategy_signals(
                 sell_cond = False
         elif ai_signals is not None and len(ai_signals) == n_bars:
             sell_cond = ai_signals[i] == 0
-        else:
+        elif not has_custom_buy:
             sell_cond = (df["SMA20"].iloc[i] < df["SMA50"].iloc[i]) or (df["RSI"].iloc[i] > 70.0)
+        else:
+            sell_cond = False
 
         if sell_cond:
             signals[i] = 0
@@ -1411,11 +1914,16 @@ def run_portfolio_backtest(
                 except Exception as pred_err:
                     logger.debug("Bỏ qua dự báo AI cho %s: %s", sym, pred_err)
 
+            meta = (symbol_metadata or {}).get(sym, {})
+            name = meta.get("name", f"Công ty Cổ phần {sym}")
+            sector = meta.get("sector", "Đa ngành")
+
             signals = evaluate_strategy_signals(
                 df_prepared,
                 buy_rules=buy_rules,
                 sell_rules=sell_rules,
                 ai_signals=ai_signals,
+                symbol_meta=meta,
             )
 
             metrics, eq_df, trades_df = simulate_vietnam_trading(
@@ -1432,10 +1940,6 @@ def run_portfolio_backtest(
                 stop_loss_pct=stop_loss_pct,
                 trailing_stop_pct=trailing_stop_pct,
             )
-
-            meta = (symbol_metadata or {}).get(sym, {})
-            name = meta.get("name", f"Công ty Cổ phần {sym}")
-            sector = meta.get("sector", "Đa ngành")
 
             breakdown_list.append(
                 {
@@ -1530,21 +2034,28 @@ def run_portfolio_backtest(
     excess_roi = tot_roi - bh_roi
     max_mdd = float(merged_eq["Drawdown_Pct"].min())
 
-    daily_rets = merged_eq["Daily_Return"].values / 100.0
-    mean_ret = float(np.mean(daily_rets))
-    std_ret = float(np.std(daily_rets))
-    rf_daily = 0.04 / 252.0
-    sharpe = float((mean_ret - rf_daily) / (std_ret + 1e-9) * np.sqrt(252.0))
-
-    downside = daily_rets[daily_rets < rf_daily]
-    down_std = float(np.std(downside)) if len(downside) > 0 else std_ret
-    sortino = float((mean_ret - rf_daily) / (down_std + 1e-9) * np.sqrt(252.0))
-
     total_trades = sum(b["trades"] for b in breakdown_list)
     total_costs = sum(b["costs"] for b in breakdown_list)
     avg_win_rate = (
         float(np.mean([b["win_rate_pct"] for b in breakdown_list])) if breakdown_list else 0.0
     )
+
+    daily_rets = merged_eq["Daily_Return"].values / 100.0
+    mean_ret = float(np.mean(daily_rets))
+    std_ret = float(np.std(daily_rets))
+    rf_daily = 0.04 / 252.0
+
+    if std_ret > 1e-6 and total_trades > 0:
+        sharpe = float((mean_ret - rf_daily) / std_ret * np.sqrt(252.0))
+    else:
+        sharpe = 0.0
+
+    downside = daily_rets[daily_rets < rf_daily]
+    down_std = float(np.std(downside)) if len(downside) > 0 else std_ret
+    if down_std > 1e-6 and total_trades > 0:
+        sortino = float((mean_ret - rf_daily) / down_std * np.sqrt(252.0))
+    else:
+        sortino = 0.0
 
     all_realized_returns: list[float] = []
     for ind in individual_results.values():
@@ -1577,7 +2088,7 @@ def run_portfolio_backtest(
         "sharpe_ratio": round(sharpe, 4),
         "sortino_ratio": round(sortino, 4),
         "max_drawdown_pct": round(abs(max_mdd), 2),
-        "calmar_ratio": round(tot_roi / (abs(max_mdd) + 1e-9), 4),
+        "calmar_ratio": round(tot_roi / abs(max_mdd), 4) if abs(max_mdd) > 1e-6 else 0.0,
         "var_95_pct": round(float(np.percentile(daily_rets, 5) * 100.0), 2),
         "cvar_95_pct": (
             round(float(np.mean(daily_rets[daily_rets <= np.percentile(daily_rets, 5)]) * 100.0), 2)
