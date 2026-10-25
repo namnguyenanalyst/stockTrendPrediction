@@ -22,7 +22,7 @@ class BatchPredictionRequest(BaseModel):
 @router.get(
     "/signal",
     response_model=PredictionResponse,
-    summary="Dự báo xu hướng T+1 cho một mã cổ phiếu (GET)",
+    summary="Dự báo xu hướng chu kỳ T+3 và Quỹ đạo 3 phiên cho một mã cổ phiếu (GET)",
     description="Thực hiện suy luận bằng mô hình LightGBM hoặc PyTorch Global LSTM, trả về xác suất 3 lớp và khuyến nghị Mua/Bán.",
 )
 async def predict_signal(
@@ -39,7 +39,7 @@ async def predict_signal(
 @router.post(
     "/signal",
     response_model=PredictionResponse,
-    summary="Dự báo xu hướng T+1 cho một mã cổ phiếu (POST)",
+    summary="Dự báo xu hướng chu kỳ T+3 và Quỹ đạo 3 phiên cho một mã cổ phiếu (POST)",
     description="Thực hiện suy luận bằng mô hình LightGBM hoặc PyTorch Global LSTM nhận body JSON.",
 )
 async def predict_signal_post(request: PredictionSignalRequest) -> PredictionResponse:

@@ -953,7 +953,9 @@ def backtest_symbol_oos(
     if sym_df.empty:
         raise ValueError(f"Không tìm thấy dữ liệu cho mã {clean_sym} trong tập test.")
 
-    scaler_path = models_dir / "scaler_window3.pkl"
+    scaler_path = models_dir / "production_scaler_t3.pkl"
+    if not scaler_path.exists():
+        scaler_path = models_dir / "scaler_window3.pkl"
     with open(scaler_path, "rb") as f:
         scaler = pickle.load(f)
 
@@ -963,7 +965,9 @@ def backtest_symbol_oos(
     if model_type.lower() == "lightgbm":
         import lightgbm as lgb
 
-        lgb_file = models_dir / "lightgbm_classifier.txt"
+        lgb_file = models_dir / "production_lgb_t3.txt"
+        if not lgb_file.exists():
+            lgb_file = models_dir / "lightgbm_classifier.txt"
         booster = lgb.Booster(model_file=str(lgb_file))
         probs = booster.predict(sym_scaled[ALL_FEATURE_COLS])
         signals = np.argmax(probs, axis=1)
@@ -991,8 +995,11 @@ def backtest_symbol_oos(
             num_classes=3,
             dropout=0.2,
         ).to(device)
+        lstm_path = models_dir / "production_lstm_t3.pth"
+        if not lstm_path.exists():
+            lstm_path = models_dir / "global_lstm_classifier.pth"
         lstm_model.load_state_dict(
-            torch.load(models_dir / "global_lstm_classifier.pth", map_location=device)
+            torch.load(lstm_path, map_location=device)
         )
         lstm_model.eval()
 

@@ -21,14 +21,14 @@ def predict_stock_signal(
     model_type: str = "lightgbm",
 ) -> PredictionResponse:
     """
-    Thực hiện suy luận dự báo xu hướng T+1 cho một mã cổ phiếu.
+    Thực hiện suy luận dự báo xu hướng chu kỳ T+3 và Quỹ đạo 3 phiên cho một mã cổ phiếu.
 
     Args:
         symbol: Mã cổ phiếu (ví dụ: VIC, HPG, FPT).
         model_type: 'lightgbm' hoặc 'lstm'.
 
     Returns:
-        PredictionResponse chứa nhãn, tên xu hướng, khuyến nghị Mua/Bán và xác suất 3 lớp.
+        PredictionResponse chứa nhãn, tên xu hướng, khuyến nghị Mua/Bán, xác suất 3 lớp và Quỹ đạo 3 phiên (T+1 -> T+3).
     """
     clean_sym = symbol.upper()
     model_clean = model_type.lower()

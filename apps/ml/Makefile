@@ -33,7 +33,7 @@ features:
 train:
 	$(PYTHON) -m vn_stock.modeling.train --symbol VIC --epochs 30
 
-## Chạy suy luận dự báo T+1
+## Chạy suy luận dự báo chu kỳ T+3 và Quỹ đạo 3 phiên
 .PHONY: predict
 predict:
 	$(PYTHON) -m vn_stock.modeling.predict --symbol VIC

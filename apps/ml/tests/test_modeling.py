@@ -331,7 +331,7 @@ def test_train_production_model(tmp_path):
 
     with (
         patch("vn_stock.data_ingestion.sync_latest_market_data", return_value={"status": "success"}),
-        patch("vn_stock.data_ingestion.build_panel_dataset", return_value=mock_panel),
+        patch("vn_stock.modeling.train.build_panel_dataset", return_value=mock_panel),
     ):
         res = train_production_model(
             symbols=["VIC"],

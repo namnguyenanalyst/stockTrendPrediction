@@ -455,7 +455,9 @@ def predict_next_day(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Dự báo xu hướng cổ phiếu phiên tiếp theo (T+1).")
+    parser = argparse.ArgumentParser(
+        description="Dự báo xu hướng cổ phiếu chu kỳ T+3 và Quỹ đạo 3 phiên (T+1 -> T+3)."
+    )
     parser.add_argument(
         "--symbol", type=str, default=DEFAULT_SYMBOL, help="Mã cổ phiếu (ví dụ: VIC, HPG)"
     )
@@ -471,15 +473,23 @@ if __name__ == "__main__":
     try:
         res = predict_trend(symbol=args.symbol, model_type=args.model)
         print("\n" + "=" * 55)
-        print(f"KẾT QUẢ DỰ BÁO XU HƯỚNG T+1 CHO MÃ {res['symbol']} ({res['model_type'].upper()})")
+        print(f"KẾT QUẢ DỰ BÁO XU HƯỚNG T+3 CHO MÃ {res['symbol']} ({res['model_type'].upper()})")
         print("=" * 55)
         print(f"Ngày gần nhất:       {res['date']}")
         print(f"Giá đóng cửa:        {res['current_price']:,.2f} VNĐ")
         print(f"Dự báo xu hướng:     {res['class_name']} (Nhãn {res['predicted_label']})")
         print(f"Khuyến nghị:         {res['signal']}")
+        print(f"Kỳ hạn:              {res['horizon']} ({res['horizon_days']} phiên)")
         print("Phân bổ xác suất:")
         for k, v in res["probabilities"].items():
             print(f"  - {k:<10}: {v * 100:.2f}%")
+        if res.get("trajectory"):
+            print("-" * 55)
+            print("Quỹ đạo dự phóng 3 phiên (T+1 -> T+3):")
+            for step in res["trajectory"]:
+                print(
+                    f"  * {step['day_name']} ({step.get('date', 'N/A')}): {step['predicted_trend']} - {step['signal']}"
+                )
         print("=" * 55)
     except (FileNotFoundError, ValueError, RuntimeError, KeyError) as err:
         print(f"Lỗi: {err}")
