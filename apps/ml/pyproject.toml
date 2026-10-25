@@ -26,6 +26,7 @@ dependencies = [
     "ruff",
     "scikit-learn",
     "scipy<1.14",
+    "shap>=0.49.1",
     "torch",
 ]
 
