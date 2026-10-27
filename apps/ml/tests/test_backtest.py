@@ -718,14 +718,18 @@ def test_backtest_symbol_oos_and_all_symbols():
         records.append(row)
     mock_test_df = pd.DataFrame(records)
 
-    mock_windows = [{}, {}, {"test_df": mock_test_df}]
+    mock_splits = {
+        "val": mock_test_df,
+        "val_warmup": mock_test_df.tail(19),
+        "scaler": None,
+    }
 
     with (
         patch("vn_stock.data_ingestion.load_panel_dataset", return_value=pd.DataFrame()),
         patch("vn_stock.features.compute_features_per_symbol", return_value=pd.DataFrame()),
         patch("vn_stock.splitting_data.apply_study_window", return_value=pd.DataFrame()),
         patch("vn_stock.splitting_data.create_multi_day_labels", return_value=pd.DataFrame()),
-        patch("vn_stock.splitting_data.generate_walk_forward_windows", return_value=mock_windows),
+        patch("vn_stock.splitting_data.prepare_production_training_data", return_value=mock_splits),
     ):
         res_vic = backtest_symbol_oos(symbol="VIC", model_type="lightgbm")
         assert res_vic.symbol == "VIC"

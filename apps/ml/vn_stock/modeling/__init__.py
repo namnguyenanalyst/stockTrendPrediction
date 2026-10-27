@@ -1,4 +1,4 @@
-"""Subpackage xây dựng kiến trúc mô hình, huấn luyện Walk-Forward và dự báo xu hướng."""
+"""Subpackage xây dựng kiến trúc mô hình, huấn luyện thực chiến (Production Retraining) và dự báo xu hướng."""
 
 __all__ = [
     "GlobalLSTMClassifier",
@@ -7,11 +7,8 @@ __all__ = [
     "evaluate_predictions",
     "predict_next_day",
     "predict_trend",
-    "train_lightgbm_window",
     "train_lstm_model",
-    "train_lstm_window",
-    "train_naive_baseline",
-    "train_walk_forward_pipeline",
+    "train_production_model",
 ]
 
 
@@ -26,11 +23,8 @@ def __getattr__(name: str):
         return getattr(predict, name)
     elif name in (
         "evaluate_predictions",
-        "train_lightgbm_window",
         "train_lstm_model",
-        "train_lstm_window",
-        "train_naive_baseline",
-        "train_walk_forward_pipeline",
+        "train_production_model",
     ):
         from vn_stock.modeling import train
 

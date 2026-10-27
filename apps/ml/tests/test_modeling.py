@@ -11,7 +11,6 @@ import torch
 
 from vn_stock.config import NUM_CLASSES
 from vn_stock.features import ALL_FEATURE_COLS, FEATURE_COLS
-
 from vn_stock.modeling.model import (
     GlobalLSTMClassifier,
     PredictionModel,
@@ -25,11 +24,8 @@ from vn_stock.modeling.predict import (
 )
 from vn_stock.modeling.train import (
     evaluate_predictions,
-    train_lightgbm_window,
-    train_lstm_window,
-    train_naive_baseline,
+    train_lstm_model,
     train_production_model,
-    train_walk_forward_pipeline,
 )
 
 
@@ -58,49 +54,52 @@ def mock_panel_data():
 def test_global_lstm_classifier_architecture():
     """Kiểm thử cấu trúc mạng GlobalLSTMClassifier và tính toán xác suất Softmax."""
     batch_size = 16
-    seq_length = 20
-    input_size = 14
-    hidden_size = 32
+    seq_len = 20
+    input_size = len(ALL_FEATURE_COLS)
 
     model = GlobalLSTMClassifier(
         input_size=input_size,
-        hidden_size=hidden_size,
+        hidden_size=32,
         num_layers=2,
         num_classes=NUM_CLASSES,
-        dropout=0.1,
+        dropout=0.2,
     )
+    model.eval()
 
-    x = torch.randn(batch_size, seq_length, input_size)
+    x = torch.randn(batch_size, seq_len, input_size)
     logits = model(x)
     assert logits.shape == (batch_size, NUM_CLASSES)
 
     probs = model.predict_proba(x)
     assert probs.shape == (batch_size, NUM_CLASSES)
-    # Xác suất phải >= 0 và tổng mỗi dòng xấp xỉ 1.0
-    assert torch.all(probs >= 0.0)
-    assert torch.allclose(probs.sum(dim=-1), torch.ones(batch_size), atol=1e-5)
+    # Tổng xác suất mỗi mẫu phải xấp xỉ 1.0
+    row_sums = probs.sum(dim=1).detach().numpy()
+    np.testing.assert_allclose(row_sums, 1.0, atol=1e-5)
 
 
-def test_legacy_prediction_model():
-    """Kiểm tra mô hình PredictionModel cũ vẫn hoạt động tương thích ngược."""
-    model = PredictionModel(input_size=1, hidden_size=16, num_layers=1, output_size=1)
-    x = torch.randn(4, 10, 1)
+def test_prediction_model_interface():
+    """Kiểm thử mô hình hồi quy đơn biến cũ PredictionModel (tương thích ngược)."""
+    model = PredictionModel(input_size=len(ALL_FEATURE_COLS), output_size=1)
+    x = torch.randn(4, 10, len(ALL_FEATURE_COLS))
     out = model(x)
     assert out.shape == (4, 1)
 
 
-def test_create_lightgbm_model():
-    """Kiểm tra factory tạo mô hình LightGBM Classifier."""
-    model = create_lightgbm_model({"n_estimators": 50, "max_depth": 3})
-    assert model.n_estimators == 50
-    assert model.max_depth == 3
-    assert model.n_jobs == 1
+def test_create_lightgbm_model_defaults_and_custom():
+    """Kiểm thử khởi tạo mô hình LightGBM với siêu tham số mặc định và tùy chỉnh."""
+    model_def = create_lightgbm_model()
+    assert model_def.n_estimators == 300
+    assert model_def.learning_rate == 0.03
+
+    model_custom = create_lightgbm_model({"n_estimators": 100, "max_depth": 3})
+    assert model_custom.n_estimators == 100
+    assert model_custom.max_depth == 3
 
 
-def test_evaluate_predictions():
-    """Kiểm tra hàm đánh giá bộ chỉ số đa lớp."""
-    y_true = np.array([0, 1, 2, 0, 1, 2, 1, 1])
-    y_pred = np.array([0, 1, 2, 0, 2, 1, 1, 1])
+def test_evaluate_predictions_metrics_integrity():
+    """Kiểm thử tính toán đầy đủ các metrics đánh giá phân loại đa lớp."""
+    y_true = np.array([0, 1, 2, 0, 1, 2, 2, 1])
+    y_pred = np.array([0, 1, 2, 0, 1, 1, 2, 0])
 
     metrics = evaluate_predictions(y_true, y_pred)
     assert "accuracy" in metrics
@@ -109,59 +108,6 @@ def test_evaluate_predictions():
     assert "confusion_matrix" in metrics
     assert metrics["accuracy"] == 6 / 8
     assert len(metrics["confusion_matrix"]) == 3
-
-
-def test_train_naive_baseline(mock_panel_data):
-    """Kiểm thử huấn luyện và đánh giá mô hình Naive Dummy."""
-    train_df = mock_panel_data.iloc[:40]
-    test_df = mock_panel_data.iloc[40:]
-
-    dummy, metrics, y_pred = train_naive_baseline(train_df, test_df, ALL_FEATURE_COLS)
-    assert metrics["accuracy"] >= 0.0
-    assert len(y_pred) == len(test_df)
-
-
-def test_train_lightgbm_window(mock_panel_data):
-    """Kiểm thử huấn luyện LightGBM trên một cửa sổ mock."""
-    train_df = mock_panel_data.iloc[:60]
-    val_df = mock_panel_data.iloc[60:90]
-    test_df = mock_panel_data.iloc[90:]
-
-    model, metrics, y_pred = train_lightgbm_window(
-        train_df,
-        val_df,
-        test_df,
-        ALL_FEATURE_COLS,
-        custom_params={"n_estimators": 10, "max_depth": 3, "min_child_samples": 2},
-        early_stopping_rounds=5,
-    )
-    assert len(y_pred) == len(test_df)
-    assert "macro_f1" in metrics
-    assert hasattr(model, "feature_importances_")
-
-
-def test_train_lstm_window(mock_panel_data):
-    """Kiểm thử huấn luyện PyTorch LSTM trên một cửa sổ mock."""
-    train_df = mock_panel_data.iloc[:60].copy()
-    val_df = mock_panel_data.iloc[60:90].copy()
-    test_df = mock_panel_data.iloc[90:].copy()
-
-    model, metrics, y_pred = train_lstm_window(
-        train_df=train_df,
-        val_df=val_df,
-        test_df=test_df,
-        val_warmup_df=train_df,
-        test_warmup_df=val_df,
-        feature_cols=ALL_FEATURE_COLS,
-        seq_length=10,
-        hidden_size=16,
-        num_layers=1,
-        epochs=2,
-        batch_size=16,
-    )
-    assert len(y_pred) > 0
-    assert "macro_f1" in metrics
-    assert isinstance(model, GlobalLSTMClassifier)
 
 
 def test_predict_trend_with_artifacts(tmp_path, mock_panel_data):
@@ -257,7 +203,6 @@ def test_predict_trend_unsupported_model_raises(tmp_path, mock_panel_data):
 
 def test_prepare_inference_features_index():
     """Kiểm tra prepare_inference_features cho chỉ số thị trường (VNINDEX)."""
-    # Tạo đủ 250 dòng để vượt ngưỡng len < 200
     dates = pd.date_range("2023-01-01", periods=250, freq="B")
     df_vni = pd.DataFrame({
         "Date": dates,
@@ -276,43 +221,8 @@ def test_prepare_inference_features_index():
             assert col in df_feat.columns
 
 
-def test_train_walk_forward_pipeline(tmp_path, mock_panel_data):
-    """Kiểm tra toàn bộ quy trình Walk-Forward Pipeline train_walk_forward_pipeline."""
-    # Tạo mock panel 150 phiên đủ chia 3 cửa sổ
-    dates = pd.date_range("2023-01-01", periods=150, freq="B")
-    records = []
-    for d in dates:
-        for sym_idx, sym in enumerate(["VIC", "HPG"]):
-            row = {
-                "Date": d,
-                "Symbol": sym,
-                "Close": 50.0 + np.random.randn(),
-                "Label": np.random.choice([0, 1, 2]),
-                "Valid_Label": True,
-            }
-            for f in FEATURE_COLS:
-                row[f] = np.random.randn() * 0.05
-            row["Symbol_Code"] = sym_idx
-            records.append(row)
-    df_long = pd.DataFrame(records).sort_values(["Date", "Symbol"]).reset_index(drop=True)
-
-    summary = train_walk_forward_pipeline(
-        df=df_long,
-        epochs=1,
-        seq_length=5,
-        save_artifacts=True,
-        models_dir=tmp_path,
-    )
-
-    assert "naive" in summary
-    assert "lightgbm" in summary
-    assert len(summary["lightgbm"]["windows"]) == 3
-    assert (tmp_path / "training_metrics.json").exists()
-
-
 def test_train_production_model(tmp_path):
     """Kiểm tra quy trình huấn luyện lại mô hình sản xuất train_production_model."""
-    # Tạo mock panel 250 ngày từ 2022-01-01 để vượt qua study window và có đủ dữ liệu
     dates = pd.date_range("2023-01-01", periods=250, freq="B")
     records = []
     for d in dates:
@@ -354,4 +264,13 @@ def test_train_production_model(tmp_path):
         assert (tmp_path / "production_training_info_t3.json").exists()
 
 
-
+def test_train_lstm_model_wrapper(tmp_path):
+    """Kiểm tra hàm train_lstm_model gọi train_production_model và trả về mô hình."""
+    mock_summary = {
+        "status": "success",
+        "lstm_metrics": {"macro_f1": 0.55},
+    }
+    with patch("vn_stock.modeling.train.train_production_model", return_value=mock_summary):
+        model, f1 = train_lstm_model(symbol="VIC", epochs=1, models_dir=tmp_path)
+        assert isinstance(model, GlobalLSTMClassifier)
+        assert f1 == 0.55

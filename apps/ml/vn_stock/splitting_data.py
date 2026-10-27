@@ -1,6 +1,5 @@
-"""Module phân chia dữ liệu chuỗi thời gian Walk-Forward Validation đa mã và chuẩn hóa chống rò rỉ thông tin."""
+"""Module tiền xử lý, gán nhãn đa phiên T+3 (Purged Horizon) và phân chia dữ liệu huấn luyện thực chiến (Production Retraining)."""
 
-from collections.abc import Sequence
 import logging
 from typing import Any
 import warnings
@@ -32,9 +31,8 @@ def apply_study_window(
     - Sau khi đã tính xong đầy đủ đặc trưng, hàm apply_study_window() được gọi để cắt gọn lại dữ liệu,
       chỉ giữ các phiên từ STUDY_START_DATE (2023-01-04) trở đi. Nhờ đó:
       (a) Các đặc trưng kỹ thuật rolling đã hội tụ đầy đủ giá trị ngay từ ngày 2023-01-04 cho cả 5 mã.
-      (b) Các tỷ lệ phân chia Walk-Forward (50/60/70%, 15%, 15%) được tính toán nghiêm ngặt trên đúng
-          tập các ngày của cửa sổ nghiên cứu, bảo đảm tính nhất quán và khả năng so sánh đối chứng
-          với các kết quả thực nghiệm trước đây.
+      (b) Dữ liệu huấn luyện thực chiến được tính toán nghiêm ngặt trên đúng
+          tập các ngày của cửa sổ nghiên cứu, bảo đảm tính nhất quán và chất lượng đặc trưng.
 
     Args:
         df: DataFrame chứa dữ liệu đặc trưng đã tính toán.
@@ -120,136 +118,6 @@ def drop_ignored_labels(X: Any, y: np.ndarray) -> tuple[Any, np.ndarray]:
     y_valid = y[valid_mask]
     return X_valid, y_valid
 
-
-def generate_walk_forward_windows(
-    df: pd.DataFrame,
-    train_ratios: Sequence[float] = (0.50, 0.60, 0.70),
-    val_ratio: float = 0.15,
-    test_ratio: float = 0.15,
-    date_col: str = "Date",
-    symbol_col: str = "Symbol",
-) -> list[dict[str, Any]]:
-    """
-    Tạo các cửa sổ Walk-Forward kiểm định cắt đồng bộ theo danh sách ngày giao dịch duy nhất (unique dates).
-
-    Nguyên tắc phân chia:
-    - Mọi mã cổ phiếu đều được cắt tại ĐÚNG CÙNG MỘT NGÀY trong toàn bộ panel.
-    - Không shuffle ở bất kỳ bước nào để bảo toàn trật tự thời gian.
-    - Quan hệ thời gian:
-      + TRONG NỘI BỘ TỪNG CỬA SỔ: Train, Validation và Test hoàn toàn không chồng lấn theo thời gian
-        (train_end_date < val_end_date < test_end_date).
-      + GIỮA CÁC CỬA SỔ (Expanding Windows): Tập Train mở rộng dần theo thời gian. Do đó, các cửa sổ
-        CÓ CHỒNG LẤN LẪN NHAU (vùng test của cửa sổ trước nằm trùm lên vùng train/val/test của cửa sổ sau).
-    - Tỷ lệ train/val/test (50/60/70%, 15%, 15%) được tính nghiêm ngặt theo số LƯỢNG NGÀY GIAO DỊCH
-      DUY NHẤT (unique dates), TUYỆT ĐỐI KHÔNG TÍNH THEO SỐ DÒNG CỦA DATAFRAME.
-      Vì các mã cổ phiếu có thể bắt đầu giao dịch ở các thời điểm khác nhau (hoặc bị loại bỏ do rolling MA ban đầu),
-      số dòng thực tế của tập train có thể chiếm tỷ lệ nhỏ hơn tỷ lệ số ngày.
-    - Tập test kết thúc tại mốc cắt riêng của từng cửa sổ (te_cut), không lấy đến cuối toàn bộ dữ liệu:
-      + Cửa sổ 1: Train 50%, Val 15%, Test 15% (Test kết thúc tại mốc 80% thời gian)
-      + Cửa sổ 2: Train 60%, Val 15%, Test 15% (Test kết thúc tại mốc 90% thời gian)
-      + Cửa sổ 3: Train 70%, Val 15%, Test 15% (Test kết thúc tại mốc 100% thời gian)
-
-    Args:
-        df: DataFrame chứa dữ liệu đa mã (bắt buộc có cột date_col và symbol_col).
-        train_ratios: Danh sách các tỷ lệ tập train mở rộng dần (Expanding Windows).
-        val_ratio: Tỷ lệ tập validation cho mỗi cửa sổ (mặc định 0.15).
-        test_ratio: Tỷ lệ tập test out-of-sample cho mỗi cửa sổ (mặc định 0.15).
-        date_col: Tên cột thời gian (mặc định 'Date').
-        symbol_col: Tên cột mã cổ phiếu (mặc định 'Symbol').
-
-    Returns:
-        list[dict[str, Any]]: Danh sách các cửa sổ, mỗi dict chứa:
-            - name: Tên định danh cửa sổ
-            - train_ratio: Tỷ lệ train của cửa sổ
-            - val_ratio: Tỷ lệ val của cửa sổ
-            - test_ratio: Tỷ lệ test của cửa sổ
-            - train_df: DataFrame tập train
-            - val_df: DataFrame tập val
-            - test_df: DataFrame tập test
-            - train_end_date: Ngày giao dịch cuối cùng của tập train (pd.Timestamp)
-            - val_end_date: Ngày giao dịch cuối cùng của tập val (pd.Timestamp)
-            - test_end_date: Ngày giao dịch cuối cùng của tập test (pd.Timestamp)
-    """
-    if date_col not in df.columns:
-        raise ValueError(f"DataFrame phải chứa cột '{date_col}' để chia tập theo thời gian.")
-    if symbol_col not in df.columns:
-        raise ValueError(f"DataFrame phải chứa cột '{symbol_col}' để quản lý dữ liệu đa mã.")
-
-    # Sắp xếp và lấy danh sách ngày duy nhất trên toàn bộ panel dữ liệu
-    unique_dates = np.sort(df[date_col].unique())
-    n_dates = len(unique_dates)
-
-    if n_dates == 0:
-        raise ValueError("DataFrame không có dữ liệu ngày hợp lệ.")
-
-    all_symbols = set(df[symbol_col].dropna().unique())
-    windows = []
-
-    for idx, t_ratio in enumerate(train_ratios, start=1):
-        if t_ratio + val_ratio + test_ratio > 1.0 + 1e-9:
-            raise ValueError(
-                f"Tổng tỷ lệ (train={t_ratio} + val={val_ratio} + test={test_ratio} = "
-                f"{t_ratio + val_ratio + test_ratio:.2f}) vượt quá 1.0."
-            )
-
-        t_end_idx = int(t_ratio * n_dates)
-        v_end_idx = int((t_ratio + val_ratio) * n_dates)
-        te_end_idx = min(int((t_ratio + val_ratio + test_ratio) * n_dates), n_dates)
-
-        if t_end_idx <= 0 or v_end_idx <= t_end_idx or te_end_idx <= v_end_idx:
-            raise ValueError(
-                f"Dữ liệu không đủ số ngày ({n_dates} ngày) để chia cửa sổ "
-                f"với tỷ lệ train={t_ratio}, val={val_ratio}, test={test_ratio}."
-            )
-
-        train_dates = unique_dates[:t_end_idx]
-        val_dates = unique_dates[t_end_idx:v_end_idx]
-        test_dates = unique_dates[v_end_idx:te_end_idx]
-
-        train_df = df[df[date_col].isin(train_dates)].copy()
-        val_df = df[df[date_col].isin(val_dates)].copy()
-        test_df = df[df[date_col].isin(test_dates)].copy()
-
-        train_end_date = pd.Timestamp(unique_dates[t_end_idx - 1])
-        val_end_date = pd.Timestamp(unique_dates[v_end_idx - 1])
-        test_end_date = pd.Timestamp(unique_dates[te_end_idx - 1])
-
-        # Kiểm tra tính đầy đủ của các mã cổ phiếu trong cửa sổ (cảnh báo niêm yết muộn hoặc thiếu dữ liệu)
-        train_symbols = set(train_df[symbol_col].dropna().unique())
-        missing_in_train = all_symbols - train_symbols
-        if missing_in_train:
-            warnings.warn(
-                f"Cửa sổ {idx} (Train {t_ratio * 100:.0f}%): Các mã {sorted(missing_in_train)} "
-                f"hoàn toàn không có dữ liệu trong tập Train (có thể do niêm yết muộn sau {train_end_date}).",
-                UserWarning,
-                stacklevel=2,
-            )
-
-        for sym in train_symbols:
-            n_sym_train = len(train_df[train_df[symbol_col] == sym])
-            if n_sym_train < DEFAULT_SEQ_LENGTH:
-                warnings.warn(
-                    f"Cửa sổ {idx}: Mã {sym} chỉ có {n_sym_train} dòng trong tập Train, "
-                    f"ít hơn DEFAULT_SEQ_LENGTH={DEFAULT_SEQ_LENGTH}.",
-                    UserWarning,
-                    stacklevel=2,
-                )
-
-        window_dict = {
-            "name": f"Window {idx} (Train {int(t_ratio * 100)}%)",
-            "train_ratio": float(t_ratio),
-            "val_ratio": float(val_ratio),
-            "test_ratio": float(test_ratio),
-            "train_df": train_df,
-            "val_df": val_df,
-            "test_df": test_df,
-            "train_end_date": train_end_date,
-            "val_end_date": val_end_date,
-            "test_end_date": test_end_date,
-        }
-        windows.append(window_dict)
-
-    return windows
 
 
 def scale_window(
@@ -348,113 +216,6 @@ def get_warmup_tail(
 
     warmup_df = pd.concat(tails, ignore_index=True)
     return warmup_df
-
-
-def prepare_all_windows(
-    df: pd.DataFrame,
-    train_ratios: Sequence[float] = (0.50, 0.60, 0.70),
-    val_ratio: float = 0.15,
-    test_ratio: float = 0.15,
-    feature_cols: list[str] = FEATURE_COLS,
-    seq_length: int = DEFAULT_SEQ_LENGTH,
-    purge_boundary: bool = True,
-    date_col: str = "Date",
-    symbol_col: str = "Symbol",
-) -> list[dict[str, Any]]:
-    """
-    Hàm điều phối toàn diện cho 3 cửa sổ Walk-Forward:
-    1. Chia 3 cửa sổ theo ngày duy nhất (generate_walk_forward_windows).
-    2. Fit StandardScaler độc lập trên train của từng cửa sổ và transform (scale_window).
-    3. Xử lý rò rỉ ranh giới (Purged Boundary): Khi purge_boundary=True, nhãn của ngày cuối Train
-       và ngày cuối Val (mỗi mã) được gán thành -1 (sentinel), dòng đặc trưng giữ nguyên để warm-up.
-    4. Trích xuất warmup tail cho val và test (get_warmup_tail với seq_length - 1 dòng).
-
-    Args:
-        df: DataFrame đầu vào (nếu có cột 'Label' sẽ thực hiện purge boundary).
-        train_ratios: Tỷ lệ tập train mở rộng.
-        val_ratio: Tỷ lệ tập val.
-        test_ratio: Tỷ lệ tập test.
-        feature_cols: Danh sách cột đặc trưng cần scale.
-        seq_length: Độ dài chuỗi quan sát LSTM (mặc định 20).
-        purge_boundary: Nếu True, gán nhãn ngày cuối Train và Val bằng -1 để triệt tiêu rò rỉ.
-        date_col: Cột ngày giao dịch.
-        symbol_col: Cột mã cổ phiếu.
-
-    Returns:
-        list[dict[str, Any]]: Danh sách 3 cửa sổ chuẩn bị sẵn sàng cho huấn luyện và kiểm định.
-    """
-    raw_windows = generate_walk_forward_windows(
-        df=df,
-        train_ratios=train_ratios,
-        val_ratio=val_ratio,
-        test_ratio=test_ratio,
-        date_col=date_col,
-        symbol_col=symbol_col,
-    )
-
-    prepared_windows = []
-    has_label = "Label" in df.columns
-
-    for win in raw_windows:
-        tr_df = win["train_df"].copy()
-        va_df = win["val_df"].copy()
-        te_df = win["test_df"].copy()
-
-        # Chuẩn hóa dữ liệu chống rò rỉ (fit chỉ trên train)
-        train_s, val_s, test_s, scaler = scale_window(
-            train_df=tr_df,
-            val_df=va_df,
-            test_df=te_df,
-            feature_cols=feature_cols,
-        )
-
-        # Xử lý rò rỉ ranh giới (Purged Boundary)
-        if has_label:
-            if purge_boundary:
-                # Gán nhãn -1 cho ngày cuối cùng của Train và Val (mỗi mã)
-                tr_end = win["train_end_date"]
-                va_end = win["val_end_date"]
-
-                train_s.loc[train_s[date_col] == tr_end, "Label"] = -1
-                val_s.loc[val_s[date_col] == va_end, "Label"] = -1
-
-            # Cột Valid_Label luôn suy ra từ Label != -1
-            train_s["Valid_Label"] = train_s["Label"] != -1
-            val_s["Valid_Label"] = val_s["Label"] != -1
-            test_s["Valid_Label"] = test_s["Label"] != -1
-
-        # Trích xuất warm-up tails (seq_length - 1 dòng đuôi)
-        val_warmup = get_warmup_tail(
-            prev_split_df=train_s,
-            seq_length=seq_length,
-            symbol_col=symbol_col,
-            date_col=date_col,
-        )
-        test_warmup = get_warmup_tail(
-            prev_split_df=val_s,
-            seq_length=seq_length,
-            symbol_col=symbol_col,
-            date_col=date_col,
-        )
-
-        prepared_win = {
-            "name": win["name"],
-            "train_ratio": win["train_ratio"],
-            "val_ratio": win["val_ratio"],
-            "test_ratio": win["test_ratio"],
-            "train": train_s,
-            "val": val_s,
-            "test": test_s,
-            "val_warmup": val_warmup,
-            "test_warmup": test_warmup,
-            "scaler": scaler,
-            "train_end_date": win["train_end_date"],
-            "val_end_date": win["val_end_date"],
-            "test_end_date": win["test_end_date"],
-        }
-        prepared_windows.append(prepared_win)
-
-    return prepared_windows
 
 
 def create_multi_day_labels(

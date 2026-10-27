@@ -921,9 +921,10 @@ def backtest_symbol_oos(
     take_profit_pct: float | None = None,
     stop_loss_pct: float | None = None,
     trailing_stop_pct: float | None = None,
+    val_buffer_days: int = 40,
 ) -> BacktestResult:
     """
-    Thực hiện Backtest tự động trên tập kiểm thử Out-of-Sample (OOS Cửa sổ 3)
+    Thực hiện Backtest tự động trên tập kiểm thử Out-of-Sample thực chiến (Validation Buffer)
     sử dụng mô hình AI và Scaler đã lưu trong models/.
     """
     from vn_stock.data_ingestion import load_panel_dataset
@@ -936,7 +937,7 @@ def backtest_symbol_oos(
     from vn_stock.splitting_data import (
         apply_study_window,
         create_multi_day_labels,
-        generate_walk_forward_windows,
+        prepare_production_training_data,
     )
 
     clean_sym = symbol.upper()
@@ -947,23 +948,16 @@ def backtest_symbol_oos(
     df_labeled = create_multi_day_labels(
         df_study, horizon=DEFAULT_HORIZON_DAYS, threshold=DEFAULT_TREND_THRESHOLD_3D
     )
-    w3 = generate_walk_forward_windows(df_labeled)[2]
-    test_df = w3["test_df"].copy()
+    splits = prepare_production_training_data(df_labeled, val_buffer_days=val_buffer_days)
+    val_scaled = splits["val"].copy()
 
     sym_df = (
-        test_df[test_df["Symbol"] == clean_sym].copy().sort_values("Date").reset_index(drop=True)
+        val_scaled[val_scaled["Symbol"] == clean_sym].copy().sort_values("Date").reset_index(drop=True)
     )
     if sym_df.empty:
-        raise ValueError(f"Không tìm thấy dữ liệu cho mã {clean_sym} trong tập test.")
-
-    scaler_path = models_dir / "production_scaler_t3.pkl"
-    if not scaler_path.exists():
-        scaler_path = models_dir / "scaler_window3.pkl"
-    with open(scaler_path, "rb") as f:
-        scaler = pickle.load(f)
+        raise ValueError(f"Không tìm thấy dữ liệu cho mã {clean_sym} trong tập kiểm thử.")
 
     sym_scaled = sym_df.copy()
-    sym_scaled[FEATURE_COLS] = scaler.transform(sym_df[FEATURE_COLS])
 
     if model_type.lower() == "lightgbm":
         import lightgbm as lgb
@@ -979,15 +973,13 @@ def backtest_symbol_oos(
 
         from vn_stock.features import create_multivariate_sequences
         from vn_stock.modeling.model import GlobalLSTMClassifier
-        from vn_stock.splitting_data import get_warmup_tail, scale_window
 
-        _, va_sc, te_sc, _ = scale_window(w3["train_df"], w3["val_df"], w3["test_df"])
-        warmup_val = get_warmup_tail(va_sc, seq_length=20)
+        warmup_val = splits["val_warmup"]
         xs_te, _ = create_multivariate_sequences(
-            te_sc, warmup_df=warmup_val, feature_cols=ALL_FEATURE_COLS
+            val_scaled, warmup_df=warmup_val, feature_cols=ALL_FEATURE_COLS
         )
 
-        sym_mask = te_sc["Symbol"] == clean_sym
+        sym_mask = val_scaled["Symbol"] == clean_sym
         xs_sym = xs_te[sym_mask.values]
 
         device = torch.device("cpu")
@@ -1920,17 +1912,28 @@ def run_portfolio_backtest(
             ai_signals = None
             if booster is not None and scaler is not None:
                 try:
-                    feat_copy = df_prepared.copy()
-                    for c in FEATURE_COLS:
-                        if c not in feat_copy.columns:
-                            feat_copy[c] = 0.0
-                    feat_scaled = feat_copy.copy()
-                    feat_scaled[FEATURE_COLS] = scaler.transform(feat_copy[FEATURE_COLS])
-                    from vn_stock.config import SYMBOL_TO_CODE
+                    from vn_stock.data_ingestion import fetch_daily_index
+                    from vn_stock.features import compute_features_per_symbol
 
-                    feat_scaled["Symbol_Code"] = SYMBOL_TO_CODE.get(sym, 0)
-                    probs = booster.predict(feat_scaled[ALL_FEATURE_COLS])
-                    ai_signals = np.argmax(probs, axis=1)
+                    df_for_feat = df_sym.copy()
+                    if "VNINDEX_Return_1d" not in df_for_feat.columns:
+                        vni_idx = fetch_daily_index("VNINDEX")
+                        df_for_feat = pd.merge(
+                            df_for_feat, vni_idx[["Date", "VNINDEX_Return_1d"]], on="Date", how="left"
+                        )
+                    computed_feats = compute_features_per_symbol(df_for_feat, drop_na=False)
+                    mask_dates = computed_feats["Date"].isin(filtered_df["Date"])
+                    aligned_feats = computed_feats[mask_dates].copy().sort_values("Date").reset_index(drop=True)
+
+                    if len(aligned_feats) == len(df_prepared):
+                        feat_scaled = aligned_feats.copy()
+                        feat_scaled[FEATURE_COLS] = feat_scaled[FEATURE_COLS].bfill().ffill().fillna(0.0)
+                        feat_scaled[FEATURE_COLS] = scaler.transform(feat_scaled[FEATURE_COLS])
+                        from vn_stock.config import SYMBOL_TO_CODE
+
+                        feat_scaled["Symbol_Code"] = SYMBOL_TO_CODE.get(sym, 0)
+                        probs = booster.predict(feat_scaled[ALL_FEATURE_COLS])
+                        ai_signals = np.argmax(probs, axis=1)
                 except Exception as pred_err:
                     logger.debug("Bỏ qua dự báo AI cho %s: %s", sym, pred_err)
 
