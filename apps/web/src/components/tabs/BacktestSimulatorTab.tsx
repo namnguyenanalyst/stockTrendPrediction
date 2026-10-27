@@ -921,7 +921,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                               onChange={(e) => setModelType(e.target.value as "lightgbm" | "lstm")}
                               className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-slate-100 focus:border-emerald-500 focus:outline-none"
                             >
-                              <option value="lightgbm">LightGBM (Walk-forward OOS)</option>
+                              <option value="lightgbm">LightGBM (Production OOS)</option>
                               <option value="lstm">PyTorch LSTM (Đa biến)</option>
                             </select>
                           </div>

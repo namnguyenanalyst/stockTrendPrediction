@@ -10,7 +10,7 @@ Module nghiên cứu, xử lý dữ liệu và huấn luyện mô hình Machine 
   - `config.py`: Đường dẫn và siêu tham số hệ thống.
   - `dataset.py`: Tải dữ liệu qua SSI Fast Connect Data API và đọc cache local.
   - `features.py`: Tính toán chỉ báo kỹ thuật (SMA, RSI, SD, Bollinger Bands,...).
-  - `validation.py`: Chia tập chuỗi thời gian & Walk-forward validation chống data leakage.
+  - `splitting_data.py`: Chuẩn bị dữ liệu huấn luyện thực chiến & Validation Buffer với Purged Horizon chống data leakage.
   - `backtest.py`: Mô phỏng chiến lược đầu tư với phí & thuế thực tế tại VN.
   - `modeling/`: Kiến trúc PyTorch LSTM (`model.py`), huấn luyện (`train.py`), suy luận (`predict.py`).
 - `tests/`: Bộ kiểm thử tự động với PyTest.

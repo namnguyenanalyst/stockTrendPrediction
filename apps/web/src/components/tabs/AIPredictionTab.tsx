@@ -590,7 +590,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
 
           <div className="mt-6 border-t border-slate-800/80 pt-3 flex items-center justify-between text-xs text-slate-400">
             <span>Mô hình đang chạy: <strong className="text-slate-200">{modelType.toUpperCase()}</strong></span>
-            <span className="text-[11px] text-slate-500">Đã kiểm định Walk-Forward OOS</span>
+            <span className="text-[11px] text-slate-500">Đã kiểm định OOS Thực chiến</span>
           </div>
         </div>
       </div>

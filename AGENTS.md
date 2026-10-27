@@ -73,9 +73,9 @@ Agent tự động kích hoạt kỹ năng tương ứng khi thực hiện tác 
 ## 3. KỶ LUẬT MACHINE LEARNING CHUỖI THỜI GIAN & TÀI CHÍNH
 
 1. **Tuyệt đối chống rò rỉ dữ liệu tương lai (No Lookahead Bias / Data Leakage):**
-   - Cấm sử dụng k-fold Cross-Validation ngẫu nhiên cho chuỗi thời gian. Bắt buộc dùng **Walk-forward Validation (Expanding / Rolling Window)** hoặc **TimeSeriesSplit**.
-   - Feature Scaling (MinMaxScaler, StandardScaler) và Imputation chỉ được `fit` trên tập Train, sau đó áp dụng `transform` lên Validation/Test.
-   - Nhãn $y_{t+k}$ (mặc định chu kỳ $T+3$ với $k=3$) phải được dịch chuyển thời gian đúng chuẩn (`shift(-3)` hoặc `shift(-k)`), các chỉ báo kỹ thuật tại thời điểm $t$ chỉ được tính dựa trên thông tin $t$ trở về trước.
+   - Cấm sử dụng k-fold Cross-Validation ngẫu nhiên cho chuỗi thời gian. Bắt buộc áp dụng **Quy trình Huấn luyện Thực chiến Liên tục (Continuous Production Retraining & Dynamic Validation Buffer)** kết hợp **Kỹ thuật Cô lập Ranh giới (Purged Horizon)** theo Marcos López de Prado.
+   - Feature Scaling (RobustScaler, StandardScaler) chỉ được `fit` trên tập Train lịch sử, sau đó lưu cố định thành artifact `.pkl` để áp dụng `transform` lên Validation và Live Inference.
+   - Nhãn $y_{t+k}$ (mặc định chu kỳ $T+3$ với $k=3$) phải được cô lập ranh giới (Purged Horizon) cắt bỏ đúng 3 phiên cuối ($T, T-1, T-2$) khi tạo nhãn, các chỉ báo kỹ thuật tại thời điểm $t$ chỉ được tính dựa trên thông tin quá khứ $t$ trở về trước.
 2. **Backtesting sát với thực tế thị trường chứng khoán Việt Nam:**
    - Khớp lệnh có độ trễ chu kỳ thanh toán ($T+2.5$ / $T+2$).
    - Trừ đủ chi phí giao dịch: tối thiểu **0.15% phí giao dịch mỗi chiều** và **0.1% thuế bán chứng khoán**.
@@ -107,13 +107,12 @@ graph TD
   - Biến động: Bollinger Bands, ATR, Historical Volatility.
   - Khối lượng: Volume SMA, OBV.
 * Phân tích tương quan đặc trưng, loại bỏ đa cộng tuyến.
-* Thiết lập khung chia tập dữ liệu Walk-forward nghiêm ngặt.
+* Thiết lập quy trình phân chia Huấn luyện Thực chiến Liên tục (`prepare_production_training_data`: tích lũy lịch sử đến T-40 làm Train, 40 phiên gần nhất làm Validation Buffer) và Purged Horizon nghiêm ngặt.
 
 ### Phase 3: Xây dựng & Huấn luyện Mô hình (Tương ứng Chương 2 & Chương 4)
-* Mô hình chính: PyTorch LSTM / GRU đa biến (Multivariate Time Series).
-* Mô hình đối chứng (Baseline): XGBoost / Random Forest.
-* Thiết lập Early Stopping, Loss function phù hợp (BCEWithLogitsLoss cho phân loại xu hướng Tăng/Giảm; MSE/Huber Loss cho dự báo giá).
-* Lưu trữ artifact mô hình (`.pth`, `.json`), tham số scaler (`.pkl`) và log thực nghiệm.
+* Mô hình chính: PyTorch Global LSTM đa biến (Multivariate Time Series) và LightGBM Classifier (GBDT dạng bảng).
+* Thiết lập Early Stopping trên Validation Buffer, Loss function phù hợp (CrossEntropyLoss với Class Weighting cân bằng phân phối 3 lớp; Softmax phân bổ xác suất).
+* Lưu trữ 4 artifact mô hình sản xuất (`production_lgb_t3.txt`, `production_lstm_t3.pth`, `production_scaler_t3.pkl`, `production_training_info_t3.json`).
 
 ### Phase 4: Động cơ Backtesting & Đánh giá Tài chính (Tương ứng Chương 4 & Chương 5)
 * Xây dựng engine mô phỏng giao dịch trừ phí thuế.
