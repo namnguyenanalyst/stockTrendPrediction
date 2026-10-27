@@ -3,6 +3,7 @@
 import React from "react";
 import { X } from "lucide-react";
 import { BacktestScopeType, SectorItem, StockSymbolInfo } from "@/lib/types";
+import { togglePortfolioSymbolList } from "@/lib/strategyStorage";
 
 interface ScopeSelectorProps {
   scopeType: BacktestScopeType;
@@ -34,13 +35,7 @@ export const ScopeSelector: React.FC<ScopeSelectorProps> = ({
   sectors,
 }) => {
   const togglePortfolioSymbol = (sym: string) => {
-    if (portfolioSymbols.includes(sym)) {
-      if (portfolioSymbols.length > 1) {
-        onChangePortfolioSymbols(portfolioSymbols.filter((s) => s !== sym));
-      }
-    } else {
-      onChangePortfolioSymbols([...portfolioSymbols, sym]);
-    }
+    onChangePortfolioSymbols(togglePortfolioSymbolList(portfolioSymbols, sym));
   };
 
   return (

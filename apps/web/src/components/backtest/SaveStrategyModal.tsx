@@ -9,6 +9,7 @@ import {
   Copy,
 } from "lucide-react";
 import { SavedStrategyItem } from "@/lib/types";
+import { generateCopyStrategyName } from "@/lib/strategyStorage";
 
 interface SaveStrategyModalProps {
   isOpen: boolean;
@@ -69,12 +70,7 @@ export const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
 
   const handleSaveAsCopy = () => {
     if (!name.trim()) return;
-    let copyName = `${name.trim()} (Bản sao)`;
-    let counter = 2;
-    while (savedStrategies.some((s) => s.name.toLowerCase() === copyName.toLowerCase())) {
-      copyName = `${name.trim()} (Bản sao ${counter})`;
-      counter++;
-    }
+    const copyName = generateCopyStrategyName(name, savedStrategies);
     onSave({
       name: copyName,
       status,

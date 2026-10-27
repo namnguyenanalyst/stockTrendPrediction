@@ -60,42 +60,17 @@ import { SellConditionAdjuster } from "@/components/backtest/SellConditionAdjust
 import { PortfolioBreakdownTable } from "@/components/backtest/PortfolioBreakdownTable";
 import { SaveStrategyModal } from "@/components/backtest/SaveStrategyModal";
 import { SavedStrategiesManager } from "@/components/backtest/SavedStrategiesManager";
-
-const STRATEGY_STORAGE_KEY = "stockpulse_saved_strategies_v1";
-
-function generateStrategyId(): string {
-  return `strat-${Date.now()}`;
-}
-
-function getCurrentDateTimeString(): string {
-  return new Date().toLocaleString("vi-VN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-/**
- * Tính toán động dải ngày 1 năm gần nhất dựa trên lịch thị trường chứng khoán Việt Nam:
- * - Nếu hôm nay là Thứ Bảy (day 6), lùi 1 ngày về phiên Thứ Sáu gần nhất.
- * - Nếu hôm nay là Chủ Nhật (day 0), lùi 2 ngày về phiên Thứ Sáu gần nhất.
- * - Ngày bắt đầu tự động tính lùi 365 ngày (1 năm) từ phiên gần nhất theo chuẩn DNSE.
- */
-function getDynamicDateRange(): { start: string; end: string } {
-  const now = new Date();
-  const day = now.getDay();
-  const rollback = day === 6 ? 1 : day === 0 ? 2 : 0;
-  const end = new Date(now);
-  end.setDate(end.getDate() - rollback);
-  const start = new Date(end);
-  start.setFullYear(start.getFullYear() - 1);
-  return {
-    start: start.toISOString().split("T")[0],
-    end: end.toISOString().split("T")[0],
-  };
-}
+import {
+  deleteStrategy,
+  getCurrentDateTimeString,
+  getDynamicDateRange,
+  loadSavedStrategies,
+  mapPresetToStrategyConfig,
+  persistSavedStrategies,
+  saveOrUpdateStrategy,
+  toggleStrategyStatus,
+  validateDateRange,
+} from "@/lib/strategyStorage";
 
 interface BacktestSimulatorTabProps {
   selectedSymbol: string;
@@ -118,26 +93,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
   // Mặc định luôn hiển thị giao diện Quản lý chiến thuật (manager) như Hình 2
   const [strategyViewMode, setStrategyViewMode] = useState<"manager" | "builder">("manager");
   const [savedStrategies, setSavedStrategies] = useState<SavedStrategyItem[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const raw = localStorage.getItem(STRATEGY_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          // Lọc bỏ triệt để các ID seed mẫu cũ nếu từng lưu vào trình duyệt của người dùng
-          const userOnly = parsed.filter(
-            (s: SavedStrategyItem) => s && s.id !== "strat-seed-1" && s.id !== "strat-seed-2"
-          );
-          if (userOnly.length !== parsed.length) {
-            localStorage.setItem(STRATEGY_STORAGE_KEY, JSON.stringify(userOnly));
-          }
-          return userOnly;
-        }
-      }
-    } catch {
-      // fallback nếu lỗi parse JSON
-    }
-    return [];
+    return loadSavedStrategies();
   });
   const [isSaveModalOpen, setIsSaveModalOpen] = useState<boolean>(false);
   const [activeStrategyId, setActiveStrategyId] = useState<string | null>(null);
@@ -259,22 +215,11 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
     if (e) e.preventDefault();
 
     // Kiểm tra ràng buộc dải ngày <= 365 ngày
-    try {
-      const s = new Date(startDate);
-      const end = new Date(endDate);
-      const diff = Math.round((end.getTime() - s.getTime()) / (1000 * 3600 * 24));
-      if (diff > 365) {
-        setSavedToast("Lỗi: Khoảng thời gian chọn không quá 1 năm (tối đa 365 ngày)!");
-        setTimeout(() => setSavedToast(null), 4000);
-        return;
-      }
-      if (diff < 0) {
-        setSavedToast("Lỗi: Ngày kết thúc phải sau ngày bắt đầu!");
-        setTimeout(() => setSavedToast(null), 4000);
-        return;
-      }
-    } catch {
-      // ignore
+    const dateValidation = validateDateRange(startDate, endDate);
+    if (!dateValidation.isValid) {
+      setSavedToast(dateValidation.error || "Lỗi dải ngày không hợp lệ!");
+      setTimeout(() => setSavedToast(null), 4000);
+      return;
     }
 
     setIsAdvancedLoading(true);
@@ -330,11 +275,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
             }
             return s;
           });
-          try {
-            localStorage.setItem(STRATEGY_STORAGE_KEY, JSON.stringify(updated));
-          } catch (e) {
-            console.debug("Lỗi lưu localStorage:", e);
-          }
+          persistSavedStrategies(updated);
           return updated;
         });
       }
@@ -391,109 +332,14 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
     setStrategyName(preset.name);
     setModelType(preset.model_type);
 
-    // Cấu hình phạm vi tương ứng
-    if (preset.category.includes("VN30")) {
-      setScopeType("index");
-      setSelectedIndex("VN30");
-    } else if (preset.category.includes("VN100")) {
-      setScopeType("index");
-      setSelectedIndex("VN100");
-    } else if (preset.category.includes("Ngân hàng")) {
-      setScopeType("sector");
-      setSelectedSector("Ngân hàng");
-    } else if (preset.target_symbols && preset.target_symbols.length > 1) {
-      setScopeType("portfolio");
-      setPortfolioSymbols(preset.target_symbols);
-    } else {
-      setScopeType("stock");
-      onSelectSymbol(preset.default_symbol);
-    }
-
-    const updatedSell: BacktestConditionFilter = {
-      ...sellConditions,
-      condition_logic: "OR",
-      take_profit_pct: preset.take_profit_pct > 0 ? preset.take_profit_pct : null,
-      stop_loss_pct: preset.stop_loss_pct > 0 ? preset.stop_loss_pct : null,
-      trailing_stop_pct: preset.trailing_stop_pct > 0 ? preset.trailing_stop_pct : null,
-    };
-    setSellConditions(updatedSell);
-
-    // Cấu hình điều kiện Mua chuẩn theo từng Preset DNSE
-    let updatedBuy: BacktestConditionFilter = {
-      condition_logic: "AND",
-      market_condition: "all",
-    };
-
-    if (preset.id === "dnse-01") {
-      updatedBuy = {
-        ...updatedBuy,
-        use_ema: true,
-        use_volume_spike: true,
-        use_price_cross: true,
-        foreign_net_buy: true,
-      };
-    } else if (preset.id === "dnse-02") {
-      updatedBuy = {
-        ...updatedBuy,
-        use_rsi: true,
-        rsi_threshold: 70,
-        use_volume_spike: true,
-      };
-    } else if (preset.id === "dnse-03") {
-      updatedBuy = {
-        ...updatedBuy,
-        use_pe: true,
-        max_pe: 16,
-        use_price_increase: true,
-        foreign_net_buy: true,
-      };
-    } else if (preset.id === "dnse-04") {
-      updatedBuy = {
-        ...updatedBuy,
-        use_stock_price: true,
-        min_stock_price: 10.0,
-        use_market_cap: true,
-        min_market_cap: 2000,
-        use_pe: true,
-        min_roe: 5.0,
-        growth_eps: true,
-      };
-    } else if (preset.id === "dnse-05") {
-      updatedBuy = {
-        ...updatedBuy,
-        use_pb: true,
-        max_pb: 1.0,
-        use_avg_trading_val: true,
-        min_avg_trading_val: 10,
-      };
-    } else if (preset.id === "dnse-06") {
-      updatedBuy = {
-        ...updatedBuy,
-        use_price_increase: true,
-        use_volume_spike: true,
-      };
-    } else if (preset.id === "dnse-07") {
-      updatedBuy = {
-        ...updatedBuy,
-        use_adx: true,
-        use_bb: true,
-      };
-    } else if (preset.id === "dnse-08") {
-      updatedBuy = {
-        ...updatedBuy,
-        use_price_cross: true,
-        use_rsi: true,
-        rsi_threshold: 57,
-      };
-    } else {
-      updatedBuy = {
-        ...updatedBuy,
-        use_ma: true,
-        use_rsi: true,
-      };
-    }
-
-    setBuyConditions(updatedBuy);
+    const config = mapPresetToStrategyConfig(preset, sellConditions);
+    setScopeType(config.scope_type);
+    if (config.symbol) onSelectSymbol(config.symbol);
+    if (config.index_name) setSelectedIndex(config.index_name);
+    if (config.sector_name) setSelectedSector(config.sector_name);
+    if (config.portfolio_symbols) setPortfolioSymbols(config.portfolio_symbols);
+    setBuyConditions(config.buy_conditions);
+    setSellConditions(config.sell_conditions);
 
     setSavedToast(`Đã nạp preset "${preset.name}". Nhấn Chạy kiểm thử để bắt đầu!`);
     setTimeout(() => setSavedToast(null), 3500);
@@ -509,8 +355,6 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
     status: "active" | "draft";
     overwriteExistingId?: string;
   }) => {
-    const now = getCurrentDateTimeString();
-
     const currentMetrics = metrics
       ? {
         roi_pct: metrics.total_return_pct,
@@ -526,48 +370,12 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
       }
       : undefined;
 
-    let updatedList: SavedStrategyItem[];
-    const targetId =
-      overwriteExistingId ||
-      savedStrategies.find((s) => s.name.trim().toLowerCase() === name.trim().toLowerCase())?.id;
-
-    if (targetId) {
-      // Cập nhật chiến lược đã tồn tại
-      updatedList = savedStrategies.map((s) => {
-        if (s.id === targetId) {
-          return {
-            ...s,
-            name,
-            status,
-            updated_at: now,
-            scope_type: scopeType,
-            symbol: selectedSymbol,
-            index_name: selectedIndex,
-            sector_name: selectedSector,
-            portfolio_symbols: portfolioSymbols,
-            start_date: startDate,
-            end_date: endDate,
-            initial_capital: initialCapital,
-            model_type: modelType,
-            slippage_rate: slippageRate,
-            use_advanced_settings: useAdvancedSettings,
-            buy_conditions: buyConditions,
-            sell_conditions: sellConditions,
-            last_metrics: currentMetrics || s.last_metrics,
-          };
-        }
-        return s;
-      });
-      setActiveStrategyId(targetId);
-      setSavedToast(`Đã cập nhật chiến lược "${name}" thành công!`);
-    } else {
-      // Thêm chiến lược mới
-      const newStrategy: SavedStrategyItem = {
-        id: generateStrategyId(),
+    const { updatedList, activeId, action } = saveOrUpdateStrategy(
+      savedStrategies,
+      {
         name,
         status,
-        created_at: now,
-        updated_at: now,
+        overwriteExistingId,
         scope_type: scopeType,
         symbol: selectedSymbol,
         index_name: selectedIndex,
@@ -581,21 +389,18 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
         use_advanced_settings: useAdvancedSettings,
         buy_conditions: buyConditions,
         sell_conditions: sellConditions,
-        last_metrics: currentMetrics,
-      };
-      updatedList = [newStrategy, ...savedStrategies];
-      setActiveStrategyId(newStrategy.id);
-      setSavedToast(`Đã lưu chiến lược mới "${name}" thành công!`);
-    }
+        metrics: currentMetrics,
+      }
+    );
 
     setSavedStrategies(updatedList);
+    setActiveStrategyId(activeId);
     setStrategyName(name);
-    try {
-      localStorage.setItem(STRATEGY_STORAGE_KEY, JSON.stringify(updatedList));
-    } catch (e) {
-      console.debug("Lỗi lưu localStorage:", e);
-    }
-
+    setSavedToast(
+      action === "created"
+        ? `Đã lưu chiến lược mới "${name}" thành công!`
+        : `Đã cập nhật chiến lược "${name}" thành công!`
+    );
     setTimeout(() => setSavedToast(null), 4000);
   };
 
@@ -634,29 +439,12 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
     const targetStrat = savedStrategies.find((s) => s.id === strategyId);
     if (!targetStrat) return;
 
-    const nextStatus: "active" | "draft" = targetStrat.status === "active" ? "draft" : "active";
-    const targetName = targetStrat.name;
-
-    const updatedList = savedStrategies.map((s) => {
-      if (s.id === strategyId) {
-        return {
-          ...s,
-          status: nextStatus,
-          updated_at: getCurrentDateTimeString(),
-        };
-      }
-      return s;
-    });
-
+    const { updatedList, nextStatus } = toggleStrategyStatus(savedStrategies, strategyId);
     setSavedStrategies(updatedList);
-    try {
-      localStorage.setItem(STRATEGY_STORAGE_KEY, JSON.stringify(updatedList));
-    } catch (e) {
-      console.debug("Lỗi cập nhật localStorage:", e);
-    }
 
     setSavedToast(
-      `Chiến lược "${targetName}" đã chuyển sang: ${nextStatus === "active" ? "Triển khai (Đang theo dõi)" : "Chưa triển khai (Bản nháp)"
+      `Chiến lược "${targetStrat.name}" đã chuyển sang: ${
+        nextStatus === "active" ? "Triển khai (Đang theo dõi)" : "Chưa triển khai (Bản nháp)"
       }`
     );
     setTimeout(() => setSavedToast(null), 3500);
@@ -668,15 +456,12 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
     if (!strat) return;
 
     if (window.confirm(`Bạn có chắc chắn muốn xóa chiến lược "${strat.name}" khỏi danh sách?`)) {
-      const updatedList = savedStrategies.filter((s) => s.id !== strategyId);
-      setSavedStrategies(updatedList);
-      try {
-        localStorage.setItem(STRATEGY_STORAGE_KEY, JSON.stringify(updatedList));
-      } catch (e) {
-        console.debug("Lỗi xóa localStorage:", e);
+      const { updatedList, deleted } = deleteStrategy(savedStrategies, strategyId);
+      if (deleted) {
+        setSavedStrategies(updatedList);
+        setSavedToast(`Đã xóa chiến lược "${strat.name}"`);
+        setTimeout(() => setSavedToast(null), 3000);
       }
-      setSavedToast(`Đã xóa chiến lược "${strat.name}"`);
-      setTimeout(() => setSavedToast(null), 3000);
     }
   };
 

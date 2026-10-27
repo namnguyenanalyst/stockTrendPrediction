@@ -14,6 +14,7 @@ import {
   Activity,
 } from "lucide-react";
 import { SavedStrategyItem } from "@/lib/types";
+import { filterStrategies } from "@/lib/strategyStorage";
 
 interface SavedStrategiesManagerProps {
   strategies: SavedStrategyItem[];
@@ -41,25 +42,8 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
   const activeCount = strategies.filter((s) => s.status === "active").length;
   const draftCount = strategies.filter((s) => s.status === "draft").length;
 
-  // Lọc danh sách chiến lược
-  const filteredStrategies = strategies.filter((s) => {
-    // Lọc theo tab trạng thái
-    if (filterStatus === "active" && s.status !== "active") return false;
-    if (filterStatus === "draft" && s.status !== "draft") return false;
-
-    // Lọc theo từ khóa tìm kiếm
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchName = s.name.toLowerCase().includes(q);
-      const matchScope =
-        (s.symbol && s.symbol.toLowerCase().includes(q)) ||
-        (s.index_name && s.index_name.toLowerCase().includes(q)) ||
-        (s.sector_name && s.sector_name.toLowerCase().includes(q)) ||
-        (s.portfolio_symbols && s.portfolio_symbols.some((sym) => sym.toLowerCase().includes(q)));
-      return matchName || matchScope;
-    }
-    return true;
-  });
+  // Lọc danh sách chiến lược thông qua hàm nghiệp vụ chuẩn hóa
+  const filteredStrategies = filterStrategies(strategies, filterStatus, searchQuery);
 
   return (
     <div className="space-y-4 animate-fade-in">
