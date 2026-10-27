@@ -932,9 +932,10 @@ def backtest_symbol_oos(
         FEATURE_COLS,
         compute_features_per_symbol,
     )
+    from vn_stock.config import DEFAULT_HORIZON_DAYS, DEFAULT_TREND_THRESHOLD_3D
     from vn_stock.splitting_data import (
         apply_study_window,
-        create_labels_per_symbol,
+        create_multi_day_labels,
         generate_walk_forward_windows,
     )
 
@@ -943,7 +944,9 @@ def backtest_symbol_oos(
     df_raw = load_panel_dataset()
     df_feat = compute_features_per_symbol(df_raw, drop_na=True)
     df_study = apply_study_window(df_feat)
-    df_labeled = create_labels_per_symbol(df_study)
+    df_labeled = create_multi_day_labels(
+        df_study, horizon=DEFAULT_HORIZON_DAYS, threshold=DEFAULT_TREND_THRESHOLD_3D
+    )
     w3 = generate_walk_forward_windows(df_labeled)[2]
     test_df = w3["test_df"].copy()
 
@@ -1026,15 +1029,25 @@ def backtest_symbol_oos(
 
 
 def backtest_all_symbols(
-    symbols: list[str] | None = None,
+    symbols: list[str] | str | None = None,
     model_type: str = "lightgbm",
     initial_capital: float = INITIAL_CAPITAL,
     slippage_rate: float = 0.0005,
 ) -> pd.DataFrame:
-    """Chạy Backtest OOS đồng loạt trên danh mục cổ phiếu và xuất bảng tổng hợp đối chứng."""
-    from vn_stock.config import DEFAULT_SYMBOLS
+    """Chạy Backtest OOS đồng loạt trên danh mục cổ phiếu (VN30 hoặc CORE) và xuất bảng tổng hợp đối chứng."""
+    from vn_stock.config import DEFAULT_SYMBOLS, VN30_SYMBOLS
 
-    target_symbols = symbols or DEFAULT_SYMBOLS
+    if symbols is None or (isinstance(symbols, str) and symbols.upper() in ["VN30", "ALL"]):
+        target_symbols = list(VN30_SYMBOLS)
+    elif isinstance(symbols, str) and symbols.upper() == "CORE":
+        target_symbols = list(DEFAULT_SYMBOLS)
+    elif isinstance(symbols, str):
+        target_symbols = [symbols.upper()]
+    elif isinstance(symbols, list):
+        target_symbols = [s.upper() for s in symbols]
+    else:
+        target_symbols = list(VN30_SYMBOLS)
+
     rows = []
 
     for sym in target_symbols:
@@ -2164,9 +2177,16 @@ if __name__ == "__main__":
         help="Loại mô hình AI.",
     )
     parser.add_argument(
+        "--scope",
+        type=str,
+        default="VN30",
+        choices=["VN30", "CORE"],
+        help="Phạm vi danh mục kiểm thử: 'VN30' (toàn bộ 30 mã) hoặc 'CORE' (5 mã cốt lõi).",
+    )
+    parser.add_argument(
         "--all-symbols",
         action="store_true",
-        help="Chạy đồng loạt trên cả 5 mã (VIC, HPG, FPT, VNM, MWG).",
+        help="Chạy đồng loạt trên toàn bộ danh mục (--scope, mặc định VN30).",
     )
     parser.add_argument(
         "--monte-carlo",
@@ -2184,9 +2204,13 @@ if __name__ == "__main__":
 
     if args.all_symbols:
         print("=" * 80)
-        print(f"BẢNG TỔNG HỢP KIỂM THỬ BACKTEST T+2 TRÊN TẬP OOS ({args.model.upper()})")
+        print(f"BẢNG TỔNG HỢP KIỂM THỬ BACKTEST T+2 TRÊN TẬP OOS ({args.model.upper()} - {args.scope})")
         print("=" * 80)
-        summary_df = backtest_all_symbols(model_type=args.model, initial_capital=args.capital)
+        summary_df = backtest_all_symbols(
+            symbols=args.scope,
+            model_type=args.model,
+            initial_capital=args.capital,
+        )
         print(summary_df.to_string(index=False))
         print("=" * 80)
     else:
@@ -2469,7 +2493,7 @@ def get_recent_strategy_signals() -> list[dict[str, Any]]:
             "stop_price": 60200,
             "confidence": 86.7,
             "timestamp": "Hôm qua",
-            "status": "ĐÃ KHỚP T+1",
+            "status": "ĐÃ KHỚP T+2",
         },
         {
             "signal_id": "sig_05",

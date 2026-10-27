@@ -37,6 +37,7 @@ import lightgbm as lgb
 
 from vn_stock.config import (
     DEFAULT_EARLY_STOPPING_ROUNDS,
+    DEFAULT_HORIZON_DAYS,
     DEFAULT_LABEL_THRESHOLD,
     DEFAULT_LSTM_BATCH_SIZE,
     DEFAULT_LSTM_DROPOUT,
@@ -46,6 +47,7 @@ from vn_stock.config import (
     DEFAULT_LSTM_NUM_LAYERS,
     DEFAULT_LSTM_WEIGHT_DECAY,
     DEFAULT_SEQ_LENGTH,
+    DEFAULT_TREND_THRESHOLD_3D,
     MODELS_DIR,
     NUM_CLASSES,
     RANDOM_SEED,
@@ -284,10 +286,12 @@ def train_walk_forward_pipeline(
     seq_length: int = DEFAULT_SEQ_LENGTH,
     save_artifacts: bool = True,
     models_dir: Path = MODELS_DIR,
+    horizon: int = DEFAULT_HORIZON_DAYS,
+    threshold: float = DEFAULT_TREND_THRESHOLD_3D,
 ) -> dict[str, Any]:
     """
     Quy trình điều phối toàn diện huấn luyện và kiểm định Walk-Forward 3 cửa sổ:
-    1. Chuẩn bị dữ liệu bảng đa mã và nhãn xu hướng 3 lớp có ngưỡng.
+    1. Chuẩn bị dữ liệu bảng đa mã và nhãn xu hướng 3 lớp có ngưỡng (chuẩn chu kỳ T+3).
     2. Chia 3 cửa sổ Walk-Forward chuẩn hóa độc lập (Zero Lookahead Bias).
     3. Huấn luyện đối chứng Naive Baseline -> LightGBM -> PyTorch LSTM.
     4. Tính toán bảng tổng hợp Mean ± Std qua 3 cửa sổ.
@@ -303,7 +307,7 @@ def train_walk_forward_pipeline(
 
         feat_df = compute_features_per_symbol(raw_panel, drop_na=True)
         study_df = apply_study_window(feat_df)
-        labeled_df = create_labels_per_symbol(study_df, threshold=DEFAULT_LABEL_THRESHOLD)
+        labeled_df = create_multi_day_labels(study_df, horizon=horizon, threshold=threshold)
     else:
         labeled_df = df.copy()
 
@@ -471,15 +475,25 @@ def train_production_model(
     """
     from vn_stock.config import DEFAULT_SYMBOLS, VN30_SYMBOLS
 
-    if isinstance(symbols, str) and symbols.upper() == "VN30":
+    if symbols is None or (isinstance(symbols, str) and symbols.upper() in ["VN30", "ALL"]):
         target_symbols = list(VN30_SYMBOLS)
         scope_name = "VN30"
-    elif isinstance(symbols, list):
-        target_symbols = symbols
-        scope_name = "VN30" if len(symbols) >= 20 else "CUSTOM"
-    else:
+    elif isinstance(symbols, str) and symbols.upper() == "CORE":
         target_symbols = list(DEFAULT_SYMBOLS)
         scope_name = "CORE"
+    elif isinstance(symbols, str):
+        target_symbols = [symbols.upper()]
+        scope_name = "SINGLE"
+    elif isinstance(symbols, list):
+        target_symbols = [s.upper() for s in symbols]
+        scope_name = (
+            "VN30"
+            if len(target_symbols) >= 20
+            else ("CORE" if set(target_symbols) == set(DEFAULT_SYMBOLS) else "CUSTOM")
+        )
+    else:
+        target_symbols = list(VN30_SYMBOLS)
+        scope_name = "VN30"
 
     logger.info("=== BẮT ĐẦU HUẤN LUYỆN MÔ HÌNH THỰC CHIẾN (PRODUCTION MODEL) ===")
     logger.info(
@@ -718,6 +732,13 @@ if __name__ == "__main__":
     )
     parser.add_argument("--symbol", type=str, default=None, help="Mã cổ phiếu (tùy chọn)")
     parser.add_argument(
+        "--scope",
+        type=str,
+        default="VN30",
+        choices=["VN30", "CORE"],
+        help="Phạm vi danh mục huấn luyện: 'VN30' (30 mã rổ chỉ số) hoặc 'CORE' (5 mã cốt lõi)",
+    )
+    parser.add_argument(
         "--production",
         action="store_true",
         help="Huấn luyện mô hình thực chiến (100% dữ liệu đến T/T-1, nhãn T+3)",
@@ -740,7 +761,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.production:
+        train_symbols = [args.symbol.upper()] if args.symbol else args.scope
         train_production_model(
+            symbols=train_symbols,
             horizon=args.horizon,
             threshold=args.threshold,
             val_buffer_days=args.val_buffer,

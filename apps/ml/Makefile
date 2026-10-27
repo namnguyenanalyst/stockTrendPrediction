@@ -11,7 +11,7 @@ help:
 	@echo "  make data      - Thu thập và lưu dữ liệu chứng khoán vào data/raw/"
 	@echo "  make features  - Tính toán các chỉ báo kỹ thuật tài chính"
 	@echo "  make train     - Huấn luyện mô hình PyTorch LSTM và lưu checkpoint"
-	@echo "  make predict   - Chạy suy luận dự báo mức giá phiên tiếp theo"
+	@echo "  make predict   - Chạy suy luận dự báo chu kỳ T+3 và Quỹ đạo 3 phiên"
 	@echo "  make backtest  - Kiểm thử chiến lược giao dịch với chi phí thuế phí"
 	@echo "  make test      - Chạy toàn bộ unit test với pytest"
 	@echo "  make lint      - Kiểm tra mã nguồn với ruff"

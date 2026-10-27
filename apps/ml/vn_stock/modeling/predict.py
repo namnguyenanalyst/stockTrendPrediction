@@ -447,7 +447,8 @@ def predict_next_day(
     models_dir: Path = MODELS_DIR,
 ) -> dict[str, Any]:
     """
-    Hàm giao tiếp tương thích ngược: gọi `predict_trend` với mô hình LSTM mặc định.
+    Hàm giao tiếp tương thích ngược: chuyển hướng gọi `predict_trend` chu kỳ T+3 mặc định.
+    Khuyến nghị sử dụng trực tiếp `predict_trend(symbol=..., horizon_days=3)`.
     """
     return predict_trend(
         symbol=symbol, model_type="lstm", seq_length=seq_length, models_dir=models_dir

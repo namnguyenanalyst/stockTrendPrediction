@@ -60,62 +60,40 @@ def apply_study_window(
 def create_labels_per_symbol(
     df: pd.DataFrame,
     threshold: float = 0.01,
+    horizon: int = 1,
     close_col: str = "Close",
     symbol_col: str = "Symbol",
     date_col: str = "Date",
 ) -> pd.DataFrame:
     """
-    Tạo nhãn xu hướng 3 lớp Next-Day (T+1) có ngưỡng độc lập theo từng mã cổ phiếu.
+    Tạo nhãn xu hướng 3 lớp có ngưỡng độc lập theo từng mã cổ phiếu (mặc định horizon=1 cho tương thích ngược).
+    Khuyến nghị sử dụng trực tiếp `create_multi_day_labels` cho các pipeline thực chiến T+3 (horizon=3, threshold=0.02).
 
     Công thức:
-        Next_Return = (Close(t+1) - Close(t)) / Close(t)
+        Next_Return = (Close(t+horizon) - Close(t)) / Close(t)
         - Nhãn 0 (Giảm): Next_Return <= -threshold
         - Nhãn 1 (Đi ngang): -threshold < Next_Return < threshold
         - Nhãn 2 (Tăng): Next_Return >= threshold
 
-    Quy tắc:
-    - Bắt buộc gom nhóm theo từng mã cổ phiếu (groupby Symbol) trước khi shift(-1) để ngăn rò rỉ
-      hoặc lấy nhầm giá của mã khác.
-    - Dòng cuối cùng của mỗi mã (không có ngày giao dịch tiếp theo t+1 trong lịch sử) sẽ bị loại bỏ
-      do Next_Return là NaN.
-
     Args:
         df: DataFrame chứa dữ liệu đa mã.
         threshold: Ngưỡng lọc nhiễu nhãn xu hướng (mặc định 0.01 tương ứng +-1.0%).
+        horizon: Số phiên nhìn về tương lai (mặc định 1 cho T+1).
         close_col: Tên cột giá đóng cửa.
         symbol_col: Tên cột mã cổ phiếu.
         date_col: Tên cột ngày giao dịch.
 
     Returns:
-        pd.DataFrame đã có thêm cột 'Label' (kiểu int64).
+        pd.DataFrame đã có thêm cột 'Label' (kiểu int64) và 'Target_Return'.
     """
-    if close_col not in df.columns:
-        raise ValueError(f"DataFrame phải chứa cột giá đóng cửa '{close_col}'.")
-    if symbol_col not in df.columns or date_col not in df.columns:
-        raise ValueError(f"DataFrame phải chứa cột '{symbol_col}' và '{date_col}'.")
-
-    dfs = []
-    for _, grp in df.groupby(symbol_col):
-        g = grp.sort_values(date_col).copy()
-        next_close = g[close_col].shift(-1)
-        next_return = (next_close - g[close_col]) / g[close_col]
-
-        conditions = [
-            next_return <= -threshold,
-            (next_return > -threshold) & (next_return < threshold),
-            next_return >= threshold,
-        ]
-        g["Label"] = np.select(conditions, [0, 1, 2], default=np.nan)
-        # Loại bỏ dòng cuối cùng của từng mã vì không có phiên t+1
-        g = g.dropna(subset=["Label"]).reset_index(drop=True)
-        g["Label"] = g["Label"].astype(int)
-        dfs.append(g)
-
-    if not dfs:
-        return pd.DataFrame(columns=list(df.columns) + ["Label"])
-
-    res = pd.concat(dfs, ignore_index=True)
-    return res.sort_values([date_col, symbol_col]).reset_index(drop=True)
+    return create_multi_day_labels(
+        df=df,
+        horizon=horizon,
+        threshold=threshold,
+        close_col=close_col,
+        symbol_col=symbol_col,
+        date_col=date_col,
+    )
 
 
 def drop_ignored_labels(X: Any, y: np.ndarray) -> tuple[Any, np.ndarray]:

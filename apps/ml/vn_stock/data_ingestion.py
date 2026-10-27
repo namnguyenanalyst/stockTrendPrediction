@@ -13,6 +13,7 @@ from vn_stock.config import (
     DEFAULT_SYMBOLS,
     PANEL_DATA_DIR,
     RAW_DATA_DIR,
+    VN30_SYMBOLS,
     get_default_end_date,
 )
 from vn_stock.market_session import (
@@ -349,14 +350,34 @@ def fetch_stock_data(
     return cleaned_df
 
 
+def resolve_target_symbols(symbols: list[str] | str | None = None) -> list[str]:
+    """
+    Chuẩn hóa danh sách mã cổ phiếu mục tiêu:
+    - None, 'VN30', 'ALL' -> Toàn bộ 30 mã VN30 (VN30_SYMBOLS)
+    - 'CORE' -> 5 mã cốt lõi (DEFAULT_SYMBOLS: VIC, HPG, FPT, VNM, MWG)
+    - list/tuple/set -> Danh sách mã viết hoa
+    - str đơn -> [str.upper()]
+    """
+    if symbols is None:
+        return list(VN30_SYMBOLS)
+    if isinstance(symbols, str):
+        sym_clean = symbols.strip().upper()
+        if sym_clean in ["VN30", "ALL"]:
+            return list(VN30_SYMBOLS)
+        if sym_clean == "CORE":
+            return list(DEFAULT_SYMBOLS)
+        return [sym_clean]
+    return [str(s).strip().upper() for s in symbols]
+
+
 def sync_latest_market_data(
-    symbols: list[str] | None = None,
+    symbols: list[str] | str | None = None,
     force: bool = False,
 ) -> dict[str, Any]:
     """
     Tự động đồng bộ nến thị trường mới nhất tới phiên chốt hợp lệ gần nhất (T hoặc T-1).
-    - Cập nhật VNINDEX
-    - Cập nhật các mã được chỉ định (mặc định DEFAULT_SYMBOLS = ['VIC', 'HPG', 'FPT', 'VNM', 'MWG'])
+    - Cập nhật chỉ số thị trường (VNINDEX, VN30)
+    - Cập nhật các mã được chỉ định (mặc định toàn bộ 30 mã VN30)
     - Cập nhật phân vùng Panel dataset interim
     """
     session_info = get_target_market_session_info()
@@ -370,16 +391,17 @@ def sync_latest_market_data(
     synced_symbols = []
     errors = {}
 
-    # 1. Đồng bộ VNINDEX
-    try:
-        fetch_daily_index(index_id="VNINDEX", end_date=target_date, force_refresh=force)
-        synced_symbols.append("VNINDEX")
-    except Exception as exc:
-        logger.error("Lỗi đồng bộ VNINDEX: %s", exc)
-        errors["VNINDEX"] = str(exc)
+    # 1. Đồng bộ các chỉ số thị trường chính
+    for idx_id in ["VNINDEX", "VN30"]:
+        try:
+            fetch_daily_index(index_id=idx_id, end_date=target_date, force_refresh=force)
+            synced_symbols.append(idx_id)
+        except Exception as exc:
+            logger.warning("Lỗi đồng bộ chỉ số %s: %s", idx_id, exc)
+            errors[idx_id] = str(exc)
 
     # 2. Đồng bộ các mã chỉ định
-    target_list = symbols or DEFAULT_SYMBOLS
+    target_list = resolve_target_symbols(symbols)
     for sym in target_list:
         try:
             fetch_stock_data(symbol=sym, end_date=target_date, force_refresh=force)
@@ -414,21 +436,13 @@ def build_panel_dataset(
     Thu thập dữ liệu đa mã, tích hợp chỉ số VN-Index và lưu dạng Parquet phân vùng theo Symbol.
 
     Args:
-        symbols: Danh sách mã, hoặc 'VN30' để tự lấy 30 mã rổ chỉ số, hoặc None (5 mã mặc định).
+        symbols: Danh sách mã, hoặc 'VN30'/'ALL' (30 mã VN30), 'CORE' (5 mã cốt lõi), hoặc None (toàn bộ VN30).
         start_date: Ngày bắt đầu.
         end_date: Ngày kết thúc.
         save_to_interim: Lưu phân vùng Parquet vào data/interim/panel/.
         force_refresh: Bắt buộc tải lại từ API thay vì đọc cache.
     """
-    ssi_client = SSIFastConnectClient()
-    if symbols is None:
-        target_symbols = DEFAULT_SYMBOLS
-    elif isinstance(symbols, str) and symbols.upper() in ["VN30", "VN100"]:
-        target_symbols = ssi_client.get_index_components(symbols.upper())
-    elif isinstance(symbols, str):
-        target_symbols = [symbols.upper()]
-    else:
-        target_symbols = [s.upper() for s in symbols]
+    target_symbols = resolve_target_symbols(symbols)
 
     dfs: list[pd.DataFrame] = []
     for sym in target_symbols:
@@ -442,7 +456,15 @@ def build_panel_dataset(
             raise InsufficientDataCoverageError(
                 f"Mã {sym} không bao phủ đủ dải ngày yêu cầu [{start_date} -> {end_date}]. Dừng tạo panel."
             )
-        dfs.append(df_sym)
+        # Lọc đúng dải ngày yêu cầu để đồng bộ nhất quán với chỉ số VN-Index
+        effective_end = end_date or get_default_end_date()
+        df_sym_filtered = df_sym.copy()
+        df_sym_filtered["Date"] = pd.to_datetime(df_sym_filtered["Date"])
+        df_sym_filtered = df_sym_filtered[
+            (df_sym_filtered["Date"] >= pd.to_datetime(start_date))
+            & (df_sym_filtered["Date"] <= pd.to_datetime(effective_end))
+        ].sort_values("Date").reset_index(drop=True)
+        dfs.append(df_sym_filtered)
 
     panel_df = pd.concat(dfs, ignore_index=True)
     panel_df = panel_df.sort_values(["Date", "Symbol"]).reset_index(drop=True)

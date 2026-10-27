@@ -724,7 +724,7 @@ def test_backtest_symbol_oos_and_all_symbols():
         patch("vn_stock.data_ingestion.load_panel_dataset", return_value=pd.DataFrame()),
         patch("vn_stock.features.compute_features_per_symbol", return_value=pd.DataFrame()),
         patch("vn_stock.splitting_data.apply_study_window", return_value=pd.DataFrame()),
-        patch("vn_stock.splitting_data.create_labels_per_symbol", return_value=pd.DataFrame()),
+        patch("vn_stock.splitting_data.create_multi_day_labels", return_value=pd.DataFrame()),
         patch("vn_stock.splitting_data.generate_walk_forward_windows", return_value=mock_windows),
     ):
         res_vic = backtest_symbol_oos(symbol="VIC", model_type="lightgbm")
