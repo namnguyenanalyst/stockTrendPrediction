@@ -15,7 +15,7 @@ interface NavbarProps {
   setSelectedSymbol: (symbol: string) => void;
 }
 
-const CORE_SYMBOLS = ["VIC", "HPG", "FPT", "VNM", "MWG"];
+const QUICK_SYMBOLS = ["VN30", "VNINDEX", "VIC", "HPG", "FPT", "VNM", "MWG", "TCB", "SSI"];
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
@@ -48,15 +48,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Quick Symbol Switcher (Chỉ hiển thị khi không ở Tab 1) */}
         {activeTab !== "market" && (
-          <div className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900/90 p-1">
+          <div className="flex flex-wrap items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/90 p-1">
             <span className="hidden px-2 text-xs font-medium text-slate-400 md:inline">
-              Mã CP:
+              Mục tiêu:
             </span>
-            {CORE_SYMBOLS.map((sym) => (
+            {QUICK_SYMBOLS.map((sym) => (
               <button
                 key={sym}
                 onClick={() => setSelectedSymbol(sym)}
-                className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                className={`rounded-md px-2 py-1 text-xs font-semibold transition-all ${
                   selectedSymbol === sym
                     ? "bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/40"
                     : "text-slate-300 hover:bg-slate-800 hover:text-slate-100"

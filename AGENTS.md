@@ -75,7 +75,7 @@ Agent tự động kích hoạt kỹ năng tương ứng khi thực hiện tác 
 1. **Tuyệt đối chống rò rỉ dữ liệu tương lai (No Lookahead Bias / Data Leakage):**
    - Cấm sử dụng k-fold Cross-Validation ngẫu nhiên cho chuỗi thời gian. Bắt buộc dùng **Walk-forward Validation (Expanding / Rolling Window)** hoặc **TimeSeriesSplit**.
    - Feature Scaling (MinMaxScaler, StandardScaler) và Imputation chỉ được `fit` trên tập Train, sau đó áp dụng `transform` lên Validation/Test.
-   - Nhãn $y_{t+1}$ hoặc $y_{t+k}$ phải được dịch chuyển thời gian đúng chuẩn (`shift(-1)`), các chỉ báo kỹ thuật tại thời điểm $t$ chỉ được tính dựa trên thông tin $t$ trở về trước.
+   - Nhãn $y_{t+k}$ (mặc định chu kỳ $T+3$ với $k=3$) phải được dịch chuyển thời gian đúng chuẩn (`shift(-3)` hoặc `shift(-k)`), các chỉ báo kỹ thuật tại thời điểm $t$ chỉ được tính dựa trên thông tin $t$ trở về trước.
 2. **Backtesting sát với thực tế thị trường chứng khoán Việt Nam:**
    - Khớp lệnh có độ trễ chu kỳ thanh toán ($T+2.5$ / $T+2$).
    - Trừ đủ chi phí giao dịch: tối thiểu **0.15% phí giao dịch mỗi chiều** và **0.1% thuế bán chứng khoán**.

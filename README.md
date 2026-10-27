@@ -72,7 +72,7 @@ make features
 # Huấn luyện mô hình PyTorch LSTM
 make train
 
-# Chạy suy luận dự báo phiên T+1 và phát sinh tín hiệu đầu tư
+# Chạy suy luận dự báo chu kỳ T+3 và Quỹ đạo 3 phiên
 make predict
 
 # Kiểm thử chiến lược đầu tư (Backtesting có trừ 0.15% phí và 0.1% thuế)
