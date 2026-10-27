@@ -17,6 +17,8 @@ class PredictionSignalRequest(BaseModel):
 
 class BatchPredictionRequest(BaseModel):
     model_type: str = Field(default="lightgbm", description="Loại mô hình AI ('lightgbm' hoặc 'lstm')")
+    symbols: list[str] | None = Field(default=None, description="Danh sách mã cổ phiếu tùy chọn")
+    scope: str = Field(default="VN30", description="Phạm vi danh mục: 'VN30' hoặc 'CORE'")
 
 
 @router.get(
@@ -53,27 +55,32 @@ async def predict_signal_post(request: PredictionSignalRequest) -> PredictionRes
 @router.get(
     "/batch",
     response_model=BatchPredictionResponse,
-    summary="Dự báo đồng loạt cho 5 cổ phiếu trọng tâm (GET)",
-    description="Chạy dự báo xu hướng song song cho danh mục 5 mã VN30: VIC, HPG, FPT, VNM, MWG.",
+    summary="Dự báo đồng loạt cho danh mục cổ phiếu (GET)",
+    description="Chạy dự báo xu hướng song song cho danh mục cổ phiếu (mặc định toàn bộ 30 mã VN30 hoặc 5 mã CORE).",
 )
 async def predict_batch(
     model_type: str = Query("lightgbm", description="Loại mô hình AI ('lightgbm' hoặc 'lstm')"),
+    scope: str = Query("VN30", description="Phạm vi danh mục: 'VN30' hoặc 'CORE'"),
 ) -> BatchPredictionResponse:
-    """Endpoint dự báo danh mục 5 mã trọng tâm qua GET."""
-    return prediction_service.predict_batch_signals(model_type=model_type)
+    """Endpoint dự báo danh mục cổ phiếu qua GET."""
+    return prediction_service.predict_batch_signals(model_type=model_type, scope=scope)
 
 
 @router.post(
     "/batch",
     response_model=BatchPredictionResponse,
-    summary="Dự báo đồng loạt cho 5 cổ phiếu trọng tâm (POST)",
-    description="Chạy dự báo xu hướng song song cho danh mục 5 mã qua POST body.",
+    summary="Dự báo đồng loạt cho danh mục cổ phiếu (POST)",
+    description="Chạy dự báo xu hướng song song cho danh mục cổ phiếu qua POST body.",
 )
 async def predict_batch_post(
     request: BatchPredictionRequest,
 ) -> BatchPredictionResponse:
-    """Endpoint dự báo danh mục 5 mã trọng tâm qua POST."""
-    return prediction_service.predict_batch_signals(model_type=request.model_type)
+    """Endpoint dự báo danh mục cổ phiếu qua POST."""
+    return prediction_service.predict_batch_signals(
+        model_type=request.model_type,
+        symbols=request.symbols,
+        scope=request.scope,
+    )
 
 
 @router.post(

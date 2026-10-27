@@ -22,8 +22,14 @@ class Settings(BaseSettings):
     DATA_DIR: Path = ML_APP_DIR / "data"
     MODELS_DIR: Path = ML_APP_DIR / "models"
 
-    # Danh mục mã cổ phiếu hỗ trợ
+    # Danh mục mã cổ phiếu và chỉ số hỗ trợ
     CORE_SYMBOLS: list[str] = ["VIC", "HPG", "FPT", "VNM", "MWG"]
+    VN30_SYMBOLS: list[str] = [
+        "ACB", "BCM", "BID", "BVH", "CTG", "FPT", "GAS", "GVR", "HDB", "HPG",
+        "MBB", "MSN", "MWG", "PLX", "POW", "SAB", "SHB", "SSB", "SSI", "STB",
+        "TCB", "TPB", "VCB", "VHM", "VIB", "VIC", "VJC", "VNM", "VPB", "VRE",
+    ]
+    SUPPORTED_INDICES: list[str] = ["VNINDEX", "VN30"]
     AUTO_SYNC_ON_STARTUP: bool = True
 
     model_config = SettingsConfigDict(

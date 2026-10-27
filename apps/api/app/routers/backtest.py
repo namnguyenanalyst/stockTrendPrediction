@@ -69,10 +69,11 @@ async def run_simulation(
     "/summary",
     response_model=BacktestSummaryResponse,
     summary="Bảng tổng hợp hiệu quả Backtest OOS trên các mã cổ phiếu",
-    description="Truy vấn kết quả so sánh ROI, Sharpe, Sortino, MDD và Win Rate trên danh mục 5 mã trọng tâm.",
+    description="Truy vấn kết quả so sánh ROI, Sharpe, Sortino, MDD và Win Rate trên danh mục cổ phiếu (mặc định VN30 hoặc CORE).",
 )
 async def get_summary(
     model_type: str = Query("lightgbm", description="Loại mô hình AI ('lightgbm' hoặc 'lstm')"),
+    scope: str = Query("CORE", description="Phạm vi danh mục: 'CORE' (5 mã trọng tâm) hoặc 'VN30' (toàn bộ 30 mã)"),
 ) -> BacktestSummaryResponse:
     """Endpoint lấy bảng tổng hợp đối chứng hiệu quả đầu tư."""
-    return backtest_service.get_backtest_summary(model_type=model_type)
+    return backtest_service.get_backtest_summary(model_type=model_type, scope=scope)

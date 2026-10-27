@@ -179,10 +179,21 @@ def retrain_production_system(
         )
 
 
-def predict_batch_signals(model_type: str = "lightgbm") -> BatchPredictionResponse:
-    """Thực hiện dự báo đồng loạt cho 5 cổ phiếu trọng tâm nghiên cứu."""
+def predict_batch_signals(
+    model_type: str = "lightgbm",
+    symbols: list[str] | None = None,
+    scope: str = "VN30",
+) -> BatchPredictionResponse:
+    """Thực hiện dự báo đồng loạt cho danh mục cổ phiếu (mặc định toàn bộ 30 mã VN30 hoặc 5 mã CORE)."""
+    if symbols is not None and len(symbols) > 0:
+        target_symbols = [s.upper() for s in symbols]
+    elif scope.upper() == "CORE":
+        target_symbols = settings.CORE_SYMBOLS
+    else:
+        target_symbols = getattr(settings, "VN30_SYMBOLS", settings.CORE_SYMBOLS)
+
     results = []
-    for sym in settings.CORE_SYMBOLS:
+    for sym in target_symbols:
         try:
             pred = predict_stock_signal(symbol=sym, model_type=model_type)
             results.append(pred)

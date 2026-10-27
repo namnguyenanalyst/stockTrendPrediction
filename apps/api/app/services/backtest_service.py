@@ -170,8 +170,12 @@ def run_backtest_simulation(req: BacktestRequest) -> BacktestResponse:
         )
 
 
-def get_backtest_summary(model_type: str = "lightgbm") -> BacktestSummaryResponse:
-    """Lấy bảng tổng hợp kết quả Backtest Out-of-Sample trên các mã cổ phiếu."""
+def get_backtest_summary(
+    model_type: str = "lightgbm",
+    symbols: list[str] | None = None,
+    scope: str = "CORE",
+) -> BacktestSummaryResponse:
+    """Lấy bảng tổng hợp kết quả Backtest Out-of-Sample trên các mã cổ phiếu (mặc định CORE 5 mã, hoặc VN30 30 mã)."""
     model_clean = model_type.lower()
     if model_clean not in ["lightgbm", "lstm"]:
         raise HTTPException(
@@ -182,8 +186,15 @@ def get_backtest_summary(model_type: str = "lightgbm") -> BacktestSummaryRespons
     try:
         from vn_stock.backtest import backtest_all_symbols
 
+        if symbols is not None and len(symbols) > 0:
+            target_symbols = [s.upper() for s in symbols]
+        elif scope.upper() == "CORE":
+            target_symbols = settings.CORE_SYMBOLS
+        else:
+            target_symbols = getattr(settings, "VN30_SYMBOLS", settings.CORE_SYMBOLS)
+
         df_summary = backtest_all_symbols(
-            symbols=settings.CORE_SYMBOLS,
+            symbols=target_symbols,
             model_type=model_clean,
         )
 
