@@ -551,9 +551,9 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
               setActiveSubtab("my_strategy");
               setStrategyViewMode("manager");
             }}
-            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${activeSubtab === "my_strategy" && strategyViewMode === "manager"
-              ? "bg-slate-800 text-emerald-400 border border-slate-700 shadow-md shadow-emerald-500/10"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${activeSubtab === "my_strategy" && strategyViewMode === "manager"
+              ? "bg-slate-800 text-emerald-400 border border-slate-700"
+              : "text-slate-400 hover:text-slate-200"
               }`}
           >
             <FolderOpen className="h-4 w-4" />
@@ -567,9 +567,9 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
               setActiveSubtab("my_strategy");
               setStrategyViewMode("builder");
             }}
-            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${activeSubtab === "my_strategy" && strategyViewMode === "builder"
-              ? "bg-slate-800 text-emerald-400 border border-slate-700 shadow-md shadow-emerald-500/10"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${activeSubtab === "my_strategy" && strategyViewMode === "builder"
+              ? "bg-slate-800 text-emerald-400 border border-slate-700"
+              : "text-slate-400 hover:text-slate-200"
               }`}
           >
             <Sliders className="h-4 w-4" />
@@ -580,9 +580,9 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
           <button
             type="button"
             onClick={() => setActiveSubtab("presets")}
-            className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold transition-all ${activeSubtab === "presets"
-              ? "bg-slate-800 text-purple-400 border border-slate-700 shadow-md shadow-purple-500/10"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${activeSubtab === "presets"
+              ? "bg-slate-800 text-blue-400 border border-slate-700"
+              : "text-slate-400 hover:text-slate-200"
               }`}
           >
             <Sparkles className="h-4 w-4" />
@@ -593,7 +593,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
         {/* Action Buttons: Lưu chiến lược & Toast */}
         <div className="flex items-center gap-2">
           {savedToast && (
-            <div className="flex items-center gap-1.5 rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-400 border border-emerald-500/40 animate-fade-in shadow-lg">
+            <div className="flex items-center gap-1.5 rounded-md bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-400 border border-emerald-500/30">
               <CheckCircle className="h-4 w-4 shrink-0" />
               <span>{savedToast}</span>
               {strategyViewMode === "builder" && (
@@ -618,7 +618,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
               }
               setIsSaveModalOpen(true);
             }}
-            className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-200 border border-slate-700 hover:border-emerald-500/50 hover:text-emerald-400 transition-colors shadow-sm cursor-pointer"
+            className="flex items-center gap-1.5 rounded-md bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 border border-slate-700 hover:border-emerald-500/50 hover:text-emerald-400 transition-colors cursor-pointer"
           >
             <BookmarkCheck className="h-4 w-4 text-emerald-400" />
             <span>Lưu chiến lược</span>
@@ -811,9 +811,9 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
 
                 {/* Collapsible Cài đặt nâng cao (Vốn, AI Model, Slippage) */}
                 <div
-                  className={`rounded-xl border transition-all ${useAdvancedSettings
-                    ? "border-emerald-500/50 bg-slate-950/80 shadow-[0_0_15px_rgba(16,185,129,0.08)]"
-                    : "border-slate-800/80 bg-slate-950/50"
+                  className={`rounded-lg border transition-colors ${useAdvancedSettings
+                    ? "border-emerald-500/40 bg-slate-950/80"
+                    : "border-slate-800 bg-slate-950/50"
                     } overflow-hidden`}
                 >
                   <div className="flex items-center justify-between p-2.5 text-xs">
@@ -952,7 +952,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                   type="button"
                   onClick={handleRunAdvancedSimulation}
                   disabled={isLoading}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 text-xs font-bold text-slate-950 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+                  className="flex w-full items-center justify-center gap-2 rounded-md bg-emerald-500 py-2.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {isLoading ? (
                     <>
@@ -987,9 +987,9 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
 
               {/* Trường hợp chưa chạy kiểm thử: Hiển thị Mascot và lời nhắc chuẩn DNSE ảnh 1 */}
               {!portfolioResult && !backtestResult && !isLoading && (
-                <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/40 p-12 text-center backdrop-blur-sm min-h-[360px]">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-800 text-emerald-400 border border-slate-700 shadow-xl mb-4">
-                    <Bot className="h-8 w-8 animate-pulse" />
+                <div className="flex flex-col items-center justify-center rounded-lg border border-slate-800 bg-slate-900 p-8 text-center min-h-[340px]">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-slate-800 text-blue-400 border border-slate-700 mb-3">
+                    <Bot className="h-7 w-7" />
                   </div>
                   <h4 className="text-base font-bold text-slate-200">
                     Lựa chọn điều kiện để chạy chiến lược.
@@ -1140,9 +1140,9 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                         </div>
 
                         {/* 4. Tỷ lệ Lợi nhuận / Rủi ro */}
-                        <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-2.5 hover:border-purple-500/30 transition-all">
+                        <div className="rounded-lg border border-slate-800 bg-slate-950/80 p-2.5 hover:border-blue-500/30 transition-colors">
                           <div className="text-[11px] font-medium text-slate-400 truncate">Lợi nhuận / Rủi ro (R:R)</div>
-                          <div className="mt-1 text-base font-black text-purple-300">
+                          <div className="mt-1 text-base font-bold font-mono text-blue-300">
                             {metrics?.reward_risk_ratio ? `${metrics.reward_risk_ratio}` : `${metrics?.profit_factor.toFixed(2) || "---"} : 1`}
                           </div>
                           <p className="mt-0.5 text-[9px] text-slate-500 truncate">Hệ số lãi gộp / lỗ gộp</p>
@@ -1154,76 +1154,74 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                   {/* Lưới 5 Chỉ số Định lượng cốt lõi */}
                   <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
                     {/* 1. ROI */}
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                    <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
                       <div className="flex items-center justify-between text-slate-400 text-[11px] font-medium">
-                        <span>{useAdvancedSettings ? "ROI Danh mục AI" : "ROI Danh mục"}</span>
+                        <span>{useAdvancedSettings ? "Lợi nhuận (ROI)" : "Lợi nhuận (ROI)"}</span>
                         {(metrics?.total_return_pct ?? 0) >= 0 ? (
                           <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
                         ) : (
                           <TrendingDown className="h-3.5 w-3.5 text-rose-400" />
                         )}
                       </div>
-                      <div className="mt-1 text-base font-black">
+                      <div className="mt-1 text-base font-bold font-mono">
                         <span className={(metrics?.total_return_pct ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"}>
                           {metrics ? `${metrics.total_return_pct.toFixed(2)}%` : "---"}
                         </span>
                       </div>
                       <p className="mt-0.5 text-[10px] text-slate-500">
-                        B&amp;H: {metrics ? `${metrics.buy_and_hold_return_pct.toFixed(2)}%` : "---"}
+                        Mua &amp; Giữ: {metrics ? `${metrics.buy_and_hold_return_pct.toFixed(2)}%` : "---"}
                       </p>
                     </div>
 
                     {/* 2. Alpha */}
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                    <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
                       <div className="flex items-center justify-between text-slate-400 text-[11px] font-medium">
-                        <span>Alpha Vượt trội</span>
-                        <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+                        <span>Lãi vượt trội (Alpha)</span>
+                        <Sparkles className="h-3.5 w-3.5 text-blue-400" />
                       </div>
-                      <div className="mt-1 text-base font-black">
+                      <div className="mt-1 text-base font-bold font-mono">
                         <span className={isAlphaPositive ? "text-emerald-400" : "text-rose-400"}>
                           {metrics ? `${metrics.excess_return_pct.toFixed(2)}%` : "---"}
                         </span>
                       </div>
-                      <p className="mt-0.5 text-[10px] text-slate-500">Chênh lệch so với B&amp;H</p>
+                      <p className="mt-0.5 text-[10px] text-slate-500">Lãi thêm so với Mua &amp; Giữ</p>
                     </div>
 
                     {/* 3. Sharpe */}
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                    <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
                       <div className="flex items-center justify-between text-slate-400 text-[11px] font-medium">
-                        <span>Sharpe (Rf=4%)</span>
+                        <span>Chỉ số Sharpe</span>
                         <Coins className="h-3.5 w-3.5 text-amber-400" />
                       </div>
-                      <div className="mt-1 text-base font-black text-slate-100">
+                      <div className="mt-1 text-base font-bold font-mono text-slate-100">
                         {metrics ? metrics.sharpe_ratio.toFixed(2) : "---"}
                       </div>
-                      <p className="mt-0.5 text-[10px] text-slate-500">Bù đắp rủi ro</p>
+                      <p className="mt-0.5 text-[10px] text-slate-500">Sinh lời / rủi ro (&gt;1 là tốt)</p>
                     </div>
 
                     {/* 4. MDD */}
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+                    <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
                       <div className="flex items-center justify-between text-slate-400 text-[11px] font-medium">
-                        <span>Max Drawdown</span>
+                        <span>Sụt giảm tối đa (MDD)</span>
                         <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
                       </div>
-                      <div className="mt-1 text-base font-black text-rose-400">
+                      <div className="mt-1 text-base font-bold font-mono text-rose-400">
                         {metrics ? `-${Math.abs(metrics.max_drawdown_pct).toFixed(2)}%` : "---"}
                       </div>
-                      <p className="mt-0.5 text-[10px] text-slate-500">Sụt giảm vốn từ đỉnh</p>
+                      <p className="mt-0.5 text-[10px] text-slate-500">Mức giảm lớn nhất từ đỉnh</p>
                     </div>
 
                     {/* 5. Chi phí */}
-                    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3 col-span-2 sm:col-span-1">
+                    <div className="rounded-lg border border-slate-800 bg-slate-900 p-3 col-span-2 sm:col-span-1">
                       <div className="flex items-center justify-between text-slate-400 text-[11px] font-medium">
                         <span>Tổng thuế &amp; phí</span>
                         <Wallet className="h-3.5 w-3.5 text-slate-400" />
                       </div>
-                      <div className="mt-1 text-base font-black text-slate-200">
+                      <div className="mt-1 text-base font-bold font-mono text-slate-200">
                         {metrics ? `${(metrics.total_costs / 1000).toLocaleString("vi-VN")} k` : "---"}
                       </div>
                       <p className="mt-0.5 text-[10px] text-slate-500">
-                        {useAdvancedSettings
-                          ? `Tác động: ${metrics ? `${metrics.cost_impact_pct.toFixed(2)}%` : "---"} vốn`
-                          : `Tỷ lệ chi phí: ${metrics ? `${metrics.cost_impact_pct.toFixed(2)}%` : "---"}`}
+                        Phí 0.15% + Thuế 0.1%
                       </p>
                     </div>
                   </div>

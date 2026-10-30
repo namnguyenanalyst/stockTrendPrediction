@@ -28,8 +28,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Top Banner: Branding & Status */}
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/20">
-            <TrendingUp className="h-6 w-6 stroke-[2.5]" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500 text-slate-950">
+            <TrendingUp className="h-5 w-5 stroke-[2.5]" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -58,7 +58,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={() => setSelectedSymbol(sym)}
                 className={`rounded-md px-2 py-1 text-xs font-semibold transition-all ${
                   selectedSymbol === sym
-                    ? "bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/40"
+                    ? "bg-emerald-500 text-slate-950"
                     : "text-slate-300 hover:bg-slate-800 hover:text-slate-100"
                 }`}
               >

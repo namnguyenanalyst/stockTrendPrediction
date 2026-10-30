@@ -280,17 +280,20 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   return (
     <div className="space-y-4">
       {/* 1. Header & Bộ điều phối Mô hình Học máy & Live Feed */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-lg border border-slate-800 bg-slate-900 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/20 text-purple-400">
-            <Brain className="h-6 w-6" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-400">
+            <Brain className="h-5 w-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-slate-100 sm:text-xl">
+              <h2 className="text-base font-bold text-slate-100 sm:text-lg">
                 Trung tâm Tín hiệu AI & Mô hình Định lượng
               </h2>
             </div>
+            <p className="text-xs text-slate-400">
+              Dự báo xác suất xu hướng giá theo chu kỳ T+3 cho nhà đầu tư cá nhân
+            </p>
           </div>
         </div>
 
@@ -300,9 +303,9 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           <button
             onClick={handleRetrain}
             disabled={isRetraining || loading}
-            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-all shadow-sm ${isRetraining
+            className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${isRetraining
               ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
-              : "border-indigo-500/40 bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-500/30"
+              : "border-blue-600 bg-blue-600 text-white hover:bg-blue-500"
               }`}
             title="Tự động nạp nến mới nhất và huấn luyện lại LightGBM & LSTM trên toàn bộ 30 mã rổ VN30"
           >
@@ -312,7 +315,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
 
 
           {/* Bộ chọn Mô hình kèm Cơ chế Hover 3 Giây Thả Đặc Tả */}
-          <div className="relative flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 p-1">
+          <div className="relative flex items-center gap-1 rounded-md border border-slate-800 bg-slate-950 p-1">
             <button
               onClick={() => {
                 setLocalPrediction(null);
@@ -320,8 +323,8 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               }}
               onMouseEnter={() => startHoverTimer("lightgbm")}
               onMouseLeave={cancelHoverTimer}
-              className={`relative flex items-center gap-1.5 overflow-hidden rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${modelType === "lightgbm"
-                ? "bg-purple-600 text-white shadow-sm shadow-purple-500/40"
+              className={`relative flex items-center gap-1.5 overflow-hidden rounded px-2.5 py-1 text-xs font-semibold transition-colors ${modelType === "lightgbm"
+                ? "bg-blue-600 text-white"
                 : "text-slate-400 hover:text-slate-200"
                 }`}
               title="Giữ chuột 3 giây để xem cửa sổ đặc tả mô hình LightGBM"
@@ -331,7 +334,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               {/* Thanh đếm giờ 3 giây trực quan */}
               {hoveredModel === "lightgbm" && activeTooltipModel !== "lightgbm" && (
                 <span
-                  className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-purple-400 to-indigo-300"
+                  className="absolute bottom-0 left-0 h-0.5 bg-blue-400"
                   style={{
                     animation: "fillProgress 3s linear forwards",
                   }}
@@ -345,8 +348,8 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               }}
               onMouseEnter={() => startHoverTimer("lstm")}
               onMouseLeave={cancelHoverTimer}
-              className={`relative flex items-center gap-1.5 overflow-hidden rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${modelType === "lstm"
-                ? "bg-purple-600 text-white shadow-sm shadow-purple-500/40"
+              className={`relative flex items-center gap-1.5 overflow-hidden rounded px-2.5 py-1 text-xs font-semibold transition-colors ${modelType === "lstm"
+                ? "bg-blue-600 text-white"
                 : "text-slate-400 hover:text-slate-200"
                 }`}
               title="Giữ chuột 3 giây để xem cửa sổ đặc tả mô hình PyTorch LSTM"
@@ -356,7 +359,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               {/* Thanh đếm giờ 3 giây trực quan */}
               {hoveredModel === "lstm" && activeTooltipModel !== "lstm" && (
                 <span
-                  className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-sky-400 to-indigo-300"
+                  className="absolute bottom-0 left-0 h-0.5 bg-sky-400"
                   style={{
                     animation: "fillProgress 3s linear forwards",
                   }}
@@ -404,7 +407,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           )}
           <span className="text-slate-600">•</span>
           <span>
-            Kỳ hạn: <strong className="text-purple-300">3 phiên tiếp theo</strong>
+            Kỳ hạn: <strong className="text-blue-300 font-mono">3 phiên tiếp theo (T+3)</strong>
           </span>
         </div>
       </div>
@@ -412,11 +415,11 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
       {/* 2. Thẻ Khuyến nghị Tín hiệu & Thanh Phân phối Xác suất */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         {/* Cột trái: Thẻ Tín hiệu AI Hành động (5 cột) */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur-sm lg:col-span-5 flex flex-col justify-between">
+        <div className="rounded-lg border border-slate-800 bg-slate-900 p-4 lg:col-span-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Khuyến nghị chiến lược ({selectedSymbol})
+                Khuyến nghị ({selectedSymbol})
               </span>
               <div className="flex items-center gap-1.5">
                 {activePred?.is_live_synced && (
@@ -425,48 +428,48 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                     LIVE SSI
                   </span>
                 )}
-                <span className="rounded bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-300">
-                  Kỳ hạn: {activePred?.horizon || "T+3"}
+                <span className="rounded bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-300 font-mono">
+                  {activePred?.horizon || "T+3"}
                 </span>
               </div>
             </div>
 
             {loading ? (
               <div className="my-8 flex flex-col items-center justify-center gap-2">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
                 <span className="text-xs text-slate-400">Mô hình AI đang suy luận...</span>
               </div>
             ) : (
-              <div className="my-6">
+              <div className="my-4">
                 <div
-                  className={`flex items-center gap-3 rounded-2xl border p-4 ${isBuy
-                    ? "border-emerald-500/40 bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-emerald-300"
+                  className={`flex items-center gap-3 rounded-lg border p-3.5 ${isBuy
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
                     : isSell
-                      ? "border-rose-500/40 bg-gradient-to-r from-rose-500/20 to-pink-500/10 text-rose-300"
-                      : "border-amber-500/40 bg-gradient-to-r from-amber-500/20 to-yellow-500/10 text-amber-300"
+                      ? "border-rose-500/30 bg-rose-500/10 text-rose-300"
+                      : "border-amber-500/30 bg-amber-500/10 text-amber-300"
                     }`}
                 >
                   <div
-                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${isBuy
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md ${isBuy
                       ? "bg-emerald-500 text-slate-950"
                       : isSell
-                        ? "bg-rose-500 text-slate-950"
+                        ? "bg-rose-500 text-white"
                         : "bg-amber-400 text-slate-950"
                       }`}
                   >
                     {isBuy ? (
-                      <TrendingUp className="h-7 w-7 stroke-[2.5]" />
+                      <TrendingUp className="h-6 w-6 stroke-[2.5]" />
                     ) : isSell ? (
-                      <TrendingDown className="h-7 w-7 stroke-[2.5]" />
+                      <TrendingDown className="h-6 w-6 stroke-[2.5]" />
                     ) : (
-                      <Minus className="h-7 w-7 stroke-[2.5]" />
+                      <Minus className="h-6 w-6 stroke-[2.5]" />
                     )}
                   </div>
                   <div>
-                    <span className="text-xs font-semibold uppercase tracking-wider opacity-80">
+                    <span className="text-[11px] font-medium uppercase tracking-wider opacity-80">
                       Tín hiệu chu kỳ T+3
                     </span>
-                    <h3 className="text-xl font-black tracking-tight sm:text-2xl">
+                    <h3 className="text-lg font-bold tracking-tight sm:text-xl">
                       {activePred?.signal || "NẮM GIỮ (HOLD)"}
                     </h3>
                   </div>
@@ -475,19 +478,19 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 <div className="mt-4 space-y-2 text-xs">
                   <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
                     <span className="text-slate-400">Xu hướng phân loại:</span>
-                    <span className="font-bold text-slate-200">
+                    <span className="font-semibold text-slate-200">
                       {activePred?.class_name || "ĐI NGANG"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
                     <span className="text-slate-400">Dữ liệu chốt phiên căn cứ:</span>
-                    <span className="font-bold text-slate-200">
+                    <span className="font-mono text-slate-200">
                       {activePred?.data_as_of_date || activePred?.date || "---"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
                     <span className="text-slate-400">Thị giá đóng cửa phiên t:</span>
-                    <span className="font-bold text-slate-200">
+                    <span className="font-mono font-semibold text-slate-200">
                       {activePred
                         ? (activePred.current_price * 1000).toLocaleString("vi-VN")
                         : "---"}{" "}
@@ -496,7 +499,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                   </div>
                   <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
                     <span className="text-slate-400">Độ tin cậy mô hình:</span>
-                    <span className="font-bold text-purple-400">{confidencePct}%</span>
+                    <span className="font-mono font-semibold text-blue-400">{confidencePct}%</span>
                   </div>
                 </div>
               </div>
@@ -505,7 +508,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
         </div>
 
         {/* Cột phải: Phân phối Xác suất Softmax 3 Lớp (7 cột) */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur-sm lg:col-span-7 flex flex-col justify-between">
+        <div className="rounded-lg border border-slate-800 bg-slate-900 p-4 lg:col-span-7 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -522,30 +525,29 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
             </div>
 
             {showInfo && (
-              <div className="mb-4 rounded-lg bg-slate-950 p-3 text-xs text-slate-400 border border-slate-800">
+              <div className="mb-4 rounded-md bg-slate-950 p-3 text-xs text-slate-300 border border-slate-800 leading-relaxed">
                 <p>
-                  Mô hình Machine Learning xuất ra 3 giá trị logit, sau đó chuẩn hóa qua hàm Softmax:
-                  &sigma;(z)<sub>i</sub> = exp(z<sub>i</sub>) / &sum; exp(z<sub>j</sub>). Điều này giúp phản ánh đúng bản chất ngẫu nhiên của thị trường thay vì đưa ra một con số cứng nhắc.
+                  Mô hình AI dự báo xác suất 3 kịch bản trong chu kỳ T+3: <strong>TĂNG</strong> (kỳ vọng lãi &gt; 1.5%), <strong>GIẢM</strong> (nguy cơ lỗ &gt; 1.5%) hoặc <strong>ĐI NGANG</strong>. Tổng xác suất bằng 100%. Kịch bản có xác suất cao nhất sẽ đưa ra khuyến nghị Mua, Bán hoặc Nắm giữ an toàn cho nhà đầu tư cá nhân.
                 </p>
               </div>
             )}
 
             {/* 3 Thanh tiến trình xác suất */}
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               {/* Lớp TĂNG */}
               <div>
                 <div className="flex items-center justify-between text-xs font-medium mb-1">
                   <span className="flex items-center gap-1.5 text-emerald-400">
                     <TrendingUp className="h-3.5 w-3.5" /> Xu hướng TĂNG (Up)
                   </span>
-                  <span className="font-bold text-emerald-400">
+                  <span className="font-mono font-bold text-emerald-400">
                     {(probUp * 100).toFixed(1)}%
                   </span>
                 </div>
-                <div className="h-3 w-full rounded-full bg-slate-950 p-0.5 border border-slate-800">
+                <div className="h-2 w-full rounded bg-slate-800 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-emerald-600 to-teal-400 transition-all duration-500"
-                    style={{ width: `${Math.max(probUp * 100, 3)}%` }}
+                    className="h-full bg-emerald-500 transition-all duration-300"
+                    style={{ width: `${Math.max(probUp * 100, 2)}%` }}
                   />
                 </div>
               </div>
@@ -556,14 +558,14 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                   <span className="flex items-center gap-1.5 text-amber-400">
                     <Minus className="h-3.5 w-3.5" /> Xu hướng ĐI NGANG (Neutral)
                   </span>
-                  <span className="font-bold text-amber-400">
+                  <span className="font-mono font-bold text-amber-400">
                     {(probHold * 100).toFixed(1)}%
                   </span>
                 </div>
-                <div className="h-3 w-full rounded-full bg-slate-950 p-0.5 border border-slate-800">
+                <div className="h-2 w-full rounded bg-slate-800 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-amber-600 to-yellow-400 transition-all duration-500"
-                    style={{ width: `${Math.max(probHold * 100, 3)}%` }}
+                    className="h-full bg-amber-500 transition-all duration-300"
+                    style={{ width: `${Math.max(probHold * 100, 2)}%` }}
                   />
                 </div>
               </div>
@@ -574,14 +576,14 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                   <span className="flex items-center gap-1.5 text-rose-400">
                     <TrendingDown className="h-3.5 w-3.5" /> Xu hướng GIẢM (Down)
                   </span>
-                  <span className="font-bold text-rose-400">
+                  <span className="font-mono font-bold text-rose-400">
                     {(probDown * 100).toFixed(1)}%
                   </span>
                 </div>
-                <div className="h-3 w-full rounded-full bg-slate-950 p-0.5 border border-slate-800">
+                <div className="h-2 w-full rounded bg-slate-800 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-rose-600 to-pink-500 transition-all duration-500"
-                    style={{ width: `${Math.max(probDown * 100, 3)}%` }}
+                    className="h-full bg-rose-500 transition-all duration-300"
+                    style={{ width: `${Math.max(probDown * 100, 2)}%` }}
                   />
                 </div>
               </div>
@@ -595,134 +597,19 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
         </div>
       </div>
 
-      {/* 2.5. Quỹ đạo Dự phóng Xu hướng 3 Phiên (Multi-step Trajectory theo chuẩn FireAnt & vi cấu trúc T+2) */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 backdrop-blur-sm">
-        <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+      {/* 2.5. Biểu đồ Nến Kỹ thuật & Quỹ đạo Dự phóng Xu hướng T+1 -> T+3 chuẩn FireAnt */}
+      <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+        <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-purple-400" />
-            <h3 className="text-sm font-bold text-slate-100 sm:text-base">
-              Dự báo xu hướng 3 phiên tiếp theo.
+            <Activity className="h-4 w-4 text-blue-400" />
+            <h3 className="text-sm font-semibold text-slate-100 sm:text-base">
+              Biểu đồ Nến & Quỹ đạo Dự phóng Xu hướng (T+1 → T+3)
             </h3>
           </div>
+          <span className="text-xs text-slate-400">
+            Mô phỏng chu kỳ thanh toán T+2.5 và đường cong kỳ vọng giá AI ({modelType.toUpperCase()})
+          </span>
         </div>
-
-        {/* 3 Thẻ Bước trong Quỹ đạo */}
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {activePred?.trajectory && activePred.trajectory.length > 0 ? (
-            activePred.trajectory.map((step, idx) => {
-              const isStepBuy = step.predicted_trend === "TĂNG";
-              const isStepSell = step.predicted_trend === "GIẢM";
-              const stepConf = (step.confidence * 100).toFixed(1);
-
-              return (
-                <div
-                  key={step.day_name}
-                  className={`relative flex flex-col justify-between rounded-xl border p-4 transition-all ${isStepBuy
-                    ? "border-emerald-500/30 bg-emerald-950/20"
-                    : isStepSell
-                      ? "border-rose-500/30 bg-rose-950/20"
-                      : "border-amber-500/30 bg-amber-950/20"
-                    }`}
-                >
-                  <div>
-                    {/* Header ngày */}
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/60">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="flex h-6 px-1.5 items-center justify-center rounded-md bg-slate-800 text-xs font-bold text-slate-200">
-                          {step.day_name}
-                        </span>
-                        {step.date && (
-                          <span className="rounded bg-purple-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-purple-300 border border-purple-500/20">
-                            {step.date}
-                          </span>
-                        )}
-                        <span className="text-xs font-semibold text-slate-300">
-                          {idx === 0
-                            ? "Phiên mở vị thế (Open)"
-                            : idx === 1
-                              ? "Phiên lưu ký (Khóa T+2)"
-                              : "Phiên khả dụng bán (T+3)"}
-                        </span>
-                      </div>
-                      <span className="text-[11px] font-bold text-purple-400">
-                        {stepConf}% tin cậy
-                      </span>
-                    </div>
-
-                    {/* Xu hướng dự báo */}
-                    <div className="my-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {isStepBuy ? (
-                          <TrendingUp className="h-5 w-5 text-emerald-400" />
-                        ) : isStepSell ? (
-                          <TrendingDown className="h-5 w-5 text-rose-400" />
-                        ) : (
-                          <Minus className="h-5 w-5 text-amber-400" />
-                        )}
-                        <span
-                          className={`text-sm font-black ${isStepBuy
-                            ? "text-emerald-400"
-                            : isStepSell
-                              ? "text-rose-400"
-                              : "text-amber-400"
-                            }`}
-                        >
-                          {step.predicted_trend}
-                        </span>
-                      </div>
-                      <span className="rounded bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-slate-300 border border-slate-800">
-                        {step.signal}
-                      </span>
-                    </div>
-
-                    {/* Phân bổ xác suất thanh nhỏ */}
-                    <div className="space-y-1 text-[11px]">
-                      <div className="flex justify-between text-slate-400">
-                        <span>Tăng: {(step.probabilities["TĂNG"] * 100).toFixed(0)}%</span>
-                        <span>Ngang: {(step.probabilities["ĐI NGANG"] * 100).toFixed(0)}%</span>
-                        <span>Giảm: {(step.probabilities["GIẢM"] * 100).toFixed(0)}%</span>
-                      </div>
-                      <div className="h-1.5 w-full rounded-full bg-slate-950 flex overflow-hidden">
-                        <div
-                          className="bg-emerald-500"
-                          style={{ width: `${step.probabilities["TĂNG"] * 100}%` }}
-                        />
-                        <div
-                          className="bg-amber-400"
-                          style={{ width: `${step.probabilities["ĐI NGANG"] * 100}%` }}
-                        />
-                        <div
-                          className="bg-rose-500"
-                          style={{ width: `${step.probabilities["GIẢM"] * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Ghi chú nghiệp vụ sàn */}
-                  <p className="mt-3 border-t border-slate-800/60 pt-2 text-[11px] text-slate-400 italic">
-                    {step.note}
-                  </p>
-                </div>
-              );
-            })
-          ) : (
-            <div className="col-span-3 text-center py-6 text-xs text-slate-400">
-              Đang tính toán quỹ đạo 3 phiên cho mã {selectedSymbol}...
-            </div>
-          )}
-        </div>
-
-        {/* Khuyến nghị Thực chiến tổng hợp (Executive Strategy Guidance) */}
-        {activePred?.summary_guidance && (
-          <div className="mt-4 flex items-start gap-3 rounded-lg border border-purple-500/30 bg-purple-950/20 p-3.5 text-xs text-purple-200">
-            <Sparkles className="h-4 w-4 shrink-0 text-purple-400 mt-0.5" />
-            <div>
-              <strong className="font-bold text-purple-300">Nhận định định lượng: </strong>
-              <span>{activePred.summary_guidance}</span>
-            </div>
-          </div>
-        )}
 
         {/* Biểu đồ Nến Kỹ thuật & Quỹ đạo Dự phóng Xu hướng T+1 -> T+3 chuẩn FireAnt */}
         <FireAntTrajectoryChart
@@ -735,12 +622,12 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
       </div>
 
       {/* 3. Bảng Nhật ký Lịch sử Dự báo & Tín hiệu Mô hình */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 backdrop-blur-sm">
+      <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <History className="h-4 w-4 text-purple-400" />
-              <h3 className="text-sm font-bold text-slate-100 sm:text-base">
+              <History className="h-4 w-4 text-blue-400" />
+              <h3 className="text-sm font-semibold text-slate-100 sm:text-base">
                 Nhật ký Lịch sử Dự báo & Phân tích Mô hình
               </h3>
             </div>
@@ -753,7 +640,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
             <span className="rounded bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-300">
               {history.length} bản ghi
               {history.length > 10 && (
-                <span className="ml-1 text-[10px] font-normal text-purple-400">
+                <span className="ml-1 text-[10px] font-normal text-blue-400">
                   • Cuộn xem thêm
                 </span>
               )}
@@ -828,7 +715,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                         <td className="px-3 py-3 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold border ${item.model_type === "lightgbm"
-                              ? "border-purple-500/30 bg-purple-500/10 text-purple-300"
+                              ? "border-blue-500/30 bg-blue-500/10 text-blue-300"
                               : "border-sky-500/30 bg-sky-500/10 text-sky-300"
                               }`}
                           >
@@ -843,12 +730,12 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                         <td className="px-3 py-3 font-mono text-slate-300 whitespace-nowrap">
                           {item.data_date}
                         </td>
-                        <td className="px-3 py-3 font-semibold text-slate-200 whitespace-nowrap">
+                        <td className="px-3 py-3 font-mono font-semibold text-slate-200 whitespace-nowrap">
                           {(item.current_price * 1000).toLocaleString("vi-VN")} đ
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold ${isItemBuy
+                            className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold ${isItemBuy
                               ? "bg-emerald-500/10 text-emerald-400"
                               : isItemSell
                                 ? "bg-rose-500/10 text-rose-400"
@@ -865,13 +752,13 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                             {item.signal}
                           </span>
                         </td>
-                        <td className="px-3 py-3 font-medium text-emerald-400 whitespace-nowrap">
+                        <td className="px-3 py-3 font-mono text-emerald-400 whitespace-nowrap">
                           {(item.prob_up * 100).toFixed(1)}%
                         </td>
-                        <td className="px-3 py-3 font-medium text-rose-400 whitespace-nowrap">
+                        <td className="px-3 py-3 font-mono text-rose-400 whitespace-nowrap">
                           {(item.prob_down * 100).toFixed(1)}%
                         </td>
-                        <td className="px-3 py-3 font-semibold text-purple-400 whitespace-nowrap">
+                        <td className="px-3 py-3 font-mono font-semibold text-blue-400 whitespace-nowrap">
                           {(item.confidence * 100).toFixed(1)}%
                         </td>
                         <td className="px-3 py-3 text-right whitespace-nowrap">
@@ -882,7 +769,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                               onSelectSymbol(item.symbol);
                               onChangeModelType(item.model_type);
                             }}
-                            className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:border-purple-500 hover:bg-purple-600 hover:text-white transition-all shadow-sm"
+                            className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:border-blue-500 hover:bg-blue-600 hover:text-white transition-colors"
                             title={`Nạp lại dự báo mã ${item.symbol} (${item.model_type.toUpperCase()})`}
                           >
                             <span>Xem lại</span>
@@ -922,14 +809,14 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-xl max-h-[90vh] flex flex-col rounded-2xl border border-slate-700/80 bg-slate-900/98 shadow-2xl shadow-purple-950/40 backdrop-blur-xl animate-in zoom-in-95 duration-200 overflow-hidden"
+            className="relative w-full max-w-xl max-h-[90vh] flex flex-col rounded-lg border border-slate-700 bg-slate-900 shadow-xl overflow-hidden"
           >
             {/* Header Modal */}
             <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-950/60">
               <div className="flex items-center gap-3">
                 <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-xl shadow-inner ${activeTooltipModel === "lightgbm"
-                    ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg ${activeTooltipModel === "lightgbm"
+                    ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
                     : "bg-sky-500/20 text-sky-400 border border-sky-500/30"
                     }`}
                 >
@@ -963,9 +850,9 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
             {/* Body Modal (Cuộn mượt mà nếu màn hình nhỏ) */}
             <div className="p-6 space-y-4 overflow-y-auto max-h-[calc(90vh-140px)] text-xs text-slate-200">
               {/* 1. Mô hình này là mô hình gì? */}
-              <div className="rounded-xl border border-slate-800/80 bg-slate-950/40 p-3.5">
+              <div className="rounded-md border border-slate-800 bg-slate-950/60 p-3.5">
                 <div className="flex items-center gap-2 font-bold text-slate-100 mb-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-purple-500/20 text-xs text-purple-300 font-mono font-bold">
+                  <span className="flex h-5 w-5 items-center justify-center rounded bg-blue-500/20 text-xs text-blue-300 font-mono font-bold">
                     1
                   </span>
                   <span className="text-sm">Mô hình này là gì? (Cách hiểu đơn giản)</span>
@@ -1023,10 +910,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               </div>
 
               {/* Quick Tip Footer Box */}
-              <div className="rounded-lg border border-purple-500/20 bg-purple-950/20 p-3 text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
-                <span className="font-semibold text-purple-200">💡 Quy tắc ghi nhớ nhanh:</span>
+              <div className="rounded-md border border-blue-500/20 bg-slate-950 p-3 text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+                <span className="font-semibold text-blue-200">💡 Quy tắc ghi nhớ nhanh:</span>
                 <span className="font-medium text-slate-300">
-                  Thị trường Sideway / Lướt ngắn ➔ <strong className="text-purple-300">LightGBM</strong> | Vào Sóng mạnh / Trend ➔ <strong className="text-sky-300">LSTM</strong>
+                  Thị trường Sideway / Lướt ngắn ➔ <strong className="text-blue-300">LightGBM</strong> | Vào Sóng mạnh / Trend ➔ <strong className="text-sky-300">LSTM</strong>
                 </span>
               </div>
             </div>
@@ -1042,7 +929,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                     setActiveTooltipModel(null);
                     setHoveredModel(null);
                   }}
-                  className="rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                  className="rounded-md border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
                 >
                   Đã hiểu & Đóng
                 </button>
@@ -1054,13 +941,13 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                       setActiveTooltipModel(null);
                       setHoveredModel(null);
                     }}
-                    className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-4 py-2 text-xs font-bold text-white hover:bg-purple-500 transition-colors shadow-lg shadow-purple-600/30"
+                    className="flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-500 transition-colors"
                   >
                     <CheckCircle2 className="h-4 w-4" />
                     <span>Chuyển sang dùng mô hình này</span>
                   </button>
                 ) : (
-                  <span className="flex items-center gap-1.5 text-xs text-purple-400 font-semibold px-2">
+                  <span className="flex items-center gap-1.5 text-xs text-blue-400 font-semibold px-2">
                     <CheckCircle2 className="h-4 w-4" />
                     Đang áp dụng mô hình này
                   </span>

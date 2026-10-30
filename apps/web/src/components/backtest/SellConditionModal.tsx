@@ -140,9 +140,9 @@ export const SellConditionModal: React.FC<SellConditionModalProps> = ({
               <button
                 type="button"
                 onClick={() => setLocal({ ...local, condition_logic: "OR" })}
-                className={`rounded-md px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
+                className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
                   (!local.condition_logic || local.condition_logic === "OR")
-                    ? "bg-rose-500 text-slate-100 shadow-md shadow-rose-500/20"
+                    ? "bg-rose-600 text-white"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
@@ -151,9 +151,9 @@ export const SellConditionModal: React.FC<SellConditionModalProps> = ({
               <button
                 type="button"
                 onClick={() => setLocal({ ...local, condition_logic: "AND" })}
-                className={`rounded-md px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
+                className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
                   local.condition_logic === "AND"
-                    ? "bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20"
+                    ? "bg-amber-500 text-slate-950"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
@@ -454,7 +454,7 @@ export const SellConditionModal: React.FC<SellConditionModalProps> = ({
           <button
             type="button"
             onClick={handleApply}
-            className="flex items-center gap-2 rounded-lg bg-rose-500 px-5 py-2 text-xs font-bold text-white hover:bg-rose-600 shadow-lg shadow-rose-500/20 transition-all cursor-pointer"
+            className="flex items-center gap-2 rounded-md bg-rose-600 px-5 py-2 text-xs font-semibold text-white hover:bg-rose-500 transition-colors cursor-pointer"
           >
             <Check className="h-4 w-4" />
             <span>Áp dụng điều kiện Bán ({count})</span>

@@ -495,9 +495,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
                 </strong>
               </span>
               <span
-                className={`font-semibold ${
-                  isUp ? "text-emerald-400" : "text-rose-400"
-                }`}
+                className={`font-semibold ${isUp ? "text-emerald-400" : "text-rose-400"
+                  }`}
               >
                 {isUp ? "+" : ""}
                 {inspectChange.toFixed(1)} ({isUp ? "+" : ""}
@@ -518,11 +517,10 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
               <button
                 key={r}
                 onClick={() => setTimeRange(r)}
-                className={`rounded px-2 py-0.5 transition-all ${
-                  timeRange === r
+                className={`rounded px-2 py-0.5 transition-all ${timeRange === r
                     ? "bg-purple-600 text-white shadow-sm"
                     : "text-slate-400 hover:text-slate-200"
-                }`}
+                  }`}
               >
                 {r === "ALL" ? "Tất cả" : r}
               </button>
@@ -537,9 +535,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
           {/* Toggle Quỹ đạo AI FireAnt */}
           <button
             onClick={() => setShowTrajectory(!showTrajectory)}
-            className={`flex items-center gap-1.5 font-bold transition-opacity ${
-              showTrajectory ? "text-sky-300" : "text-slate-500 line-through opacity-60"
-            }`}
+            className={`flex items-center gap-1.5 font-bold transition-opacity ${showTrajectory ? "text-sky-300" : "text-slate-500 line-through opacity-60"
+              }`}
             title="Bật/Tắt đường đi xu hướng dự báo AI của các phiên tiếp theo"
           >
             <span className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></span>
@@ -549,9 +546,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
           {/* Toggle SMA 20 */}
           <button
             onClick={() => setShowSMA20(!showSMA20)}
-            className={`flex items-center gap-1.5 font-medium transition-opacity ${
-              showSMA20 ? "text-blue-400" : "text-slate-500 line-through opacity-60"
-            }`}
+            className={`flex items-center gap-1.5 font-medium transition-opacity ${showSMA20 ? "text-blue-400" : "text-slate-500 line-through opacity-60"
+              }`}
           >
             <span className="h-0.5 w-3 bg-blue-500"></span>
             <span>SMA 20</span>
@@ -560,9 +556,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
           {/* Toggle SMA 50 */}
           <button
             onClick={() => setShowSMA50(!showSMA50)}
-            className={`flex items-center gap-1.5 font-medium transition-opacity ${
-              showSMA50 ? "text-amber-400" : "text-slate-500 line-through opacity-60"
-            }`}
+            className={`flex items-center gap-1.5 font-medium transition-opacity ${showSMA50 ? "text-amber-400" : "text-slate-500 line-through opacity-60"
+              }`}
           >
             <span className="h-0.5 w-3 bg-amber-400"></span>
             <span>SMA 50</span>
@@ -571,9 +566,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
           {/* Toggle Khối lượng Volume */}
           <button
             onClick={() => setShowVolume(!showVolume)}
-            className={`flex items-center gap-1.5 font-medium transition-opacity ${
-              showVolume ? "text-slate-300" : "text-slate-500 line-through opacity-60"
-            }`}
+            className={`flex items-center gap-1.5 font-medium transition-opacity ${showVolume ? "text-slate-300" : "text-slate-500 line-through opacity-60"
+              }`}
           >
             <span className="h-2 w-2 rounded-sm bg-slate-600"></span>
             <span>Khối lượng</span>
@@ -585,11 +579,10 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-slate-400">Mục tiêu T+3 ({modelType.toUpperCase()}):</span>
             <span
-              className={`font-mono font-bold px-2 py-0.5 rounded border text-xs shadow-sm ${
-                targetT3.changePct >= 0
+              className={`font-mono font-bold px-2 py-0.5 rounded border text-xs shadow-sm ${targetT3.changePct >= 0
                   ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-400"
                   : "bg-rose-500/10 border-rose-500/40 text-rose-400"
-              }`}
+                }`}
             >
               {targetT3.price.toLocaleString()} VNĐ ({targetT3.changePct >= 0 ? "+" : ""}
               {targetT3.changePct}%)
@@ -603,78 +596,86 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
 
       {/* 4. Thước đo 4 Mốc Quỹ đạo Tương tác (T -> T+1 -> T+2 -> T+3) */}
       <div className="border-t border-slate-800/80 bg-slate-900/60 p-3 sm:p-4">
-        <div className="mb-2 flex items-center justify-between text-xs">
+        <div className="mb-2.5 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-xs">
           <div className="flex items-center gap-1.5 font-bold text-slate-200">
             <Sparkles className="h-4 w-4 text-sky-400" />
             <span>Chi tiết Tọa độ Quỹ đạo Đường đi Xu hướng ({modelType.toUpperCase()})</span>
           </div>
           <span className="text-[11px] text-slate-400">
-            Đường cong xanh lơ thể hiện xung lực quán tính và kỳ vọng giá của AI
+            Đường cong xanh lơ thể hiện xung lực quán tính và kỳ vọng giá của AI theo chu kỳ T+2.5
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
           {trajectoryPoints.map((point, idx) => {
-            const isTarget = idx === trajectoryPoints.length - 1;
             const isPointUp = point.changePct > 0;
             const isPointDown = point.changePct < 0;
+
+            const roleLabels = [
+              "Dữ liệu căn cứ",
+              "Phiên mở vị thế (Open)",
+              "Phiên lưu ký (Khóa T+2)",
+              "Phiên khả dụng bán (T+3)",
+            ];
 
             return (
               <div
                 key={point.date + idx}
-                className={`flex flex-col justify-between rounded-lg border p-2.5 transition-all ${
-                  isTarget
-                    ? "border-sky-500/40 bg-sky-950/20 shadow-md shadow-sky-950/40 ring-1 ring-sky-500/20"
-                    : idx === 0
-                    ? "border-slate-800 bg-slate-950/60"
-                    : "border-slate-800/80 bg-slate-900/40"
-                }`}
+                className={`flex flex-col justify-between rounded-lg border p-3 transition-all ${idx === 0
+                    ? "border-slate-800 bg-slate-950/70"
+                    : "border-slate-800/80 bg-slate-900/50"
+                  }`}
               >
-                <div className="flex items-center justify-between border-b border-slate-800/60 pb-1.5 mb-1.5">
-                  <span className="font-bold text-slate-200 text-xs">
-                    {idx === 0 ? "Phiên T (Chốt)" : `Phiên ${point.dayName}`}
-                  </span>
-                  <span className="font-mono text-[10px] text-slate-400">
-                    {point.date}
-                  </span>
+                <div>
+                  <div className="flex items-center justify-between border-b border-slate-800/60 pb-1.5 mb-2">
+                    <span className="font-bold text-slate-200 text-xs">
+                      {idx === 0 ? "Phiên T (Chốt)" : `Phiên ${point.dayName}`}
+                    </span>
+                    <span className="font-mono text-[10px] text-slate-400">
+                      {point.date}
+                    </span>
+                  </div>
+
+                  <div className="flex items-baseline justify-between mb-1">
+                    <span className="font-mono text-base font-black text-slate-100">
+                      {point.price.toLocaleString()}
+                    </span>
+                    {idx > 0 ? (
+                      <span
+                        className={`font-mono text-xs font-bold flex items-center ${isPointUp
+                            ? "text-emerald-400"
+                            : isPointDown
+                              ? "text-rose-400"
+                              : "text-amber-400"
+                          }`}
+                      >
+                        {isPointUp ? (
+                          <ArrowUpRight className="h-3.5 w-3.5 inline mr-0.5" />
+                        ) : isPointDown ? (
+                          <ArrowDownRight className="h-3.5 w-3.5 inline mr-0.5" />
+                        ) : (
+                          <Minus className="h-3.5 w-3.5 inline mr-0.5" />
+                        )}
+                        {point.changePct > 0 ? "+" : ""}
+                        {point.changePct}%
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold">
+                        Tham chiếu
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="text-[11px] text-slate-400 font-medium">
+                    {roleLabels[idx] || ""}
+                  </div>
                 </div>
 
-                <div className="flex items-baseline justify-between">
-                  <span className="font-mono text-sm font-black text-slate-100">
-                    {point.price.toLocaleString()}
-                  </span>
-                  {idx > 0 ? (
-                    <span
-                      className={`font-mono text-xs font-bold flex items-center ${
-                        isPointUp
-                          ? "text-emerald-400"
-                          : isPointDown
-                          ? "text-rose-400"
-                          : "text-amber-400"
-                      }`}
-                    >
-                      {isPointUp ? (
-                        <ArrowUpRight className="h-3 w-3 inline" />
-                      ) : isPointDown ? (
-                        <ArrowDownRight className="h-3 w-3 inline" />
-                      ) : (
-                        <Minus className="h-3 w-3 inline" />
-                      )}
-                      {point.changePct > 0 ? "+" : ""}
-                      {point.changePct}%
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-slate-400 uppercase font-semibold">
-                      Giá tham chiếu
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400 border-t border-slate-800/40 pt-1">
-                  <span>{idx === 0 ? "Dữ liệu căn cứ" : point.signal}</span>
+                <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-300 border-t border-slate-800/40 pt-1.5">
+                  <span className="font-semibold">{idx === 0 ? "Chốt phiên" : point.signal}</span>
                   {idx > 0 && (
-                    <span className="font-semibold text-purple-300">
-                      {(point.confidence * 100).toFixed(0)}% tin cậy
+                    <span className="font-semibold text-sky-400 font-mono text-[10px]">
+                      {(point.confidence * 100).toFixed(1)}% tin cậy
                     </span>
                   )}
                 </div>
@@ -682,6 +683,17 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
             );
           })}
         </div>
+
+        {/* Khuyến nghị Thực chiến tổng hợp (Executive Strategy Guidance) */}
+        {prediction?.summary_guidance && (
+          <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-sky-500/30 bg-sky-950/30 p-3 text-xs text-sky-200">
+            <Sparkles className="h-4 w-4 shrink-0 text-sky-400 mt-0.5" />
+            <div>
+              <strong className="font-semibold text-sky-300">Nhận định định lượng: </strong>
+              <span>{prediction.summary_guidance}</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

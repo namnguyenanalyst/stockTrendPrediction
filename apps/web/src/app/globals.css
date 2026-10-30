@@ -2,9 +2,14 @@
 
 @layer base {
   body {
-    background-color: #030712;
+    background-color: #020617;
     color: #f8fafc;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  ::selection {
+    background-color: #2563eb;
+    color: #ffffff;
   }
 }
 

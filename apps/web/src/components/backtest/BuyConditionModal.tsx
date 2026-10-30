@@ -174,9 +174,9 @@ export const BuyConditionModal: React.FC<BuyConditionModalProps> = ({
               <button
                 type="button"
                 onClick={() => setLocal({ ...local, condition_logic: "AND" })}
-                className={`rounded-md px-3 py-1 text-xs font-bold transition-all ${
+                className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
                   (!local.condition_logic || local.condition_logic === "AND")
-                    ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
+                    ? "bg-emerald-500 text-slate-950"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
@@ -185,9 +185,9 @@ export const BuyConditionModal: React.FC<BuyConditionModalProps> = ({
               <button
                 type="button"
                 onClick={() => setLocal({ ...local, condition_logic: "OR" })}
-                className={`rounded-md px-3 py-1 text-xs font-bold transition-all ${
+                className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
                   local.condition_logic === "OR"
-                    ? "bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20"
+                    ? "bg-amber-400 text-slate-950"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
@@ -595,7 +595,7 @@ export const BuyConditionModal: React.FC<BuyConditionModalProps> = ({
           <button
             type="button"
             onClick={handleApply}
-            className="flex items-center gap-2 rounded-xl bg-emerald-500 px-6 py-2.5 text-xs font-bold text-slate-950 shadow-xl shadow-emerald-500/20 hover:bg-emerald-400 active:scale-95 transition-all cursor-pointer"
+            className="flex items-center gap-2 rounded-md bg-emerald-500 px-5 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 transition-colors cursor-pointer"
           >
             <Check className="h-4 w-4" />
             <span>Áp dụng điều kiện Mua{count > 0 ? ` (${count})` : ""}</span>

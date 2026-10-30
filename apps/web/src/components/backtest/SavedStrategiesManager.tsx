@@ -6,7 +6,6 @@ import {
   Play,
   Edit3,
   Trash2,
-  Sparkles,
   Search,
   LayoutGrid,
   List,
@@ -55,15 +54,15 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
           <button
             type="button"
             onClick={() => setFilterStatus("all")}
-            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
               filterStatus === "all"
-                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-md shadow-emerald-500/10"
-                : "bg-slate-800/60 text-slate-400 border border-slate-700/60 hover:text-slate-200 hover:bg-slate-800"
+                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/40"
+                : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200"
             }`}
           >
             <span>Tất cả</span>
             <span
-              className={`rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${
+              className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
                 filterStatus === "all"
                   ? "bg-emerald-500 text-slate-950"
                   : "bg-slate-700 text-slate-300"
@@ -77,15 +76,15 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
           <button
             type="button"
             onClick={() => setFilterStatus("active")}
-            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
               filterStatus === "active"
-                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-md shadow-emerald-500/10"
-                : "bg-slate-800/60 text-slate-400 border border-slate-700/60 hover:text-slate-200 hover:bg-slate-800"
+                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/40"
+                : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200"
             }`}
           >
             <span>Triển khai</span>
             <span
-              className={`rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${
+              className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
                 filterStatus === "active"
                   ? "bg-emerald-500 text-slate-950"
                   : "bg-slate-700 text-slate-300"
@@ -99,15 +98,15 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
           <button
             type="button"
             onClick={() => setFilterStatus("draft")}
-            className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
               filterStatus === "draft"
-                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-md shadow-emerald-500/10"
-                : "bg-slate-800/60 text-slate-400 border border-slate-700/60 hover:text-slate-200 hover:bg-slate-800"
+                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/40"
+                : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200"
             }`}
           >
             <span>Chưa triển khai</span>
             <span
-              className={`rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${
+              className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
                 filterStatus === "draft"
                   ? "bg-emerald-500 text-slate-950"
                   : "bg-slate-700 text-slate-300"
@@ -164,7 +163,7 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
           <button
             type="button"
             onClick={onCreateStrategy}
-            className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-slate-950 shadow-md shadow-emerald-500/20 hover:bg-emerald-400 active:scale-95 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 transition-colors cursor-pointer"
           >
             <Plus className="h-4 w-4" />
             <span>Tạo chiến thuật</span>
@@ -174,23 +173,11 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
 
       {/* 2. NỘI DUNG DANH SÁCH CHIẾN LƯỢC / EMPTY STATE */}
       {filteredStrategies.length === 0 ? (
-        /* GIAO DIỆN EMPTY STATE CHUẨN DNSE VỚI MASCOT */
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/40 p-12 text-center backdrop-blur-sm min-h-[420px]">
-          {/* Mascot Animation / Illustration */}
-          <div className="relative mb-6">
-            <div className="flex h-24 w-24 items-center justify-center rounded-3xl border border-slate-700 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 shadow-2xl shadow-emerald-500/10">
-              <div className="relative">
-                <Bot className="h-12 w-12 text-emerald-400 animate-bounce" />
-                <span className="absolute -right-2 -top-1 flex h-4 w-4">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex h-4 w-4 rounded-full bg-emerald-500"></span>
-                </span>
-              </div>
-            </div>
-            {/* Cây cảnh / Icon phụ họa bên cạnh giống ảnh DNSE */}
-            <div className="absolute -bottom-2 -right-3 flex h-8 w-8 items-center justify-center rounded-xl bg-slate-800 border border-slate-700 text-emerald-400 shadow-md">
-              <Sparkles className="h-4 w-4" />
-            </div>
+        /* GIAO DIỆN EMPTY STATE FLAT MINIMALIST */
+        <div className="flex flex-col items-center justify-center rounded-lg border border-slate-800 bg-slate-900 p-8 text-center min-h-[360px]">
+          {/* Icon minh họa tinh gọn */}
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-blue-400">
+            <Bot className="h-8 w-8" />
           </div>
 
           <h3 className="text-base font-bold text-slate-100 sm:text-lg">
@@ -212,7 +199,7 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
           <button
             type="button"
             onClick={onCreateStrategy}
-            className="mt-6 flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-xs font-bold text-slate-950 shadow-xl shadow-emerald-500/25 hover:bg-emerald-400 active:scale-95 transition-all cursor-pointer"
+            className="mt-5 flex items-center gap-2 rounded-md bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 transition-colors cursor-pointer"
           >
             <Plus className="h-4 w-4" />
             <span>Tạo chiến thuật</span>
@@ -240,7 +227,7 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
             return (
               <div
                 key={strat.id}
-                className="group flex flex-col justify-between rounded-xl border border-slate-800 bg-slate-900/70 p-4 transition-all hover:border-slate-700 hover:shadow-xl hover:shadow-emerald-500/5 backdrop-blur-sm"
+                className="group flex flex-col justify-between rounded-lg border border-slate-800 bg-slate-900 p-4 transition-colors hover:border-slate-700"
               >
                 <div>
                   {/* Top: Status Badge & Action buttons */}
