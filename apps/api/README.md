@@ -1,23 +1,24 @@
 # VN Stock API (FastAPI Backend)
 
-Dịch vụ Backend API phục vụ các tính năng:
-- Tra cứu lịch sử giá và chỉ báo kỹ thuật chứng khoán.
-- Tiếp nhận yêu cầu suy luận dự báo từ mô hình PyTorch / XGBoost (`apps/ml`).
-- Thực thi mô phỏng backtesting cho người dùng trên web.
+Dịch vụ Backend RESTful API phục vụ các tính năng:
+- Tra cứu lịch sử giá nến OHLCV, 13 chỉ báo kỹ thuật và bảng giá thông minh rổ VN30.
+- Tiếp nhận yêu cầu suy luận dự báo từ mô hình LightGBM GBDT và PyTorch Global LSTM (`apps/ml`).
+- Cung cấp Quỹ đạo dự phóng xu hướng $T+1 \to T+3$ bám sát chu kỳ thanh toán VSDC.
+- Thực thi mô phỏng Backtesting cho người dùng trên web với bộ lọc điều kiện DNSE EnTrade X.
+- Bộ 45 unit tests tự động bảo đảm độ ổn định cho 100% endpoints và services.
 
 ## 🚀 Hướng dẫn chạy cục bộ
 
 ```bash
 cd apps/api
 
-# Cài đặt môi trường với uv
-uv venv
-source .venv/bin/activate
-uv pip install -e .
+# Khởi chạy server development với uv
+uv run uvicorn app.main:app --reload --port 8000
 
-# Chạy server ở chế độ development
-uvicorn app.main:app --reload --port 8000
+# Chạy toàn bộ 45 unit tests
+uv run pytest -v
 ```
 
-Truy cập tài liệu OpenAPI Swagger tại: `http://localhost:8000/docs`
+Truy cập tài liệu OpenAPI Swagger tại: `http://localhost:8000/docs`  
+Tài liệu ReDoc tại: `http://localhost:8000/redoc`  
 Endpoint kiểm tra sức khỏe: `http://localhost:8000/health`

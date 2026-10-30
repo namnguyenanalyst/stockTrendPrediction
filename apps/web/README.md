@@ -1,34 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VN Stock Web Dashboard (Next.js 16 & React 19)
 
-## Getting Started
+Giao diện người dùng Web Dashboard theo phong cách Institutional Trading Terminal phục vụ:
+- **Thị trường & Phân tích kỹ thuật**: Biểu đồ nến tương tác Canvas 60fps qua TradingView Lightweight Charts v5.2, chỉ báo động lượng RSI(14) và lưới 6 chỉ báo kỹ thuật.
+- **Tín hiệu AI & Quỹ đạo $T+3$**: Trực quan hóa phân bổ xác suất Softmax 3 lớp, thẻ khuyến nghị Mua/Bán/Nắm giữ, biểu đồ Quỹ đạo 3 phiên FireAnt bám sát chu kỳ thanh toán bù trừ $T+2.5$ VSDC và Modal Retrain trực tuyến.
+- **Phòng Giả lập Chiến lược DNSE EnTrade X 2 Cột**: Bộ điều khiển chiến thuật linh hoạt (ScopeSelector, DateRangePicker, 12 điều kiện mua + 12 điều kiện bán tùy biến qua DualRangeSlider, 8 chiến lược mẫu DNSE, quản lý lưu trữ chiến thuật cá nhân `strategyStorage`).
+- **Thanh Header & Navbar thông minh**: Trạng thái phiên căn cứ (T hoặc T-1) theo mốc 15:00 kết thúc ATC, giờ UTC+7, nút kích hoạt đồng bộ dữ liệu SSI và Quick Stock Switcher rổ VN30.
 
-First, run the development server:
+## 🚀 Hướng dẫn khởi chạy
 
 ```bash
+cd apps/web
+
+# Cài đặt thư viện dependencies
+npm install
+
+# Khởi chạy server development
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# Chạy toàn bộ 68 unit tests tự động với Vitest
+npm test
+
+# Build ứng dụng sản xuất
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Truy cập ứng dụng tại: [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🧪 Kiểm thử tự động (Vitest)
+Hệ thống tích hợp bộ **68 unit tests PASSED (100%)**:
+- `src/lib/api.test.ts`: 19 tests kiểm thử Web API Client, endpoints và offline fallback.
+- `src/lib/strategyStorage.test.ts`: 49 tests kiểm thử logic lưu trữ, xuất/nhập, kiểm tra tính hợp lệ dữ liệu và quản lý chiến lược người dùng trong `localStorage`.

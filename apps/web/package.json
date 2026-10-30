@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "lint:design": "npx -y impeccable detect src",
     "test": "vitest run"
   },
   "dependencies": {

@@ -126,6 +126,11 @@ docs/
 # AI Assistant Local Workspaces & Skills
 .agents/
 .claude/
+.codex/
+.impeccable/
+.github/agents/
+.github/hooks/
+.github/skills/
 
 .archify/
 skills-lock.json

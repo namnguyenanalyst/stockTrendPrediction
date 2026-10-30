@@ -14,26 +14,32 @@ VN_Stock/
 │   │   ├── models/              # Checkpoint mô hình (.pth) và scalers (.pkl)
 │   │   ├── notebooks/           # Jupyter Notebooks nghiên cứu & EDA
 │   │   ├── vn_stock/            # Package mã nguồn Python chính
-│   │   │   ├── config.py        # Cấu hình đường dẫn & siêu tham số
-│   │   │   ├── dataset.py       # Ingestion SSI Fast Connect Data & đọc/ghi dữ liệu
-│   │   │   ├── features.py      # Tính toán chỉ báo kỹ thuật tài chính
-│   │   │   ├── validation.py    # Walk-forward CV & Time-series split
-│   │   │   ├── backtest.py      # Simulator kiểm thử giao dịch có thuế phí
-│   │   │   └── modeling/        # Kiến trúc PyTorch LSTM, train.py, predict.py
-│   │   ├── tests/               # Bộ test tự động (PyTest)
+│   │   │   ├── config.py        # Cấu hình đường dẫn, danh mục VN30 & siêu tham số
+│   │   │   ├── ssi_client.py    # Cổng kết nối SSI Fast Connect Data API
+│   │   │   ├── data_ingestion.py# Quản lý Parquet 2 tầng & đồng bộ nến nối đuôi
+│   │   │   ├── market_session.py# Quản lý phiên giao dịch Việt Nam (UTC+7, mốc 15:00 ATC)
+│   │   │   ├── features.py      # Tính toán 13 chỉ báo kỹ thuật tương đối
+│   │   │   ├── splitting_data.py# Phân chia dữ liệu thực chiến & Purged Horizon
+│   │   │   ├── backtest.py      # Động cơ Backtesting T+2, thuế phí 0.4%, DNSE rules
+│   │   │   └── modeling/        # LightGBM, Global LSTM, predict, XAI explain_shap
+│   │   ├── tests/               # Bộ 96 unit tests tự động (PyTest)
 │   │   ├── pyproject.toml       # Quản lý dependencies qua uv
-│   │   └── Makefile             # Tự động hóa: data, features, train, backtest, test
+│   │   └── Makefile             # Tự động hóa: data, features, train, predict, backtest, test
 │   │
-│   ├── api/                     # Backend API (FastAPI)
+│   ├── api/                     # Backend API (FastAPI, Pydantic V2)
 │   │   ├── app/
-│   │   │   ├── main.py          # FastAPI app & endpoint /health
-│   │   │   ├── routers/         # Routers nghiệp vụ
-│   │   │   └── models/          # Pydantic schemas
+│   │   │   ├── main.py          # FastAPI app, lifespan handler & CORS
+│   │   │   ├── routers/         # stocks, prediction, backtest routers
+│   │   │   ├── services/        # Tầng logic nghiệp vụ chuyên sâu
+│   │   │   └── models/          # Pydantic V2 schemas
+│   │   ├── tests/               # Bộ 45 unit tests tự động (test_api & test_services)
 │   │   ├── Dockerfile           # Đóng gói container với uv
 │   │   └── pyproject.toml
 │   │
-│   └── web/                     # Frontend Web (Next.js App Router, TypeScript)
-│       ├── src/app/             # Giao diện người dùng
+│   └── web/                     # Frontend Web (Next.js 16, React 19, TypeScript)
+│       ├── src/app/             # Layout & App Router
+│       ├── src/lib/             # API Client, types & strategyStorage (49 tests)
+│       ├── src/components/      # Charts (Lightweight Charts), Tabs, Backtest UI
 │       └── Dockerfile           # Multi-stage production build
 │
 ├── packages/
@@ -43,8 +49,10 @@ VN_Stock/
 │   ├── docker-compose.yml       # Điều phối PostgreSQL 16, API, Web và ML batch job
 │   └── migrations/              # Quản lý schema database (Alembic)
 │
-├── docs/                        # Tài liệu nghiên cứu & kế hoạch đồ án
-│   └── GHI_CHU_DO_AN.md
+├── docs/                        # Tài liệu nghiên cứu & Cấu trúc Báo cáo ĐATN 5 Chương 34 Mục
+│   ├── Cấu trúc báo cáo ĐATN.md # Khung đồ án chuẩn Khoa CNTT - ĐH Mỏ - Địa chất
+│   ├── reports/                 # 5 Báo cáo triển khai kỹ thuật & Chương 2 cơ sở lý thuyết
+│   └── notes/                   # Sổ tay ghi chú chuyên sâu, XAI SHAP, Purged Horizon & IEEE citations
 ├── references/                  # Mã nguồn & tài liệu tham khảo bổ trợ
 ├── .github/workflows/           # CI workflow tự động kiểm thử
 └── README.md                    # Tài liệu tổng quan dự án
@@ -128,4 +136,9 @@ docker compose up -d --build
 
 ## 🧪 Kiểm Thử Tự Động (CI/CD)
 
-Hệ thống tích hợp GitHub Actions (`.github/workflows/ci.yml`) tự động kiểm tra cú pháp, linting với **Ruff** và chạy **PyTest** cho mỗi lần commit hoặc tạo Pull Request.
+Hệ thống tích hợp quy trình kiểm thử tự động toàn diện với **209 unit tests PASSED (100%)** bao phủ 3 tầng ứng dụng:
+- **`apps/ml` (96 tests)**: `uv run --directory apps/ml pytest`
+- **`apps/api` (45 tests)**: `uv run --directory apps/api pytest`
+- **`apps/web` (68 tests)**: `npm --prefix apps/web test`
+
+Quy trình CI (`.github/workflows/ci.yml`) tự động kiểm tra cú pháp, format với **Ruff**, build Next.js TypeScript và chạy kiểm thử tự động cho mỗi commit.
