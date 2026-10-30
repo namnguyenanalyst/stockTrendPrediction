@@ -246,6 +246,15 @@ def prepare_inference_features(
                 f"Mã {clean_sym} chỉ có {len(df_feat)} phiên hợp lệ, không đủ tối thiểu seq_length={seq_length}."
             )
 
+    # Bảo vệ làm sạch tuyệt đối các giá trị inf/nan trước khi đưa vào mô hình suy luận
+    df_feat[FEATURE_COLS] = (
+        df_feat[FEATURE_COLS]
+        .replace([np.inf, -np.inf], np.nan)
+        .ffill()
+        .bfill()
+        .fillna(0.0)
+    )
+
     latest_row = df_feat.iloc[-1]
     latest_close = float(latest_row["Close"])
     latest_date = str(pd.to_datetime(latest_row["Date"]).strftime("%Y-%m-%d"))

@@ -103,6 +103,9 @@ def compute_features_per_symbol(
     # Gán Symbol_Code cố định dựa theo SYMBOL_TO_CODE trong config
     res["Symbol_Code"] = res["Symbol"].map(SYMBOL_TO_CODE).fillna(-1).astype(int)
 
+    # Bảo vệ chống giá trị vô cực (+inf, -inf) do chia cho 0 hoặc lỗi dữ liệu nguồn
+    res[FEATURE_COLS] = res[FEATURE_COLS].replace([np.inf, -np.inf], np.nan)
+
     if drop_na:
         # Loại bỏ các dòng NaN do rolling 200 ngày và pct_change ngày đầu tiên
         res = res.dropna(subset=FEATURE_COLS).reset_index(drop=True)

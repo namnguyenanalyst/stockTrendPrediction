@@ -245,14 +245,26 @@ def fetch_daily_index(
                             )
                         return cached_df
                     else:
-                        # Ghép nến mới vào cache hiện tại
-                        combined = pd.concat([cached_df, tail_df], ignore_index=True)
-                        combined = combined.drop_duplicates(subset=["Date"]).sort_values("Date").reset_index(drop=True)
-                        ret_col = f"{index_id.upper()}_Return_1d"
-                        combined[ret_col] = combined[f"{index_id.upper()}_Close"].pct_change(1)
-                        if save_to_raw:
-                            _atomic_save_parquet(combined, raw_parquet_path)
-                        return combined
+                        # Ghép nến mới vào cache hiện tại (chỉ giữ nến hợp lệ Close > 0, ưu tiên bản ghi mới hơn)
+                        close_col = f"{index_id.upper()}_Close"
+                        valid_tail = tail_df.dropna(subset=[close_col]).copy()
+                        valid_tail = valid_tail[valid_tail[close_col] > 0]
+                        if not valid_tail.empty:
+                            combined = pd.concat([cached_df, valid_tail], ignore_index=True)
+                            combined = combined.drop_duplicates(subset=["Date"], keep="last").sort_values("Date").reset_index(drop=True)
+                            ret_col = f"{index_id.upper()}_Return_1d"
+                            combined[ret_col] = combined[close_col].pct_change(1)
+                            validate_downloaded_data(
+                                combined,
+                                expected_start=start_date,
+                                expected_end=effective_end,
+                                is_index=True,
+                                symbol_name=index_id,
+                            )
+                            if save_to_raw:
+                                _atomic_save_parquet(combined, raw_parquet_path)
+                            return combined
+                        return cached_df
                 except Exception as exc:  # noqa: BLE001
                     logger.warning(
                         "Không thể kiểm tra đoạn ngày mới cho %s: %s. Fallback tải lại toàn bộ.",
@@ -306,14 +318,22 @@ def fetch_stock_data(
                     )
                     if not tail_df.empty:
                         cleaned_tail = clean_stock_data(tail_df, symbol=symbol)
-                        combined = pd.concat([local_df, cleaned_tail], ignore_index=True)
-                        combined = combined.drop_duplicates(subset=["Date"]).sort_values("Date").reset_index(drop=True)
-                        if save_to_raw:
-                            parquet_path = RAW_DATA_DIR / f"{symbol}.parquet"
-                            _atomic_save_parquet(combined, parquet_path)
-                        return combined
-                    else:
-                        return local_df
+                        cleaned_tail = cleaned_tail[cleaned_tail["Close"] > 0]
+                        if not cleaned_tail.empty:
+                            combined = pd.concat([local_df, cleaned_tail], ignore_index=True)
+                            combined = combined.drop_duplicates(subset=["Date"], keep="last").sort_values("Date").reset_index(drop=True)
+                            validate_downloaded_data(
+                                combined,
+                                expected_start=start_date,
+                                expected_end=effective_end,
+                                is_index=False,
+                                symbol_name=symbol,
+                            )
+                            if save_to_raw:
+                                parquet_path = RAW_DATA_DIR / f"{symbol}.parquet"
+                                _atomic_save_parquet(combined, parquet_path)
+                            return combined
+                    return local_df
                 except Exception as inc_exc:
                     logger.warning("Không thể kéo nến mới đoạn đuôi cho %s: %s", symbol, inc_exc)
 
