@@ -12,6 +12,7 @@ WORKDIR /app
 # Set environment variables for Python runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    UV_HTTP_TIMEOUT=120 \
     PYTHONPATH="/app/apps/api:/app/apps/ml"
 
 # Install system dependencies (compiler for C-extensions, libpq, and curl for healthchecks)
@@ -23,7 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv for fast, reliable package management
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+RUN pip install --no-cache-dir uv
 
 # Copy apps/ml module into monorepo context
 COPY apps/ml /app/apps/ml
@@ -34,9 +35,14 @@ COPY apps/api /app/apps/api
 # Set working directory to apps/api where alembic.ini, pyproject.toml and app/ reside
 WORKDIR /app/apps/api
 
-# Install ML package and API package dependencies into system python
-RUN uv pip install --system --no-cache -e /app/apps/ml && \
-    uv pip install --system --no-cache -e /app/apps/api
+# Install ML package and API package dependencies into system python using PyTorch CPU
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system \
+        --extra-index-url https://download.pytorch.org/whl/cpu \
+        -e /app/apps/ml && \
+    uv pip install --system \
+        --extra-index-url https://download.pytorch.org/whl/cpu \
+        -e /app/apps/api
 
 EXPOSE 8000
 

@@ -1,22 +1,20 @@
 # Python cache and virtualenvs
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.venv/
-venv/
-env/
-.pytest_cache/
-.coverage
-htmlcov/
-.ruff_cache/
-.mypy_cache/
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+**/*.so
+**/.venv/
+**/venv/
+**/env/
+**/.pytest_cache/
+**/.coverage
+**/htmlcov/
+**/.ruff_cache/
+**/.mypy_cache/
 
 # Node.js artifacts
-node_modules/
-apps/web/node_modules/
-apps/web/.next/
-.next/
+**/node_modules/
+**/.next/
 npm-debug.log*
 
 # Git and OS

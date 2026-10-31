@@ -1,0 +1,104 @@
+# ==============================================================================
+# VN STOCK PREDICTION & QUANTITATIVE PLATFORM — DOCKER COMPOSE CONFIGURATION
+# ==============================================================================
+# Multi-container orchestration:
+# 1. vn_stock_db  : PostgreSQL 16 Alpine with healthcheck and persistent volume
+# 2. vn_stock_api : FastAPI 0.110+ Backend with automatic Alembic migrations
+# 3. vn_stock_web : Next.js 16 Standalone Frontend Dashboard
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. DATABASE SERVICE: PostgreSQL 16 Alpine
+  # ----------------------------------------------------------------------------
+  vn_stock_db:
+    image: postgres:16-alpine
+    container_name: vn_stock_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-vn_stock}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-vn_stock}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - vn_stock_net
+
+  # ----------------------------------------------------------------------------
+  # 2. BACKEND API SERVICE: FastAPI + Alembic Migrations
+  # ----------------------------------------------------------------------------
+  vn_stock_api:
+    image: infra-vn_stock_api:latest
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: vn_stock_api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@vn_stock_db:5432/${POSTGRES_DB:-vn_stock}
+      SECRET_KEY: ${SECRET_KEY:-super_secret_jwt_key_must_be_changed_in_prod_32chars}
+      JWT_SECRET_KEY: ${SECRET_KEY:-super_secret_jwt_key_must_be_changed_in_prod_32chars}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      JWT_ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      CORS_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000","http://localhost:8000"]'
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    command: /bin/sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    depends_on:
+      vn_stock_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - vn_stock_net
+
+  # ----------------------------------------------------------------------------
+  # 3. FRONTEND WEB SERVICE: Next.js 16 Standalone Dashboard
+  # ----------------------------------------------------------------------------
+  vn_stock_web:
+    image: infra-vn_stock_web:latest
+    build:
+      context: apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    container_name: vn_stock_web
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      API_INTERNAL_URL: ${API_INTERNAL_URL:-http://vn_stock_api:8000}
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+      NODE_ENV: production
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      vn_stock_api:
+        condition: service_healthy
+    networks:
+      - vn_stock_net
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  vn_stock_net:
+    driver: bridge
+
