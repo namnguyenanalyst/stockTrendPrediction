@@ -1,0 +1,38 @@
+# Python cache and virtualenvs
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+.mypy_cache/
+
+# Node.js artifacts
+node_modules/
+apps/web/node_modules/
+apps/web/.next/
+.next/
+npm-debug.log*
+
+# Git and OS
+.git/
+.gitignore
+.DS_Store
+.idea/
+.vscode/
+
+# Local secrets
+.env
+.env.local
+
+# AI agent metadata and workspace traces
+.agents/
+.claude/
+.codex/
+brain/
+
