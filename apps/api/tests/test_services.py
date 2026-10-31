@@ -2,13 +2,15 @@
 
 import asyncio
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+
 import pandas as pd
 import pytest
 from fastapi import HTTPException
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
+from app.main import app, lifespan, run_startup_sync
 from app.models.schemas import (
     AdvancedBacktestRequest,
     BacktestConditionFilter,
@@ -16,8 +18,6 @@ from app.models.schemas import (
     PredictionResponse,
 )
 from app.services import backtest_service, prediction_service, stock_service
-from app.main import run_startup_sync, lifespan, app
-
 
 # ---------------------------------------------------------------------------
 # BACKTEST SERVICE TESTS

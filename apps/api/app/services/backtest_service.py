@@ -4,10 +4,11 @@ import sys
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 import pandas as pd
+from fastapi import HTTPException
+
 from app.core.config import settings
 from app.models.schemas import (
     AdvancedBacktestRequest,
-    BacktestConditionFilter,
     BacktestMetricsSchema,
     BacktestRequest,
     BacktestResponse,
@@ -25,7 +26,6 @@ from app.models.schemas import (
     TradeLogItem,
 )
 from app.services import stock_service
-from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 

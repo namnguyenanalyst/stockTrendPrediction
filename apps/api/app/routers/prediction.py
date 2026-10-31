@@ -1,7 +1,6 @@
 """Router quản lý các endpoint suy luận dự báo xu hướng thị trường (AI Inference)."""
 
 from fastapi import APIRouter, Query
-
 from pydantic import BaseModel, Field
 
 from app.models.schemas import BatchPredictionResponse, LiveSyncRequest, PredictionResponse

@@ -18,7 +18,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.models.schemas import HealthResponse
-from app.routers import backtest_router, prediction_router, stocks_router
+from app.routers import (
+    auth_router,
+    backtest_router,
+    prediction_router,
+    stocks_router,
+    user_router,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -85,6 +91,10 @@ app.add_middleware(
 app.include_router(stocks_router, prefix=settings.API_V1_STR)
 app.include_router(prediction_router, prefix=settings.API_V1_STR)
 app.include_router(backtest_router, prefix=settings.API_V1_STR)
+
+# Đăng ký các Router xác thực và cá nhân hóa dưới prefix /api/v1
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
+app.include_router(user_router, prefix="/api/v1/user", tags=["User"])
 
 
 @app.get(

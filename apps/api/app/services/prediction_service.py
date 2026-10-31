@@ -5,9 +5,10 @@ import os
 import sys
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+from fastapi import HTTPException
+
 from app.core.config import settings
 from app.models.schemas import BatchPredictionResponse, PredictionResponse
-from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 

@@ -1,8 +1,10 @@
-from datetime import datetime
 import logging
+from datetime import datetime
 from typing import Any
 
 import pandas as pd
+from fastapi import HTTPException
+
 from app.core.config import settings
 from app.models.schemas import (
     IndexOverview,
@@ -16,7 +18,6 @@ from app.models.schemas import (
     StockSummaryResponse,
     StockSymbolInfo,
 )
-from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
