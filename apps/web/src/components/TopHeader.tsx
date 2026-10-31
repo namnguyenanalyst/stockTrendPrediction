@@ -8,6 +8,7 @@ import {
   History,
   Search,
 } from "lucide-react";
+import { UserMenu } from "@/components/auth/UserMenu";
 import { getStockSymbols } from "@/lib/api";
 import { StockSymbolInfo } from "@/lib/types";
 
@@ -154,107 +155,110 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
         </div>
 
-        {/* Bên Phải: Bộ chọn mã cổ phiếu toàn diện (Chỉ hiển thị ở Tab 2 Dự báo AI; ẩn ở Tab 1 Thị trường và Tab 3 Kiểm thử vì đã có bộ chọn chuyên biệt) */}
-        {activeTab === "prediction" && (
-          <div className="flex flex-wrap items-center gap-2">
-          {/* Ô Tìm Kiếm Mã Cổ Phiếu / Chỉ Số Mở Rộng */}
-          <div ref={searchRef} className="relative">
-            <div className="relative flex items-center">
-              <Search className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setIsSearchOpen(true);
-                }}
-                onFocus={() => setIsSearchOpen(true)}
-                onKeyDown={handleSearchKeyDown}
-                placeholder={`Nhập mã CP (${selectedSymbol})...`}
-                className="h-8 w-36 rounded-lg border border-slate-800 bg-slate-900/90 pl-8 pr-7 text-xs font-bold uppercase text-slate-100 placeholder:text-slate-500 placeholder:font-normal focus:border-emerald-500/60 focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 sm:w-48 transition-all"
-              />
-              <button
-                type="button"
-                onClick={() => setIsSearchOpen(!isSearchOpen)}
-                className="absolute right-2 text-slate-400 hover:text-slate-200"
-              >
-                <ChevronDown className="h-3 w-3" />
-              </button>
-            </div>
-
-            {/* Dropdown gợi ý mã cổ phiếu & chỉ số */}
-            {isSearchOpen && (
-              <div className="absolute right-0 mt-1 max-h-80 w-80 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-2 shadow-2xl backdrop-blur-xl z-50">
-                {/* Header gợi ý */}
-                <div className="px-1.5 py-1 text-[10px] font-semibold text-slate-400 border-b border-slate-800/80 mb-1.5">
-                  <span>Gợi ý mã giao dịch</span>
+        {/* Bên Phải: Bộ chọn mã cổ phiếu & Menu tài khoản người dùng */}
+        <div className="flex items-center gap-3 self-end md:self-auto">
+          {activeTab === "prediction" && (
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Ô Tìm Kiếm Mã Cổ Phiếu / Chỉ Số Mở Rộng */}
+              <div ref={searchRef} className="relative">
+                <div className="relative flex items-center">
+                  <Search className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setIsSearchOpen(true);
+                    }}
+                    onFocus={() => setIsSearchOpen(true)}
+                    onKeyDown={handleSearchKeyDown}
+                    placeholder={`Nhập mã CP (${selectedSymbol})...`}
+                    className="h-8 w-36 rounded-lg border border-slate-800 bg-slate-900/90 pl-8 pr-7 text-xs font-bold uppercase text-slate-100 placeholder:text-slate-500 placeholder:font-normal focus:border-emerald-500/60 focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 sm:w-48 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsSearchOpen(!isSearchOpen)}
+                    className="absolute right-2 text-slate-400 hover:text-slate-200"
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
                 </div>
 
-                {/* Thanh phân loại Category Chips */}
-                <div className="flex items-center gap-1 overflow-x-auto pb-1.5 mb-1.5 border-b border-slate-800/80 scrollbar-none">
-                  {CATEGORY_TABS.map((cat) => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedCategory(cat.id);
-                      }}
-                      className={`rounded-md px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap transition-colors ${
-                        selectedCategory === cat.id
-                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                          : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-                      }`}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
-                </div>
+                {/* Dropdown gợi ý mã cổ phiếu & chỉ số */}
+                {isSearchOpen && (
+                  <div className="absolute right-0 mt-1 max-h-80 w-80 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-2 shadow-2xl backdrop-blur-xl z-50">
+                    {/* Header gợi ý */}
+                    <div className="px-1.5 py-1 text-[10px] font-semibold text-slate-400 border-b border-slate-800/80 mb-1.5">
+                      <span>Gợi ý mã giao dịch</span>
+                    </div>
 
-                {filteredSymbols.length > 0 ? (
-                  <div className="space-y-0.5">
-                    {filteredSymbols.slice(0, 30).map((item) => (
-                      <button
-                        key={item.symbol}
-                        onClick={() => handleSelectSymbol(item.symbol)}
-                        className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition ${
-                          selectedSymbol === item.symbol
-                            ? "bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30"
-                            : "text-slate-300 hover:bg-slate-900 hover:text-white"
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="font-bold text-slate-100">{item.symbol}</span>
-                          {item.exchange === "INDEX" && (
-                            <span className="rounded bg-sky-500/15 border border-sky-500/30 px-1 py-0.2 text-[9px] font-bold text-sky-400">
-                              CHỈ SỐ
+                    {/* Thanh phân loại Category Chips */}
+                    <div className="flex items-center gap-1 overflow-x-auto pb-1.5 mb-1.5 border-b border-slate-800/80 scrollbar-none">
+                      {CATEGORY_TABS.map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCategory(cat.id);
+                          }}
+                          className={`rounded-md px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap transition-colors ${
+                            selectedCategory === cat.id
+                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                              : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                          }`}
+                        >
+                          {cat.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {filteredSymbols.length > 0 ? (
+                      <div className="space-y-0.5">
+                        {filteredSymbols.slice(0, 30).map((item) => (
+                          <button
+                            key={item.symbol}
+                            onClick={() => handleSelectSymbol(item.symbol)}
+                            className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition ${
+                              selectedSymbol === item.symbol
+                                ? "bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30"
+                                : "text-slate-300 hover:bg-slate-900 hover:text-white"
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="font-bold text-slate-100">{item.symbol}</span>
+                              {item.exchange === "INDEX" && (
+                                <span className="rounded bg-sky-500/15 border border-sky-500/30 px-1 py-0.2 text-[9px] font-bold text-sky-400">
+                                  CHỈ SỐ
+                                </span>
+                              )}
+                              <span className="text-[10px] text-slate-400 truncate max-w-[130px]">
+                                {item.name}
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-mono text-slate-500 shrink-0">
+                              {item.exchange}
                             </span>
-                          )}
-                          <span className="text-[10px] text-slate-400 truncate max-w-[130px]">
-                            {item.name}
-                          </span>
-                        </div>
-                        <span className="text-[10px] font-mono text-slate-500 shrink-0">
-                          {item.exchange}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-3 text-center text-xs text-slate-400">
+                        <p>Không thấy trong danh mục đã lưu.</p>
+                        <p className="mt-1">Nhấn <strong>Enter</strong> để tải nến SSI trực tuyến:</p>
+                        <span className="font-bold text-emerald-400 uppercase mt-1 inline-block">
+                          &quot;{searchQuery}&quot;
                         </span>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-3 text-center text-xs text-slate-400">
-                    <p>Không thấy trong danh mục đã lưu.</p>
-                    <p className="mt-1">Nhấn <strong>Enter</strong> để tải nến SSI trực tuyến:</p>
-                    <span className="font-bold text-emerald-400 uppercase mt-1 inline-block">
-                      &quot;{searchQuery}&quot;
-                    </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
+          <UserMenu />
         </div>
-        )}
       </div>
     </header>
   );

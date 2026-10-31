@@ -5,15 +5,20 @@
 
 import {
   AdvancedBacktestRequest,
+  BacktestHistoryCreateRequest,
   BacktestRequest,
   BacktestResponse,
   BacktestSummaryResponse,
   BatchPredictionResponse,
+  LoginRequest,
+  LoginResponse,
   MarketBoardResponse,
   MarketSyncStatusResponse,
   PortfolioBacktestResponse,
   PredictionResponse,
   RecentSignalsResponse,
+  RefreshTokenResponse,
+  RegisterRequest,
   RetrainResponse,
   SectorItem,
   StockHistoryResponse,
@@ -21,25 +26,50 @@ import {
   StockSummaryResponse,
   StockSymbolInfo,
   StrategyPresetsResponse,
+  User,
+  UserBacktestHistory,
+  UserStrategyPreset,
+  UserWatchlist,
 } from "./types";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+let inMemoryToken: string | null = null;
+
+export function setAuthToken(token: string | null): void {
+  inMemoryToken = token;
+}
+
+export function getAuthToken(): string | null {
+  return inMemoryToken;
+}
+
 async function fetchJson<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...((options?.headers as Record<string, string>) || {}),
+  };
+
+  if (inMemoryToken && !headers["Authorization"]) {
+    headers["Authorization"] = `Bearer ${inMemoryToken}`;
+  }
+
   try {
     const res = await fetch(url, {
+      credentials: "include",
       ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...(options?.headers || {}),
-      },
+      headers,
     });
 
     if (!res.ok) {
       const errorText = await res.text();
       throw new Error(`API error (${res.status}): ${errorText}`);
+    }
+
+    if (res.status === 204) {
+      return undefined as T;
     }
 
     return (await res.json()) as T;
@@ -218,4 +248,120 @@ export async function runAdvancedBacktest(
     body: JSON.stringify(request),
   });
 }
+
+// =============================================================================
+// Auth API Endpoints (/api/v1/auth)
+// =============================================================================
+
+export async function loginUser(
+  email: string,
+  password: string
+): Promise<LoginResponse> {
+  const data: LoginRequest = { email, password };
+  const res = await fetchJson<LoginResponse>("/api/v1/auth/login", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  if (res.access_token) {
+    setAuthToken(res.access_token);
+  }
+  return res;
+}
+
+export async function registerUser(
+  email: string,
+  password: string,
+  fullName?: string | null,
+  riskProfile?: string
+): Promise<User> {
+  const data: RegisterRequest = {
+    email,
+    password,
+    full_name: fullName,
+    risk_profile: riskProfile,
+  };
+  return fetchJson<User>("/api/v1/auth/register", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function refreshToken(token?: string): Promise<RefreshTokenResponse> {
+  const body = token ? JSON.stringify({ refresh_token: token }) : JSON.stringify({});
+  const res = await fetchJson<RefreshTokenResponse>("/api/v1/auth/refresh", {
+    method: "POST",
+    body,
+  });
+  if (res.access_token) {
+    setAuthToken(res.access_token);
+  }
+  return res;
+}
+
+export async function getCurrentUser(): Promise<User> {
+  return fetchJson<User>("/api/v1/auth/me");
+}
+
+export async function logoutUser(): Promise<void> {
+  setAuthToken(null);
+}
+
+// =============================================================================
+// Personalization API Endpoints (/api/v1/user)
+// =============================================================================
+
+export async function getUserWatchlists(): Promise<UserWatchlist[]> {
+  return fetchJson<UserWatchlist[]>("/api/v1/user/watchlists");
+}
+
+export async function createUserWatchlist(
+  name: string,
+  symbols: string[]
+): Promise<UserWatchlist> {
+  return fetchJson<UserWatchlist>("/api/v1/user/watchlists", {
+    method: "POST",
+    body: JSON.stringify({ name, symbols }),
+  });
+}
+
+export async function deleteUserWatchlist(id: string): Promise<void> {
+  return fetchJson<void>(`/api/v1/user/watchlists/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getUserPresets(): Promise<UserStrategyPreset[]> {
+  return fetchJson<UserStrategyPreset[]>("/api/v1/user/presets");
+}
+
+export async function createUserPreset(
+  name: string,
+  description: string | null | undefined,
+  parameters: Record<string, unknown>
+): Promise<UserStrategyPreset> {
+  return fetchJson<UserStrategyPreset>("/api/v1/user/presets", {
+    method: "POST",
+    body: JSON.stringify({ name, description, parameters }),
+  });
+}
+
+export async function deleteUserPreset(id: string): Promise<void> {
+  return fetchJson<void>(`/api/v1/user/presets/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getUserBacktests(): Promise<UserBacktestHistory[]> {
+  return fetchJson<UserBacktestHistory[]>("/api/v1/user/backtests");
+}
+
+export async function saveUserBacktest(
+  data: BacktestHistoryCreateRequest
+): Promise<UserBacktestHistory> {
+  return fetchJson<UserBacktestHistory>("/api/v1/user/backtests", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 

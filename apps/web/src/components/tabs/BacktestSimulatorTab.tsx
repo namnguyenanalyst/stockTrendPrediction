@@ -19,6 +19,7 @@ import {
   Bot,
   Sliders,
   FolderOpen,
+  History,
   ChevronDown,
   ChevronUp,
   Settings2,
@@ -37,16 +38,23 @@ import {
   StockSymbolInfo,
   StrategyPresetItem,
   TradeLogItem,
+  UserBacktestHistory,
 } from "@/lib/types";
 import {
+  createUserPreset,
+  deleteUserPreset,
   getMarketSyncStatus,
   getRecentStrategySignals,
   getStockSectors,
   getStockSymbols,
   getStrategyPresets,
+  getUserBacktests,
+  getUserPresets,
   runAdvancedBacktest,
+  saveUserBacktest,
   triggerMarketSync,
 } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { EquityCurveChart } from "@/components/charts/EquityCurveChart";
 import { DrawdownChart } from "@/components/charts/DrawdownChart";
 import { StrategyPresetsList } from "@/components/backtest/StrategyPresetsList";
@@ -60,6 +68,7 @@ import { SellConditionAdjuster } from "@/components/backtest/SellConditionAdjust
 import { PortfolioBreakdownTable } from "@/components/backtest/PortfolioBreakdownTable";
 import { SaveStrategyModal } from "@/components/backtest/SaveStrategyModal";
 import { SavedStrategiesManager } from "@/components/backtest/SavedStrategiesManager";
+import { BacktestHistoryTable } from "@/components/backtest/BacktestHistoryTable";
 import {
   deleteStrategy,
   getCurrentDateTimeString,
@@ -86,8 +95,14 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
   backtestResult,
   loading: externalLoading,
 }) => {
-  // Navigation Subtabs: "my_strategy" (Chiến lược của tôi) vs "presets" (Chiến lược mẫu)
-  const [activeSubtab, setActiveSubtab] = useState<"my_strategy" | "presets">("my_strategy");
+  // Navigation Subtabs: "my_strategy" (Chiến lược của tôi) vs "presets" (Chiến lược mẫu) vs "history" (Sổ nhật ký)
+  const [activeSubtab, setActiveSubtab] = useState<"my_strategy" | "presets" | "history">("my_strategy");
+
+  // Authentication & Cá nhân hóa CSDL
+  const { user, isAuthenticated } = useAuth();
+  const [backtestHistories, setBacktestHistories] = useState<UserBacktestHistory[]>([]);
+  const [loadingHistories, setLoadingHistories] = useState<boolean>(false);
+  const [isSavingHistory, setIsSavingHistory] = useState<boolean>(false);
 
   // Strategy View Mode within "Chiến lược của tôi": "manager" (Quản lý chiến thuật DNSE) vs "builder" (Phòng Lab Kiểm thử)
   // Mặc định luôn hiển thị giao diện Quản lý chiến thuật (manager) như Hình 2
@@ -209,6 +224,84 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
 
     loadInitialData();
   }, []);
+
+  // Tự động đồng bộ Presets và Nhật ký Backtest từ CSDL
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadUserData() {
+      if (!isAuthenticated) return;
+      setLoadingHistories(true);
+      try {
+        const [presetsRes, historiesRes] = await Promise.allSettled([
+          getUserPresets(),
+          getUserBacktests(),
+        ]);
+        if (ignore) return;
+        if (presetsRes.status === "fulfilled") {
+          if (presetsRes.value && presetsRes.value.length > 0) {
+            const dbPresets: SavedStrategyItem[] = presetsRes.value.map((p) => {
+              const params = (p.parameters || {}) as Record<string, unknown>;
+              return {
+                id: p.id,
+                name: p.name,
+                status: (params.status === "draft" ? "draft" : "active") as "active" | "draft",
+                created_at: p.created_at,
+                updated_at: p.updated_at || p.created_at,
+                scope_type: (params.scope_type as BacktestScopeType) || "stock",
+                symbol: typeof params.symbol === "string" ? params.symbol : undefined,
+                index_name: typeof params.index_name === "string" ? params.index_name : undefined,
+                sector_name: typeof params.sector_name === "string" ? params.sector_name : undefined,
+                portfolio_symbols: Array.isArray(params.portfolio_symbols)
+                  ? (params.portfolio_symbols as string[])
+                  : undefined,
+                start_date: typeof params.start_date === "string" ? params.start_date : "2023-01-01",
+                end_date: typeof params.end_date === "string" ? params.end_date : "2024-01-01",
+                initial_capital:
+                  typeof params.initial_capital === "number" ? params.initial_capital : 100_000_000,
+                model_type: (params.model_type as "lightgbm" | "lstm" | "none") || "lightgbm",
+                slippage_rate:
+                  typeof params.slippage_rate === "number" ? params.slippage_rate : undefined,
+                use_advanced_settings: Boolean(params.use_advanced_settings),
+                buy_conditions: (params.buy_conditions as BacktestConditionFilter) || {
+                  market_condition: "all",
+                  use_ma: true,
+                  use_rsi: true,
+                  rsi_threshold: 45,
+                  use_volume_spike: false,
+                },
+                sell_conditions: (params.sell_conditions as BacktestConditionFilter) || {
+                  take_profit_pct: 15,
+                  stop_loss_pct: 7,
+                  trailing_stop_pct: 5,
+                  max_holding_days: 30,
+                },
+                last_metrics: params.metrics as SavedStrategyItem["last_metrics"],
+              };
+            });
+
+            setSavedStrategies(dbPresets);
+          } else {
+            setSavedStrategies([]);
+          }
+        }
+        if (historiesRes.status === "fulfilled") {
+          setBacktestHistories(historiesRes.value);
+        }
+      } catch (err) {
+        console.warn("Không thể tải dữ liệu cá nhân hóa:", err);
+      } finally {
+        if (!ignore) {
+          setLoadingHistories(false);
+        }
+      }
+    }
+
+    loadUserData();
+    return () => {
+      ignore = true;
+    };
+  }, [isAuthenticated, user?.id]);
 
   // Xử lý Chạy kiểm thử nâng cao toàn diện (Chuẩn DNSE)
   const handleRunAdvancedSimulation = async (e?: React.FormEvent) => {
@@ -396,6 +489,36 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
     setSavedStrategies(updatedList);
     setActiveStrategyId(activeId);
     setStrategyName(name);
+
+    if (isAuthenticated) {
+      (async () => {
+        try {
+          if (overwriteExistingId) {
+            await deleteUserPreset(overwriteExistingId).catch(() => {});
+          }
+          await createUserPreset(name, `Chiến lược ${name}`, {
+            scope_type: scopeType,
+            symbol: selectedSymbol,
+            index_name: selectedIndex,
+            sector_name: selectedSector,
+            portfolio_symbols: portfolioSymbols,
+            start_date: startDate,
+            end_date: endDate,
+            initial_capital: initialCapital,
+            model_type: modelType,
+            slippage_rate: slippageRate,
+            use_advanced_settings: useAdvancedSettings,
+            buy_conditions: buyConditions,
+            sell_conditions: sellConditions,
+            metrics: currentMetrics,
+            status,
+          });
+        } catch (err) {
+          console.warn("Lỗi lưu preset lên CSDL:", err);
+        }
+      })();
+    }
+
     setSavedToast(
       action === "created"
         ? `Đã lưu chiến lược mới "${name}" thành công!`
@@ -459,16 +582,79 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
       const { updatedList, deleted } = deleteStrategy(savedStrategies, strategyId);
       if (deleted) {
         setSavedStrategies(updatedList);
+        if (isAuthenticated) {
+          deleteUserPreset(strategyId).catch((err) =>
+            console.warn("Lỗi xóa mẫu chiến lược trên CSDL:", err)
+          );
+        }
         setSavedToast(`Đã xóa chiến lược "${strat.name}"`);
         setTimeout(() => setSavedToast(null), 3000);
       }
     }
   };
 
-
   // Lấy các metrics hiển thị
   const metrics = portfolioResult?.aggregate_metrics || backtestResult?.metrics;
   const equityCurve = portfolioResult?.portfolio_equity_curve || backtestResult?.equity_curve || [];
+
+  // Lưu kết quả kiểm thử vào sổ nhật ký (CSDL / tài khoản)
+  const handleSaveBacktestToHistory = async () => {
+    if (!metrics) {
+      setSavedToast("⚠️ Vui lòng chạy kiểm thử trước khi lưu vào sổ nhật ký!");
+      setTimeout(() => setSavedToast(null), 3500);
+      return;
+    }
+
+    setIsSavingHistory(true);
+    try {
+      const targetSymbol =
+        scopeType === "stock"
+          ? selectedSymbol
+          : scopeType === "index"
+          ? selectedIndex
+          : scopeType === "sector"
+          ? selectedSector
+          : "PORTFOLIO";
+
+      const payload = {
+        symbol: targetSymbol || "VNINDEX",
+        strategy_name: strategyName || `Chiến lược ${targetSymbol}`,
+        strategy_type:
+          modelType === "lstm"
+            ? "Mô hình PyTorch LSTM"
+            : "Mô hình LightGBM",
+        start_date: startDate,
+        end_date: endDate,
+        initial_capital: initialCapital,
+        total_return: metrics.total_return_pct,
+        sharpe_ratio: metrics.sharpe_ratio,
+        max_drawdown: metrics.max_drawdown_pct,
+        win_rate: metrics.win_rate_pct,
+        equity_curve: equityCurve,
+      };
+
+      if (isAuthenticated) {
+        const savedItem = await saveUserBacktest(payload);
+        setBacktestHistories((prev) => [savedItem, ...prev]);
+      } else {
+        const localItem: UserBacktestHistory = {
+          id: "local_" + Date.now(),
+          ...payload,
+          executed_at: new Date().toISOString(),
+        };
+        setBacktestHistories((prev) => [localItem, ...prev]);
+      }
+
+      setSavedToast("Đã lưu kết quả kiểm thử vào Sổ nhật ký!");
+      setTimeout(() => setSavedToast(null), 3500);
+    } catch (err) {
+      console.warn("Lỗi lưu nhật ký kiểm thử:", err);
+      setSavedToast("Không thể lưu kết quả vào Sổ nhật ký.");
+      setTimeout(() => setSavedToast(null), 3500);
+    } finally {
+      setIsSavingHistory(false);
+    }
+  };
   const trades: TradeLogItem[] = useMemo(() => {
     if (detailSymbol && portfolioResult?.individual_results?.[detailSymbol]) {
       return portfolioResult.individual_results[detailSymbol].trades || [];
@@ -588,9 +774,22 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
             <Sparkles className="h-4 w-4" />
             <span>Chiến thuật mẫu</span>
           </button>
+
+          {/* Nút 4: Sổ nhật ký kiểm thử */}
+          <button
+            type="button"
+            onClick={() => setActiveSubtab("history")}
+            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${activeSubtab === "history"
+              ? "bg-slate-800 text-amber-400 border border-slate-700"
+              : "text-slate-400 hover:text-slate-200"
+              }`}
+          >
+            <History className="h-4 w-4" />
+            <span>Sổ nhật ký ({backtestHistories.length})</span>
+          </button>
         </div>
 
-        {/* Action Buttons: Lưu chiến lược & Toast */}
+        {/* Action Buttons: Lưu chiến lược, Lưu nhật ký & Toast */}
         <div className="flex items-center gap-2">
           {savedToast && (
             <div className="flex items-center gap-1.5 rounded-md bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-400 border border-emerald-500/30">
@@ -607,6 +806,17 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
               )}
             </div>
           )}
+
+          {/* Nút Lưu vào Sổ nhật ký */}
+          <button
+            type="button"
+            onClick={handleSaveBacktestToHistory}
+            disabled={isSavingHistory}
+            className="flex items-center gap-1.5 rounded-md bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 border border-slate-700 hover:border-amber-500/50 hover:text-amber-400 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <History className={`h-4 w-4 ${isSavingHistory ? "animate-spin" : "text-amber-400"}`} />
+            <span>{isSavingHistory ? "Đang lưu..." : "Lưu vào sổ nhật ký"}</span>
+          </button>
 
           <button
             type="button"
@@ -634,6 +844,29 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
           presets={presets}
           onApplyPreset={handleApplyPreset}
           loading={isLoading}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* NỘI DUNG SUBTAB: SỔ NHẬT KÝ KIỂM THỬ (BACKTEST HISTORY) */}
+      {/* ========================================================================= */}
+      {activeSubtab === "history" && (
+        <BacktestHistoryTable
+          histories={backtestHistories}
+          isLoading={loadingHistories}
+          onRefresh={async () => {
+            if (isAuthenticated) {
+              setLoadingHistories(true);
+              try {
+                const list = await getUserBacktests();
+                setBacktestHistories(list);
+              } catch (err) {
+                console.warn("Lỗi làm mới nhật ký:", err);
+              } finally {
+                setLoadingHistories(false);
+              }
+            }
+          }}
         />
       )}
 

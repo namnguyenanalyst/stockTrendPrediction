@@ -573,4 +573,93 @@ export interface SavedStrategyItem {
   };
 }
 
+// =============================================================================
+// Auth & Personalization Types
+// =============================================================================
 
+export type UserRole = "trader" | "admin";
+export type RiskProfile = "conservative" | "balanced" | "aggressive";
+
+export interface User {
+  id: string;
+  email: string;
+  full_name?: string | null;
+  role: UserRole | string;
+  risk_profile: RiskProfile | string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string | null;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+  user?: User;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  full_name?: string | null;
+  risk_profile?: RiskProfile | string;
+}
+
+export interface RefreshTokenResponse {
+  access_token: string;
+  token_type: string;
+}
+
+export interface UserWatchlist {
+  id: string;
+  user_id?: string;
+  name: string;
+  symbols: string[];
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface UserStrategyPreset {
+  id: string;
+  user_id?: string;
+  name: string;
+  description?: string | null;
+  parameters: Record<string, unknown>;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface BacktestHistoryCreateRequest {
+  symbol: string;
+  strategy_name: string;
+  strategy_type: string;
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
+  total_return: number;
+  sharpe_ratio: number;
+  max_drawdown: number;
+  win_rate: number;
+  equity_curve: EquityCurvePoint[];
+}
+
+export interface UserBacktestHistory {
+  id: string;
+  user_id?: string;
+  symbol: string;
+  strategy_name: string;
+  strategy_type: string;
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
+  total_return: number;
+  sharpe_ratio: number;
+  max_drawdown: number;
+  win_rate: number;
+  equity_curve: EquityCurvePoint[];
+  executed_at: string;
+}

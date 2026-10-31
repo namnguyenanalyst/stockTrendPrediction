@@ -12,6 +12,7 @@ import {
   Percent,
   Search,
   Sparkles,
+  Star,
   TrendingDown,
   TrendingUp,
   X,
@@ -25,6 +26,12 @@ import {
 } from "@/components/market/FinancialDetailModal";
 import { IndexRibbon } from "@/components/market/IndexRibbon";
 import { ManageRibbonModal } from "@/components/market/ManageRibbonModal";
+import { useAuth } from "@/context/AuthContext";
+import {
+  createUserWatchlist,
+  deleteUserWatchlist,
+  getUserWatchlists,
+} from "@/lib/api";
 import {
   MarketBoardResponse,
   StockBar,
@@ -50,6 +57,7 @@ const DEFAULT_RIBBON_SYMBOLS = ["VN30", "VNINDEX", "HNX30", "VN30F1M"];
 
 const CATEGORY_TABS = [
   { id: "ALL", label: "Tất cả cổ phiếu" },
+  { id: "WATCHLIST", label: "★ Theo dõi" },
   { id: "VN30", label: "VN30" },
   { id: "BANK", label: "Ngân hàng" },
   { id: "REAL_ESTATE", label: "Bất động sản" },
@@ -152,6 +160,90 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState<boolean>(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Trạng thái ghim mã cổ phiếu vào Danh mục theo dõi (Watchlist)
+  const { user, isAuthenticated } = useAuth();
+  const [pinnedSymbols, setPinnedSymbols] = useState<string[]>([]);
+  const [userWatchlistId, setUserWatchlistId] = useState<string | null>(null);
+
+  // Tải danh mục theo dõi từ CSDL hoặc localStorage
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadWatchlist() {
+      if (isAuthenticated) {
+        try {
+          const lists = await getUserWatchlists();
+          if (!ignore) {
+            if (lists && lists.length > 0) {
+              setUserWatchlistId(lists[0].id);
+              setPinnedSymbols(lists[0].symbols || []);
+            } else {
+              setUserWatchlistId(null);
+              setPinnedSymbols([]);
+            }
+            return;
+          }
+        } catch (err) {
+          console.warn("Không thể tải danh mục theo dõi từ API:", err);
+        }
+      }
+
+      // Fallback về localStorage nếu chưa đăng nhập hoặc offline
+      if (typeof window !== "undefined") {
+        try {
+          const localSaved = localStorage.getItem("stockpulse_watchlist_symbols");
+          if (localSaved && !ignore) {
+            const parsed = JSON.parse(localSaved);
+            if (Array.isArray(parsed)) {
+              setPinnedSymbols(parsed);
+            }
+          }
+        } catch {
+          // Bỏ qua lỗi parse
+        }
+      }
+    }
+
+    loadWatchlist();
+    return () => {
+      ignore = true;
+    };
+  }, [isAuthenticated, user?.id]);
+
+  const togglePinSymbol = async (targetSymbol: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const cleanSym = targetSymbol.toUpperCase();
+    const isPinned = pinnedSymbols.includes(cleanSym);
+    const nextSymbols = isPinned
+      ? pinnedSymbols.filter((s) => s !== cleanSym)
+      : [...pinnedSymbols, cleanSym];
+
+    setPinnedSymbols(nextSymbols);
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem(
+        "stockpulse_watchlist_symbols",
+        JSON.stringify(nextSymbols)
+      );
+    }
+
+    if (isAuthenticated) {
+      try {
+        if (userWatchlistId) {
+          await deleteUserWatchlist(userWatchlistId);
+        }
+        if (nextSymbols.length > 0) {
+          const newWl = await createUserWatchlist("Mục theo dõi", nextSymbols);
+          setUserWatchlistId(newWl.id);
+        } else {
+          setUserWatchlistId(null);
+        }
+      } catch (err) {
+        console.warn("Lỗi đồng bộ danh mục theo dõi:", err);
+      }
+    }
+  };
 
   // Đóng dropdown tìm kiếm khi click ra ngoài
   useEffect(() => {
@@ -307,7 +399,10 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
     }
 
     // Lọc theo nhóm ngành / rổ (Category)
-    if (selectedCategory === "VN30" || selectedCategory === "CORE") {
+    if (selectedCategory === "WATCHLIST") {
+      const pinnedSet = new Set(pinnedSymbols.map((s) => s.toUpperCase()));
+      list = list.filter((s) => pinnedSet.has(s.symbol.toUpperCase()));
+    } else if (selectedCategory === "VN30" || selectedCategory === "CORE") {
       const vn30Set = new Set([
         "ACB", "BCM", "BID", "BVH", "CTG", "FPT", "GAS", "GVR", "HDB", "HPG",
         "MBB", "MSN", "MWG", "PLX", "POW", "SAB", "SHB", "SSB", "SSI", "STB",
@@ -361,7 +456,7 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
     }
 
     return list;
-  }, [marketBoard, selectedCategory, selectedExchange, searchQuery]);
+  }, [marketBoard, selectedCategory, selectedExchange, searchQuery, pinnedSymbols]);
 
   // Thống kê độ rộng thị trường (Market Breadth) chuẩn phong cách DNSE
   const breadthStats = useMemo(() => {
@@ -721,6 +816,24 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                         {/* 1. Mã chứng khoán & Logo */}
                         <td className="py-2 pl-4 pr-3">
                           <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => togglePinSymbol(stock.symbol, e)}
+                              title={
+                                pinnedSymbols.includes(stock.symbol.toUpperCase())
+                                  ? "Bỏ ghim khỏi danh mục theo dõi"
+                                  : "Ghim vào danh mục theo dõi"
+                              }
+                              className="p-1 rounded hover:bg-slate-700/60 transition-colors shrink-0"
+                            >
+                              <Star
+                                className={`h-3.5 w-3.5 ${
+                                  pinnedSymbols.includes(stock.symbol.toUpperCase())
+                                    ? "fill-amber-400 text-amber-400"
+                                    : "text-slate-600 hover:text-amber-400"
+                                }`}
+                              />
+                            </button>
                             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 font-black text-slate-200 ring-1 ring-slate-700/60 group-hover:ring-emerald-500/50 transition-all">
                               {stock.symbol.slice(0, 2)}
                             </div>
@@ -824,6 +937,23 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                   })}
                 </tbody>
               </table>
+              {filteredStocks.length === 0 && (
+                <div className="py-12 text-center text-xs text-slate-400">
+                  {selectedCategory === "WATCHLIST" ? (
+                    <div className="flex flex-col items-center gap-2">
+                      <Star className="h-8 w-8 text-amber-400/40" />
+                      <p className="font-semibold text-slate-300">
+                        Danh mục theo dõi của bạn đang trống
+                      </p>
+                      <p className="max-w-md text-slate-500 text-[11px]">
+                        Nhấn biểu tượng ★ bên cạnh bất kỳ mã cổ phiếu nào trong bảng giá để ghim vào danh mục theo dõi cá nhân của bạn.
+                      </p>
+                    </div>
+                  ) : (
+                    <p>Không tìm thấy mã cổ phiếu phù hợp với bộ lọc hiện tại.</p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
