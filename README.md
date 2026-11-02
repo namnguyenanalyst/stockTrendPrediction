@@ -53,7 +53,7 @@ VN_Stock/
 │   ├── Cấu trúc báo cáo ĐATN.md # Khung đồ án chuẩn Khoa CNTT - ĐH Mỏ - Địa chất
 │   ├── reports/                 # 5 Báo cáo triển khai kỹ thuật & Chương 2 cơ sở lý thuyết
 │   └── notes/                   # Sổ tay ghi chú chuyên sâu, XAI SHAP, Purged Horizon & IEEE citations
-├── references/                  # Mã nguồn & tài liệu tham khảo bổ trợ
+├── tests/                       # Bộ kiểm thử End-to-End (E2E) 4 tầng (87 tests)
 ├── .github/workflows/           # CI workflow tự động kiểm thử
 └── README.md                    # Tài liệu tổng quan dự án
 ```

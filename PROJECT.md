@@ -27,13 +27,13 @@ The platform is upgraded from a single-user demo to a production-grade, multi-us
 | 13 | Environment Configuration | Comprehensive `.env.example` covering DB credentials, JWT secrets, CORS origins, API URLs | M4 | ORIGINAL_REQUEST R4 |
 | 14 | Backend Unit & Integration Tests | Pytest test suite in `apps/api/tests/` verifying db models, migrations, auth flow, user personalization, and cross-tenant isolation | E2E & M2 | ORIGINAL_REQUEST Verification |
 | 15 | Frontend Unit & Integration Tests | Vitest test suite in `apps/web/` verifying auth client, personalization client, storage migration, and middleware logic | E2E & M3 | ORIGINAL_REQUEST Verification |
-| 16 | Opaque-Box E2E Testing Suite | Requirements-driven 4-tier test suite (Tier 1 Feature, Tier 2 Boundary, Tier 3 Cross-feature, Tier 4 Real-world) producing `TEST_READY.md` | E2E Track | ORIGINAL_REQUEST Acceptance |
+| 16 | Opaque-Box E2E Testing Suite | Requirements-driven 4-tier test suite (Tier 1 Feature, Tier 2 Boundary, Tier 3 Cross-feature, Tier 4 Real-world) producing `docs/reports/TEST_READY.md` | E2E Track | ORIGINAL_REQUEST Acceptance |
 | 17 | Final E2E Verification & Hardening | 100% pass of E2E test suite followed by Tier 5 adversarial coverage hardening | Final Milestone | ORIGINAL_REQUEST Acceptance |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| E2E | E2E Testing Track | Design and construct opaque-box test suite (Tiers 1-4) covering all features independently; publish `TEST_READY.md` | none | DONE |
+| E2E | E2E Testing Track | Design and construct opaque-box test suite (Tiers 1-4) covering all features independently; publish `docs/reports/TEST_READY.md` | none | DONE |
 | M1 | Database Schema & Migrations | SQLAlchemy 2.0 Async models, session factory, Alembic async migration for all 5 tables | none | DONE |
 | M2 | Backend Auth & Personalization API | Bcrypt security, JWT Access/Refresh tokens, `/api/v1/auth`, `/api/v1/user/*` CRUD with tenant isolation, quant logic preservation | M1 | DONE |
 | M3 | Frontend Auth UI & Personalization | Next.js 16 `(auth)` routes, `middleware.ts`, `AuthContext`, watchlist/preset/backtest history UI integration | M2 | DONE |

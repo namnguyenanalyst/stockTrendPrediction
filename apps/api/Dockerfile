@@ -12,7 +12,7 @@ WORKDIR /app
 # Set environment variables for Python runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    UV_HTTP_TIMEOUT=120 \
+    UV_HTTP_TIMEOUT=300 \
     PYTHONPATH="/app/apps/api:/app/apps/ml"
 
 # Install system dependencies (compiler for C-extensions, libpq, and curl for healthchecks)
