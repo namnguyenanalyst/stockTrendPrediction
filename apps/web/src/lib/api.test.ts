@@ -12,6 +12,9 @@ import {
   getStockSectors,
   getStockSummary,
   getStockSymbols,
+  deleteUserBacktest,
+  getAdminStats,
+  getPredictStatus,
   getStrategyPresets,
   runAdvancedBacktest,
   runBacktestSimulation,
@@ -320,6 +323,64 @@ describe("Web API Client (src/lib/api.ts)", () => {
         })
       );
       expect(res.scope_type).toBe("portfolio");
+    });
+  });
+
+  describe("Gói 2 Security & Admin Endpoints", () => {
+    it("should fetch getAdminStats correctly from /api/v1/admin/stats", async () => {
+      const mockStats = {
+        total_users: 10,
+        new_users_today: 2,
+        new_users_7d: 5,
+        new_users_30d: 8,
+        online_users: 3,
+      };
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockStats,
+      } as Response);
+
+      const res = await getAdminStats();
+      expect(fetch).toHaveBeenCalledWith(
+        "http://localhost:8000/api/v1/admin/stats",
+        expect.any(Object)
+      );
+      expect(res).toEqual(mockStats);
+    });
+
+    it("should fetch getPredictStatus correctly from /api/v1/predict/status", async () => {
+      const mockStatus = {
+        last_atc_session_date: "2026-11-04",
+        last_retrain_at: null,
+      };
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockStatus,
+      } as Response);
+
+      const res = await getPredictStatus();
+      expect(fetch).toHaveBeenCalledWith(
+        "http://localhost:8000/api/v1/predict/status",
+        expect.any(Object)
+      );
+      expect(res.last_atc_session_date).toBe("2026-11-04");
+      expect(res.last_retrain_at).toBeNull();
+    });
+
+    it("should call deleteUserBacktest with DELETE method", async () => {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+        json: async () => ({}),
+      } as Response);
+
+      await deleteUserBacktest("bt-uuid-123");
+      expect(fetch).toHaveBeenCalledWith(
+        "http://localhost:8000/api/v1/user/backtests/bt-uuid-123",
+        expect.objectContaining({
+          method: "DELETE",
+        })
+      );
     });
   });
 });

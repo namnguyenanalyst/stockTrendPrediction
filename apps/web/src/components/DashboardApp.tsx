@@ -2,11 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { Terminal } from "lucide-react";
-import { Sidebar } from "@/components/Sidebar";
+import { DashboardTab, Sidebar } from "@/components/Sidebar";
 import { TopHeader } from "@/components/TopHeader";
 import { AIPredictionTab } from "@/components/tabs/AIPredictionTab";
 import { BacktestSimulatorTab } from "@/components/tabs/BacktestSimulatorTab";
 import { MarketOverviewTab } from "@/components/tabs/MarketOverviewTab";
+import { SystemStatsTab } from "@/components/tabs/SystemStatsTab";
+import { useAuth } from "@/context/AuthContext";
 import {
   getBatchPrediction,
   getMarketBoard,
@@ -28,13 +30,12 @@ import {
 } from "@/lib/types";
 
 interface DashboardAppProps {
-  initialTab?: "market" | "prediction" | "backtest";
+  initialTab?: DashboardTab;
 }
 
 export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
-  const [activeTab, setActiveTabState] = useState<"market" | "prediction" | "backtest">(
-    initialTab
-  );
+  const { user } = useAuth();
+  const [activeTab, setActiveTabState] = useState<DashboardTab>(initialTab);
   const [selectedSymbol, setSelectedSymbol] = useState<string>("VIC");
   const [modelType, setModelType] = useState<"lightgbm" | "lstm">("lightgbm");
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
@@ -58,11 +59,25 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
   );
   const [loadingBacktest, setLoadingBacktest] = useState<boolean>(false);
 
+  // Bảo vệ không cho non-admin ở lại tab admin-stats
+  useEffect(() => {
+    if (activeTab === "admin-stats" && user && user.role !== "admin") {
+      setActiveTabState("market");
+      if (typeof window !== "undefined") {
+        window.history.replaceState(null, "", "/dashboard");
+      }
+    }
+  }, [activeTab, user]);
+
   // Đồng bộ hóa URL browser khi chuyển tab
-  const setActiveTab = (tab: "market" | "prediction" | "backtest") => {
+  const setActiveTab = (tab: DashboardTab) => {
+    if (tab === "admin-stats" && user?.role !== "admin") {
+      return;
+    }
     setActiveTabState(tab);
     if (typeof window !== "undefined") {
-      const targetUrl = tab === "backtest" ? "/backtest" : "/dashboard";
+      const targetUrl =
+        tab === "backtest" ? "/backtest" : tab === "admin-stats" ? "/admin" : "/dashboard";
       if (window.location.pathname !== targetUrl) {
         window.history.pushState(null, "", targetUrl);
       }
@@ -74,6 +89,8 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
       if (typeof window !== "undefined") {
         if (window.location.pathname === "/backtest") {
           setActiveTabState("backtest");
+        } else if (window.location.pathname === "/admin") {
+          setActiveTabState(user?.role === "admin" ? "admin-stats" : "market");
         } else if (window.location.pathname === "/dashboard") {
           setActiveTabState("market");
         }
@@ -81,7 +98,7 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, []);
+  }, [user]);
 
   // Thủ tục tải dữ liệu bất đồng bộ với Promise.allSettled
   useEffect(() => {
@@ -231,6 +248,10 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
               onRunBacktest={handleRunBacktest}
               loading={loadingBacktest}
             />
+          )}
+
+          {activeTab === "admin-stats" && user?.role === "admin" && (
+            <SystemStatsTab />
           )}
         </main>
 

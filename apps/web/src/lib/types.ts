@@ -645,3 +645,16 @@ export interface UserBacktestHistory {
   equity_curve: EquityCurvePoint[];
   executed_at: string;
 }
+
+export interface AdminStatsResponse {
+  total_users: number;
+  new_users_today: number;
+  new_users_7d: number;
+  new_users_30d: number;
+  online_users: number;
+}
+
+export interface PredictStatusResponse {
+  last_atc_session_date: string;
+  last_retrain_at: string | null;
+}

@@ -322,22 +322,35 @@ def test_backtest_signals_recent_endpoint():
 
 
 def test_predict_retrain_endpoint():
-    """Kiểm tra endpoint POST /api/predict/retrain với mock training engine."""
+    """Kiểm tra endpoint POST /api/predict/retrain với mock training engine và secret header."""
     from unittest.mock import patch
+
+    from app.core.config import settings
+
     mock_ret = {
         "status": "success",
         "horizon": "T+3",
         "lightgbm_metrics": {"accuracy": 0.65},
         "lstm_metrics": {"accuracy": 0.62},
     }
-    with patch("vn_stock.modeling.train.train_production_model", return_value=mock_ret):
+    with patch.object(settings, "INTERNAL_WORKER_SECRET", "test_secret_12345"), \
+         patch("vn_stock.modeling.train.train_production_model", return_value=mock_ret):
         payload = {
             "horizon": 3,
             "threshold": 0.02,
             "val_buffer_days": 40,
             "scope": "VN30",
         }
-        response = client.post("/api/predict/retrain", json=payload)
+        # Không có secret -> 403 Forbidden
+        res_no_sec = client.post("/api/predict/retrain", json=payload)
+        assert res_no_sec.status_code == 403
+
+        # Đúng secret -> 200 OK
+        response = client.post(
+            "/api/predict/retrain",
+            json=payload,
+            headers={"X-Internal-Worker-Secret": "test_secret_12345"},
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "success"

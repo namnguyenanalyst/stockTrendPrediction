@@ -5,19 +5,23 @@ import {
   BarChart3,
   BrainCircuit,
   History,
+  ShieldCheck,
   TrendingUp,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+
+export type DashboardTab = "market" | "prediction" | "backtest" | "admin-stats";
 
 export interface SidebarProps {
-  activeTab: "market" | "prediction" | "backtest";
-  setActiveTab: (tab: "market" | "prediction" | "backtest") => void;
+  activeTab: DashboardTab;
+  setActiveTab: (tab: DashboardTab) => void;
   isCollapsed: boolean;
   setIsCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
 }
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS = [
   {
     id: "market" as const,
     label: "Thị trường & Bảng giá",
@@ -47,6 +51,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed,
   setIsCollapsed,
 }) => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
+  const navItems = [
+    ...BASE_NAV_ITEMS,
+    ...(isAdmin
+      ? [
+          {
+            id: "admin-stats" as const,
+            label: "Thống kê hệ thống",
+            shortLabel: "Thống kê",
+            description: "Giám sát định danh & PoLP",
+            icon: ShieldCheck,
+          },
+        ]
+      : []),
+  ];
   // Kích hoạt dispatch sự kiện resize để các biểu đồ Lightweight Charts tự động cập nhật độ rộng mượt mà
   useEffect(() => {
     window.dispatchEvent(new Event("resize"));
@@ -109,7 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* 2. Danh sách Menu Tabs (Dạng Cột Dọc) */}
       <div className="flex-1 px-3 py-4 overflow-y-auto">
         <nav className="flex flex-col space-y-1.5" role="tablist">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
 

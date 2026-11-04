@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # Khóa bí mật phục vụ quy trình retrain tự trị nội bộ (Gói 2/3)
+    INTERNAL_WORKER_SECRET: str | None = None
+
     @property
     def async_db_url(self) -> str:
         """Đường dẫn kết nối CSDL bất đồng bộ (cho SQLAlchemy AsyncEngine / asyncpg)."""

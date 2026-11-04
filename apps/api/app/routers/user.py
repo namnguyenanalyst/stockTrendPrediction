@@ -104,10 +104,15 @@ async def delete_watchlist(
             detail="Watchlist not found",
         )
 
-    result = await db.execute(select(UserWatchlist).where(UserWatchlist.id == wid))
+    result = await db.execute(
+        select(UserWatchlist).where(
+            UserWatchlist.id == wid,
+            UserWatchlist.user_id == current_user.id,
+        )
+    )
     item = result.scalar_one_or_none()
 
-    if not item or item.user_id != current_user.id:
+    if not item:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Watchlist not found",
@@ -187,10 +192,15 @@ async def delete_preset(
             detail="Strategy preset not found",
         )
 
-    result = await db.execute(select(StrategyPreset).where(StrategyPreset.id == pid))
+    result = await db.execute(
+        select(StrategyPreset).where(
+            StrategyPreset.id == pid,
+            StrategyPreset.user_id == current_user.id,
+        )
+    )
     item = result.scalar_one_or_none()
 
-    if not item or item.user_id != current_user.id:
+    if not item:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Strategy preset not found",
@@ -280,3 +290,41 @@ async def save_backtest(
     await db.commit()
     await db.refresh(item)
     return BacktestHistoryResponse.model_validate(item)
+
+
+@router.delete(
+    "/backtests/{backtest_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Xóa nhật ký kiểm thử chiến lược",
+)
+async def delete_backtest(
+    backtest_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Xóa nhật ký backtest theo ID. Ngăn chặn IDOR: trả về 404 nếu không tìm thấy hoặc thuộc tài khoản khác."""
+    try:
+        bid = uuid.UUID(backtest_id)
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Backtest not found",
+        )
+
+    result = await db.execute(
+        select(BacktestHistory).where(
+            BacktestHistory.id == bid,
+            BacktestHistory.user_id == current_user.id,
+        )
+    )
+    item = result.scalar_one_or_none()
+
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Backtest not found",
+        )
+
+    await db.delete(item)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

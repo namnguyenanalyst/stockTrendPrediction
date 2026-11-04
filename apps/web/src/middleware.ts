@@ -1,6 +1,25 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+function extractRoleFromJwt(jwtToken: string): string | null {
+  try {
+    const parts = jwtToken.split(".");
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    const payload = JSON.parse(jsonPayload);
+    return payload.role || null;
+  } catch {
+    return null;
+  }
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token =
@@ -24,7 +43,24 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // 3. Protected routes: "/dashboard", "/backtest"
+  // 3. Admin routes: "/admin" - Chỉ cho phép role ADMIN
+  const isAdminRoute = pathname.startsWith("/admin");
+  if (isAdminRoute) {
+    if (!isAuthenticated) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    const role = token ? extractRoleFromJwt(token) : null;
+    if (role !== "admin") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
+    return NextResponse.next();
+  }
+
+  // 4. Protected routes: "/dashboard", "/backtest"
   const isProtectedRoute =
     pathname.startsWith("/dashboard") || pathname.startsWith("/backtest");
   if (isProtectedRoute && !isAuthenticated) {
@@ -41,6 +77,7 @@ export const config = {
     "/",
     "/dashboard/:path*",
     "/backtest/:path*",
+    "/admin/:path*",
     "/login",
     "/register",
   ],

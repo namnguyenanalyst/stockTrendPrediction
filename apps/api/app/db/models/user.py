@@ -81,6 +81,11 @@ class User(Base):
         onupdate=func.now(),
         nullable=False,
     )
+    last_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+    )
 
     # Relationships với cascade deletes
     watchlists: Mapped[list["UserWatchlist"]] = relationship(

@@ -1,17 +1,26 @@
 """FastAPI dependencies cho xác thực người dùng và kết nối CSDL."""
 
+import hmac
 import uuid
+from datetime import datetime, timedelta, timezone
 
 import jwt
-from fastapi import Depends, HTTPException, Request, status
-from sqlalchemy import select
+from fastapi import Depends, Header, HTTPException, Request, status
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.security import decode_token
-from app.db.models.user import User
+from app.db.models.user import User, UserRole
 from app.db.session import get_db
 
-__all__ = ["get_current_active_user", "get_current_user", "get_db"]
+__all__ = [
+    "get_current_active_user",
+    "get_current_admin_user",
+    "get_current_user",
+    "get_db",
+    "verify_internal_worker_secret",
+]
 
 
 async def get_current_user(
@@ -90,6 +99,24 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Cập nhật có điều kiện last_seen_at ở tầng CSDL (throttle tối đa 1 lần/phút/user)
+    # Không dùng biến bộ nhớ tiến trình, điều kiện WHERE giải quyết hoàn toàn tại CSDL
+    now_utc = datetime.now(timezone.utc)
+    cutoff_60s = now_utc - timedelta(seconds=60)
+    await db.execute(
+        update(User)
+        .where(
+            User.id == user.id,
+            or_(
+                User.last_seen_at.is_(None),
+                User.last_seen_at < cutoff_60s,
+            ),
+        )
+        .values(last_seen_at=func.now())
+        .execution_options(synchronize_session=False)
+    )
+    await db.commit()
+
     return user
 
 
@@ -103,3 +130,32 @@ async def get_current_active_user(
             detail="Inactive user account",
         )
     return current_user
+
+
+async def get_current_admin_user(
+    current_user: User = Depends(get_current_active_user),
+) -> User:
+    """Xác thực người dùng hiện tại có vai trò ADMIN."""
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Admin role required",
+        )
+    return current_user
+
+
+async def verify_internal_worker_secret(
+    x_internal_worker_secret: str | None = Header(None, alias="X-Internal-Worker-Secret"),
+) -> None:
+    """Xác thực secret nội bộ cho các tác vụ worker tự trị (fail-closed)."""
+    expected = settings.INTERNAL_WORKER_SECRET
+    if not expected or not x_internal_worker_secret:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Invalid or missing internal worker secret",
+        )
+    if not hmac.compare_digest(x_internal_worker_secret.strip(), expected.strip()):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Invalid or missing internal worker secret",
+        )

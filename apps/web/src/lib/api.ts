@@ -4,6 +4,7 @@
  */
 
 import {
+  AdminStatsResponse,
   AdvancedBacktestRequest,
   BacktestHistoryCreateRequest,
   BacktestRequest,
@@ -16,6 +17,7 @@ import {
   MarketSyncStatusResponse,
   PortfolioBacktestResponse,
   PredictionResponse,
+  PredictStatusResponse,
   RecentSignalsResponse,
   RefreshTokenResponse,
   RegisterRequest,
@@ -342,6 +344,20 @@ export async function saveUserBacktest(
     method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+export async function deleteUserBacktest(id: string): Promise<void> {
+  return fetchJson<void>(`/api/v1/user/backtests/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getAdminStats(): Promise<AdminStatsResponse> {
+  return fetchJson<AdminStatsResponse>("/api/v1/admin/stats");
+}
+
+export async function getPredictStatus(): Promise<PredictStatusResponse> {
+  return fetchJson<PredictStatusResponse>("/api/v1/predict/status");
 }
 
 

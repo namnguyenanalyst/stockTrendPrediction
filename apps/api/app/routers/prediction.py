@@ -1,8 +1,13 @@
 """Router quản lý các endpoint suy luận dự báo xu hướng thị trường (AI Inference)."""
 
-from fastapi import APIRouter, Query
+import json
+
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
+from app.core.config import settings
+from app.core.deps import get_current_active_user, verify_internal_worker_secret
+from app.db.models.user import User
 from app.models.schemas import BatchPredictionResponse, LiveSyncRequest, PredictionResponse
 from app.services import prediction_service
 
@@ -122,6 +127,7 @@ class RetrainRequest(BaseModel):
 
 @router.post(
     "/retrain",
+    dependencies=[Depends(verify_internal_worker_secret)],
     summary="Huấn luyện lại mô hình thực chiến T+3 (POST)",
     description="Tự động thu thập dữ liệu tới phiên T-1 (hoặc T sau 15:00) và huấn luyện lại LightGBM + PyTorch LSTM trên toàn bộ dữ liệu tích lũy.",
 )
@@ -134,6 +140,41 @@ async def retrain_model_endpoint(
         threshold=request.threshold,
         val_buffer_days=request.val_buffer_days,
         scope=request.scope,
+    )
+
+
+class PredictStatusResponse(BaseModel):
+    last_atc_session_date: str
+    last_retrain_at: str | None = None
+
+
+@router.get(
+    "/status",
+    response_model=PredictStatusResponse,
+    summary="Trạng thái phiên ATC và thời điểm retrain mô hình",
+    description="Truy vấn ngày chốt nến ATC gần nhất và thời điểm huấn luyện lại mô hình gần nhất.",
+)
+async def get_predict_status(
+    current_user: User = Depends(get_current_active_user),
+) -> PredictStatusResponse:
+    """Endpoint trả về ngày chốt nến ATC và thời điểm retrain gần nhất."""
+    from vn_stock.market_session import get_target_market_date
+
+    last_atc = get_target_market_date()
+
+    last_retrain = None
+    prod_info_file = settings.MODELS_DIR / "production_training_info_t3.json"
+    if prod_info_file.exists():
+        try:
+            content = prod_info_file.read_text(encoding="utf-8")
+            data = json.loads(content)
+            last_retrain = data.get("timestamp")
+        except (OSError, json.JSONDecodeError, KeyError):
+            last_retrain = None
+
+    return PredictStatusResponse(
+        last_atc_session_date=last_atc,
+        last_retrain_at=last_retrain,
     )
 
 

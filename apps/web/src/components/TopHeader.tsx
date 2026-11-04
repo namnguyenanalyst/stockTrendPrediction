@@ -7,13 +7,15 @@ import {
   ChevronDown,
   History,
   Search,
+  ShieldCheck,
 } from "lucide-react";
 import { UserMenu } from "@/components/auth/UserMenu";
+import { DashboardTab } from "@/components/Sidebar";
 import { getStockSymbols } from "@/lib/api";
 import { StockSymbolInfo } from "@/lib/types";
 
 interface TopHeaderProps {
-  activeTab: "market" | "prediction" | "backtest";
+  activeTab: DashboardTab;
   selectedSymbol: string;
   setSelectedSymbol: (symbol: string) => void;
 }
@@ -33,6 +35,11 @@ const TAB_TITLES = {
     title: "Kiểm thử chiến lược",
     subtitle: "Mô phỏng vi cấu trúc HOSE/HNX, trừ phí thuế và đo lường Sharpe, MDD",
     icon: History,
+  },
+  "admin-stats": {
+    title: "Thống kê hệ thống & Giám sát Định danh",
+    subtitle: "Phân quyền bảo mật PoLP & Thống kê vĩ mô cấp hệ thống",
+    icon: ShieldCheck,
   },
 };
 
