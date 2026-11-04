@@ -110,6 +110,8 @@ references/
 scratch/
 fc-data/
 docs/
+!docs/reports/
+!docs/reports/*.md
 
 # IDE Configuration
 .vscode/*
@@ -135,5 +137,5 @@ docs/
 .archify/
 skills-lock.json
 
-scripts/
+!scripts/
 !infra/scripts/
