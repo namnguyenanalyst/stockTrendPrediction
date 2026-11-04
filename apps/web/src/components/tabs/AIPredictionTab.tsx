@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Activity,
+  Bot,
   Brain,
   CheckCircle2,
   Clock,
@@ -15,8 +16,13 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { getStockHistory, syncLivePrediction } from "@/lib/api";
-import { BatchPredictionResponse, PredictionResponse, StockBar } from "@/lib/types";
+import { getPredictStatus, getStockHistory, syncLivePrediction } from "@/lib/api";
+import {
+  BatchPredictionResponse,
+  PredictionResponse,
+  PredictStatusResponse,
+  StockBar,
+} from "@/lib/types";
 import {
   FinancialDetailModal,
   FinancialItemContext,
@@ -97,6 +103,43 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   const [localPrediction, setLocalPrediction] = useState<PredictionResponse | null>(null);
   const [fallbackBars, setFallbackBars] = useState<StockBar[]>([]);
   const chartBars = bars && bars.length > 0 ? bars : fallbackBars;
+
+  const [predictStatus, setPredictStatus] = useState<PredictStatusResponse | null>(null);
+
+  // Truy vấn trạng thái tự trị của mô hình AI từ /api/v1/predict/status
+  useEffect(() => {
+    let ignore = false;
+    getPredictStatus()
+      .then((res) => {
+        if (!ignore && res) {
+          setPredictStatus(res);
+        }
+      })
+      .catch((err) => {
+        console.warn("Lỗi truy vấn trạng thái mô hình AI:", err);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const formatRetrainTime = (timestamp: string | null | undefined): string => {
+    if (!timestamp) return "Chưa có lần cập nhật nào";
+    try {
+      const dt = new Date(timestamp);
+      if (isNaN(dt.getTime())) return timestamp;
+      return dt.toLocaleString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        timeZone: "Asia/Ho_Chi_Minh",
+      });
+    } catch {
+      return timestamp;
+    }
+  };
 
   // Tải nến dự phòng nếu không nhận được bars từ props
   useEffect(() => {
@@ -263,6 +306,28 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
             <p className="text-xs text-slate-400">
               Dự báo xác suất xu hướng giá theo chu kỳ T+3 cho nhà đầu tư cá nhân
             </p>
+            {/* Huy hiệu Trạng thái Vận hành Tự trị (Autonomous Quantitative Architecture Badge) */}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div
+                data-testid="autonomous-status-badge"
+                className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-950/40 px-3 py-1 text-[11px] font-medium text-emerald-300 shadow-sm backdrop-blur-sm"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                </span>
+                <Bot className="h-3.5 w-3.5 text-emerald-400" />
+                <span>
+                  Mô hình AI tự động cập nhật định kỳ hàng tuần | Căn cứ phiên chốt:{" "}
+                  <strong className="text-emerald-200">
+                    {predictStatus?.last_atc_session_date || "..."}
+                  </strong>
+                </span>
+                <span className="text-emerald-400/70">
+                  (Lần cập nhật gần nhất: {formatRetrainTime(predictStatus?.last_retrain_at)})
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 

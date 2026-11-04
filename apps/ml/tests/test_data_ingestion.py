@@ -392,6 +392,104 @@ def test_fetch_stock_data_force_and_cache(tmp_path):
         assert (tmp_path / "TESTSYM.parquet").exists()
 
 
+def test_fetch_stock_data_single_flight_lock(tmp_path):
+    """Kiểm tra single-flight lock: Nhiều luồng đồng thời gọi fetch_stock_data cho cùng 1 mã chỉ gọi API SSI 1 lần."""
+    import concurrent.futures
+    import time
+    from unittest.mock import MagicMock
+
+    dates = pd.date_range("2024-01-01", "2024-01-15", freq="D")
+    mock_stock = pd.DataFrame({
+        "Date": dates,
+        "Symbol": ["LOCKSYM"] * len(dates),
+        "Open": [50.0] * len(dates),
+        "High": [52.0] * len(dates),
+        "Low": [49.0] * len(dates),
+        "Close": [51.0] * len(dates),
+        "Volume": [100000] * len(dates),
+    })
+
+    def mock_api_call(*args, **kwargs):
+        time.sleep(0.05)  # Giả lập độ trễ mạng
+        return mock_stock.copy()
+
+    with (
+        patch("vn_stock.data_ingestion.RAW_DATA_DIR", tmp_path),
+        patch("vn_stock.data_ingestion.SSIFastConnectClient") as mock_client_cls,
+    ):
+        mock_client = MagicMock()
+        mock_client.get_daily_ohlcv.side_effect = mock_api_call
+        mock_client_cls.return_value = mock_client
+
+        num_threads = 8
+        results = []
+
+        def worker():
+            return fetch_stock_data(
+                symbol="LOCKSYM",
+                start_date="2024-01-01",
+                end_date="2024-01-15",
+                force_refresh=False,
+                save_to_raw=True,
+            )
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
+            futures = [executor.submit(worker) for _ in range(num_threads)]
+            for fut in concurrent.futures.as_completed(futures):
+                results.append(fut.result())
+
+        assert len(results) == num_threads
+        for df in results:
+            assert len(df) == len(dates)
+
+        # Quan trọng: SSI API chỉ được gọi đúng 1 lần duy nhất nhờ Single-Flight lock + Double-checked cache!
+        assert mock_client.get_daily_ohlcv.call_count == 1
+
+
+def test_fetch_stock_data_fallback_resilience(tmp_path):
+    """Kiểm tra fallback resilience: Khi gọi SSI API gặp lỗi mạng/timeout, fallback về cache sẵn có."""
+    from unittest.mock import MagicMock
+
+    from vn_stock.data_ingestion import _atomic_save_parquet
+
+    dates = pd.date_range("2024-01-01", "2024-01-10", freq="D")
+    cached_stock = pd.DataFrame({
+        "Date": dates,
+        "Symbol": ["FALLBACKSYM"] * len(dates),
+        "Open": [40.0] * len(dates),
+        "High": [42.0] * len(dates),
+        "Low": [39.0] * len(dates),
+        "Close": [41.0] * len(dates),
+        "Volume": [50000] * len(dates),
+    })
+    target_parquet = tmp_path / "FALLBACKSYM.parquet"
+    _atomic_save_parquet(cached_stock, target_parquet)
+
+    with (
+        patch("vn_stock.data_ingestion.RAW_DATA_DIR", tmp_path),
+        patch("vn_stock.data_ingestion.SSIFastConnectClient") as mock_client_cls,
+    ):
+        mock_client = MagicMock()
+        # Giả lập SSI API quăng ConnectionError do đứt mạng/timeout
+        mock_client.get_daily_ohlcv.side_effect = ConnectionError("SSI API Connection Timeout")
+        mock_client_cls.return_value = mock_client
+
+        # Yêu cầu dải ngày tới 2024-01-15 (cache chỉ có tới 2024-01-10)
+        df_result = fetch_stock_data(
+            symbol="FALLBACKSYM",
+            start_date="2024-01-01",
+            end_date="2024-01-15",
+            force_refresh=False,
+            save_to_raw=True,
+        )
+
+        # Phải fallback về dữ liệu cache sẵn có mà không gây crash exception
+        assert df_result is not None
+        assert len(df_result) == len(dates)
+        assert df_result["Close"].iloc[-1] == 41.0
+
+
+
 
 
 

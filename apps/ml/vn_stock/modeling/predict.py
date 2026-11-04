@@ -12,9 +12,20 @@ import argparse
 import logging
 from pathlib import Path
 import pickle
+import threading
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# Bộ nhớ đệm mô hình thread-safe trong RAM kèm mtime polling và fallback khi file hỏng
+_cache_lock = threading.Lock()
+_model_cache: dict[tuple, tuple[Any, Any, dict[str, int]]] = {}
+
+
+def clear_model_cache() -> None:
+    """Xóa bộ nhớ đệm mô hình trong RAM (phục vụ kiểm thử hot-reload)."""
+    with _cache_lock:
+        _model_cache.clear()
 
 
 import numpy as np
@@ -45,27 +56,18 @@ from vn_stock.market_session import (
 )
 
 
-def load_prediction_artifacts(
-    model_type: str = "lstm",
-    models_dir: Path = MODELS_DIR,
-    horizon: int = 3,
-    hidden_size: int = DEFAULT_LSTM_HIDDEN_SIZE,
-    num_layers: int = DEFAULT_LSTM_NUM_LAYERS,
-) -> tuple[Any, Any]:
-    """
-    Nạp mô hình đã huấn luyện (LSTM hoặc LightGBM) và Scaler chuẩn hóa từ thư mục models/.
-    Ưu tiên các artifact production T+horizon, sau đó fallback về artifact mặc định.
+def _resolve_artifact_paths(
+    model_type: str,
+    models_dir: Path,
+    horizon: int,
+) -> tuple[Path, Path]:
+    """Xác định đường dẫn file scaler và model tương ứng trên đĩa."""
+    m_type = model_type.lower()
+    if m_type not in ("lstm", "lightgbm", "lgb"):
+        raise ValueError(
+            f"Loại mô hình không hợp lệ: '{model_type}'. Chỉ hỗ trợ 'lstm' hoặc 'lightgbm'."
+        )
 
-    Args:
-        model_type: Loại mô hình ('lstm' hoặc 'lightgbm').
-        models_dir: Thư mục chứa artifact.
-        horizon: Chân trời dự báo (mặc định 3 phiên).
-        hidden_size: Số nơ-ron lớp ẩn của LSTM.
-        num_layers: Số lớp xếp chồng của LSTM.
-
-    Returns:
-        tuple[model, scaler]
-    """
     scaler_path = models_dir / f"production_scaler_t{horizon}.pkl"
     if not scaler_path.exists():
         scaler_path = models_dir / "scaler_window3.pkl"
@@ -74,14 +76,7 @@ def load_prediction_artifacts(
             f"Chưa tìm thấy scaler tại {models_dir}. Hãy chạy huấn luyện trước bằng `uv run python -m vn_stock.modeling.train --production`."
         )
 
-    with open(scaler_path, "rb") as f:
-        scaler = pickle.load(f)
-
-    if model_type.lower() == "lstm":
-        import torch
-
-        from vn_stock.modeling.model import GlobalLSTMClassifier
-
+    if m_type == "lstm":
         model_path = models_dir / f"production_lstm_t{horizon}.pth"
         if not model_path.exists():
             model_path = models_dir / "global_lstm_classifier.pth"
@@ -89,6 +84,37 @@ def load_prediction_artifacts(
             raise FileNotFoundError(
                 f"Chưa tìm thấy checkpoint LSTM tại {models_dir}. Hãy chạy huấn luyện trước!"
             )
+        return scaler_path, model_path
+
+    prod_txt = models_dir / f"production_lgb_t{horizon}.txt"
+    prod_pkl = models_dir / f"production_lgb_t{horizon}.pkl"
+    def_txt = models_dir / "lightgbm_classifier.txt"
+    def_pkl = models_dir / "lightgbm_classifier.pkl"
+    for candidate in [prod_txt, prod_pkl, def_txt, def_pkl]:
+        if candidate.exists():
+            return scaler_path, candidate
+    raise FileNotFoundError(
+        f"Chưa tìm thấy model LightGBM tại {models_dir}. Hãy chạy huấn luyện trước!"
+    )
+
+
+def _load_raw_artifacts(
+    model_type: str,
+    scaler_path: Path,
+    model_path: Path,
+    hidden_size: int,
+    num_layers: int,
+) -> tuple[Any, Any]:
+    """Đọc dữ liệu nhị phân từ đĩa để sinh model và scaler."""
+    with open(scaler_path, "rb") as f:
+        scaler = pickle.load(f)
+
+    m_type = model_type.lower()
+    if m_type == "lstm":
+        import torch
+
+        from vn_stock.modeling.model import GlobalLSTMClassifier
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = GlobalLSTMClassifier(
             input_size=len(ALL_FEATURE_COLS),
@@ -99,34 +125,73 @@ def load_prediction_artifacts(
         model.eval()
         return model, scaler
 
-    elif model_type.lower() in ("lightgbm", "lgb"):
+    if m_type in ("lightgbm", "lgb"):
         import lightgbm as lgb
 
-        prod_txt = models_dir / f"production_lgb_t{horizon}.txt"
-        prod_pkl = models_dir / f"production_lgb_t{horizon}.pkl"
-        def_txt = models_dir / "lightgbm_classifier.txt"
-        def_pkl = models_dir / "lightgbm_classifier.pkl"
-
-        if prod_txt.exists():
-            model = lgb.Booster(model_file=str(prod_txt))
-        elif prod_pkl.exists():
-            with open(prod_pkl, "rb") as f:
-                model = pickle.load(f)
-        elif def_txt.exists():
-            model = lgb.Booster(model_file=str(def_txt))
-        elif def_pkl.exists():
-            with open(def_pkl, "rb") as f:
-                model = pickle.load(f)
+        if str(model_path).endswith(".txt"):
+            model = lgb.Booster(model_file=str(model_path))
         else:
-            raise FileNotFoundError(
-                f"Chưa tìm thấy model LightGBM tại {models_dir}. Hãy chạy huấn luyện trước!"
-            )
+            with open(model_path, "rb") as f:
+                model = pickle.load(f)
         return model, scaler
 
-    else:
-        raise ValueError(
-            f"Loại mô hình không hợp lệ: '{model_type}'. Chỉ hỗ trợ 'lstm' hoặc 'lightgbm'."
-        )
+    raise ValueError(f"Loại mô hình không hợp lệ: '{model_type}'")
+
+
+def load_prediction_artifacts(
+    model_type: str = "lstm",
+    models_dir: Path = MODELS_DIR,
+    horizon: int = 3,
+    hidden_size: int = DEFAULT_LSTM_HIDDEN_SIZE,
+    num_layers: int = DEFAULT_LSTM_NUM_LAYERS,
+) -> tuple[Any, Any]:
+    """
+    Nạp mô hình đã huấn luyện (LSTM hoặc LightGBM) và Scaler chuẩn hóa từ thư mục models/
+    kết hợp ModelCache in-memory thread-safe, mtime polling và fallback an toàn khi file hỏng.
+    """
+    models_dir = Path(models_dir)
+    scaler_path, model_path = _resolve_artifact_paths(model_type, models_dir, horizon)
+    cache_key = (model_type.lower(), horizon, str(models_dir.resolve()), hidden_size, num_layers)
+
+    current_mtimes = {
+        str(scaler_path): scaler_path.stat().st_mtime_ns,
+        str(model_path): model_path.stat().st_mtime_ns,
+    }
+
+    # 1. Fast path: Kiểm tra cache in-memory không khóa nếu mtime không đổi (<1ms)
+    cached = _model_cache.get(cache_key)
+    if cached is not None:
+        cached_model, cached_scaler, cached_mtimes = cached
+        if cached_mtimes == current_mtimes:
+            return cached_model, cached_scaler
+
+    # 2. Slow path: Khóa thread để nạp mới hoặc reload khi mtime thay đổi
+    with _cache_lock:
+        cached = _model_cache.get(cache_key)
+        if cached is not None:
+            cached_model, cached_scaler, cached_mtimes = cached
+            if cached_mtimes == current_mtimes:
+                return cached_model, cached_scaler
+
+        try:
+            new_model, new_scaler = _load_raw_artifacts(
+                model_type=model_type,
+                scaler_path=scaler_path,
+                model_path=model_path,
+                hidden_size=hidden_size,
+                num_layers=num_layers,
+            )
+            _model_cache[cache_key] = (new_model, new_scaler, current_mtimes)
+            logger.info("Đã nạp artifact mới vào ModelCache: %s", cache_key)
+            return new_model, new_scaler
+        except Exception as exc:
+            if cached is not None:
+                logger.error(
+                    "Nạp artifact mới từ đĩa thất bại do file hỏng (%s). Kích hoạt fallback giữ model cũ trong RAM.",
+                    exc,
+                )
+                return cached[0], cached[1]
+            raise
 
 
 def prepare_inference_features(

@@ -69,6 +69,21 @@ from vn_stock.splitting_data import (
 logger = logging.getLogger(__name__)
 
 
+def _atomic_save_artifact(target_path: Path, write_fn: Any) -> None:
+    """Ghi artifact ra file tạm .tmp_{timestamp} rồi dùng os.replace nguyên tử để chống partial-read."""
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = target_path.with_name(f"{target_path.name}.tmp_{int(datetime.now().timestamp() * 1000)}")
+    try:
+        write_fn(tmp_path)
+        os.replace(tmp_path, target_path)
+    finally:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+
+
 def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, Any]:
     """
     Tính toán bộ chỉ số đo lường hiệu năng phân loại đa lớp chống mất cân bằng.
@@ -305,21 +320,27 @@ def train_production_model(
 
     if save_artifacts:
         models_dir.mkdir(parents=True, exist_ok=True)
-        # 1. Lưu theo tên production cụ thể
+
+        def _write_pkl(p: Path, obj: Any) -> None:
+            with open(p, "wb") as f:
+                pickle.dump(obj, f)
+
+        def _write_json(p: Path, obj: Any) -> None:
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(obj, f, ensure_ascii=False, indent=2)
+
+        # 1. Lưu theo tên production cụ thể qua file tạm và os.replace nguyên tử
         prod_lgb_txt = models_dir / f"production_lgb_t{horizon}.txt"
         prod_lgb_pkl = models_dir / f"production_lgb_t{horizon}.pkl"
         prod_lstm_pth = models_dir / f"production_lstm_t{horizon}.pth"
         prod_scaler_pkl = models_dir / f"production_scaler_t{horizon}.pkl"
         prod_info_json = models_dir / f"production_training_info_t{horizon}.json"
 
-        lgb_model.booster_.save_model(str(prod_lgb_txt))
-        with open(prod_lgb_pkl, "wb") as f:
-            pickle.dump(lgb_model, f)
-        torch.save(lstm_model.state_dict(), prod_lstm_pth)
-        with open(prod_scaler_pkl, "wb") as f:
-            pickle.dump(scaler, f)
-        with open(prod_info_json, "w", encoding="utf-8") as f:
-            json.dump(summary, f, ensure_ascii=False, indent=2)
+        _atomic_save_artifact(prod_lgb_txt, lambda p: lgb_model.booster_.save_model(str(p)))
+        _atomic_save_artifact(prod_lgb_pkl, lambda p: _write_pkl(p, lgb_model))
+        _atomic_save_artifact(prod_lstm_pth, lambda p: torch.save(lstm_model.state_dict(), p))
+        _atomic_save_artifact(prod_scaler_pkl, lambda p: _write_pkl(p, scaler))
+        _atomic_save_artifact(prod_info_json, lambda p: _write_json(p, summary))
 
         # 2. Cập nhật model mặc định để duy trì tính tương thích
         default_lgb_txt = models_dir / "lightgbm_classifier.txt"
@@ -328,22 +349,18 @@ def train_production_model(
         default_scaler_pkl = models_dir / "scaler_window3.pkl"
         default_info_json = models_dir / "production_training_info.json"
 
-        lgb_model.booster_.save_model(str(default_lgb_txt))
-        with open(default_lgb_pkl, "wb") as f:
-            pickle.dump(lgb_model, f)
-        torch.save(lstm_model.state_dict(), default_lstm_pth)
-        with open(default_scaler_pkl, "wb") as f:
-            pickle.dump(scaler, f)
-        with open(default_info_json, "w", encoding="utf-8") as f:
-            json.dump(summary, f, ensure_ascii=False, indent=2)
+        _atomic_save_artifact(default_lgb_txt, lambda p: lgb_model.booster_.save_model(str(p)))
+        _atomic_save_artifact(default_lgb_pkl, lambda p: _write_pkl(p, lgb_model))
+        _atomic_save_artifact(default_lstm_pth, lambda p: torch.save(lstm_model.state_dict(), p))
+        _atomic_save_artifact(default_scaler_pkl, lambda p: _write_pkl(p, scaler))
+        _atomic_save_artifact(default_info_json, lambda p: _write_json(p, summary))
 
         # Lưu Feature Importance của LightGBM
         feat_imp = {
             col: int(imp) for col, imp in zip(ALL_FEATURE_COLS, lgb_model.feature_importances_)
         }
         feat_imp_path = models_dir / "feature_importance.json"
-        with open(feat_imp_path, "w", encoding="utf-8") as f:
-            json.dump(feat_imp, f, ensure_ascii=False, indent=2)
+        _atomic_save_artifact(feat_imp_path, lambda p: _write_json(p, feat_imp))
 
         print(f"\n[OK] Đã lưu Artifacts mô hình thực chiến T+{horizon} tại: {models_dir}")
         print(f" - Dữ liệu thị trường chốt tới: {latest_date_str}")

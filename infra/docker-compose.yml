@@ -52,6 +52,7 @@ services:
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
       CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:3000","http://127.0.0.1:3000","http://localhost:8000"]}'
       ENVIRONMENT: ${ENVIRONMENT:-production}
+      INTERNAL_WORKER_SECRET: ${INTERNAL_WORKER_SECRET:-}
     ports:
       - "${API_PORT:-8000}:8000"
     command: /bin/sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
@@ -86,6 +87,27 @@ services:
       NODE_ENV: production
     ports:
       - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      vn_stock_api:
+        condition: service_healthy
+    networks:
+      - vn_stock_net
+
+  # ----------------------------------------------------------------------------
+  # 4. AUTONOMOUS RETRAIN WORKER SERVICE: Định kỳ Chủ Nhật 02:00 ICT (Phương án A)
+  # ----------------------------------------------------------------------------
+  vn_stock_retrain_worker:
+    image: python:3.11-alpine
+    container_name: vn_stock_retrain_worker
+    restart: unless-stopped
+    environment:
+      API_BASE_URL: http://vn_stock_api:8000
+      INTERNAL_WORKER_SECRET: ${INTERNAL_WORKER_SECRET:-}
+      RETRAIN_SCOPE: "VN30"
+      TZ: Asia/Ho_Chi_Minh
+    volumes:
+      - ./scripts/retrain_worker.py:/app/retrain_worker.py:ro
+    command: python /app/retrain_worker.py
     depends_on:
       vn_stock_api:
         condition: service_healthy

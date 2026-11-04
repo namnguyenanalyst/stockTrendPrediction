@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 import shutil
+import threading
 import time
 from typing import Any
 
@@ -23,6 +24,19 @@ from vn_stock.market_session import (
 from vn_stock.ssi_client import SSIFastConnectClient
 
 logger = logging.getLogger(__name__)
+
+# Single-flight lock registry để chống cache stampede khi nhiều request cùng thiếu nến
+_symbol_locks: dict[str, threading.Lock] = {}
+_registry_lock = threading.Lock()
+
+
+def _get_symbol_lock(symbol: str) -> threading.Lock:
+    """Trả về lock đồng bộ độc quyền theo từng mã cổ phiếu (Single-Flight Lock)."""
+    clean_sym = symbol.upper()
+    with _registry_lock:
+        if clean_sym not in _symbol_locks:
+            _symbol_locks[clean_sym] = threading.Lock()
+        return _symbol_locks[clean_sym]
 
 
 class InsufficientDataCoverageError(ValueError):
@@ -176,11 +190,12 @@ def clean_stock_data(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFram
 
 def load_local_data(
     symbol: str = DEFAULT_SYMBOL,
-    data_dir: Path = RAW_DATA_DIR,
+    data_dir: Path | None = None,
 ) -> pd.DataFrame | None:
     """Đọc dữ liệu lịch sử giá đã lưu trong data/raw/ (ưu tiên Parquet, fallback CSV)."""
+    target_dir = data_dir if data_dir is not None else RAW_DATA_DIR
     # 1. Thử đọc Parquet
-    parquet_path = data_dir / f"{symbol.upper()}.parquet"
+    parquet_path = target_dir / f"{symbol.upper()}.parquet"
     if parquet_path.exists():
         df = pd.read_parquet(parquet_path)
         return clean_stock_data(df, symbol=symbol)
@@ -193,7 +208,7 @@ def load_local_data(
         f"{symbol.upper()}.csv",
     ]
     for name in possible_names:
-        file_path = data_dir / name
+        file_path = target_dir / name
         if file_path.exists():
             df = pd.read_csv(file_path)
             return clean_stock_data(df, symbol=symbol)
@@ -295,79 +310,100 @@ def fetch_stock_data(
     force_refresh: bool = False,
     unit: str = "kVND",
 ) -> pd.DataFrame:
-    """Tải dữ liệu OHLCV đơn mã (ưu tiên đọc Parquet cache có kiểm tra bao phủ ngày, fallback API)."""
+    """Tải dữ liệu OHLCV đơn mã (Single-flight lock, Double-Checked Cache và error fallback)."""
     symbol = symbol.upper()
     effective_end = end_date or get_default_end_date()
 
+    # 1. Fast-path: Kiểm tra cache trước khi khóa (tránh block các request đọc khi cache đã đủ)
     if not force_refresh:
         local_df = load_local_data(symbol)
         if local_df is not None and not local_df.empty:
             if check_cache_coverage(local_df, start_date=start_date, end_date=effective_end):
                 return local_df
-            # Nếu cache có sẵn nhưng thiếu các phiên mới nhất
-            max_local_date = local_df["Date"].max()
-            if max_local_date < pd.to_datetime(effective_end):
-                next_start = (max_local_date + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-                try:
-                    ssi_client = SSIFastConnectClient()
-                    tail_df = ssi_client.get_daily_ohlcv(
-                        symbol=symbol,
-                        start_date=next_start,
-                        end_date=effective_end,
-                        unit=unit,
-                    )
-                    if not tail_df.empty:
-                        cleaned_tail = clean_stock_data(tail_df, symbol=symbol)
-                        cleaned_tail = cleaned_tail[cleaned_tail["Close"] > 0]
-                        if not cleaned_tail.empty:
-                            combined = pd.concat([local_df, cleaned_tail], ignore_index=True)
-                            combined = combined.drop_duplicates(subset=["Date"], keep="last").sort_values("Date").reset_index(drop=True)
-                            validate_downloaded_data(
-                                combined,
-                                expected_start=start_date,
-                                expected_end=effective_end,
-                                is_index=False,
-                                symbol_name=symbol,
-                            )
-                            if save_to_raw:
-                                parquet_path = RAW_DATA_DIR / f"{symbol}.parquet"
-                                _atomic_save_parquet(combined, parquet_path)
-                            return combined
+
+    # 2. Single-Flight Lock: Đảm bảo tại một thời điểm chỉ một luồng kéo dữ liệu cho mã này
+    lock = _get_symbol_lock(symbol)
+    with lock:
+        # Double-Checked Cache: Kiểm tra lại cache sau khi chiếm được khóa
+        if not force_refresh:
+            local_df = load_local_data(symbol)
+            if local_df is not None and not local_df.empty:
+                if check_cache_coverage(local_df, start_date=start_date, end_date=effective_end):
                     return local_df
-                except Exception as inc_exc:
-                    logger.warning("Không thể kéo nến mới đoạn đuôi cho %s: %s", symbol, inc_exc)
+                # Nếu cache có sẵn nhưng thiếu các phiên mới nhất
+                max_local_date = local_df["Date"].max()
+                if max_local_date < pd.to_datetime(effective_end):
+                    next_start = (max_local_date + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+                    try:
+                        ssi_client = SSIFastConnectClient()
+                        tail_df = ssi_client.get_daily_ohlcv(
+                            symbol=symbol,
+                            start_date=next_start,
+                            end_date=effective_end,
+                            unit=unit,
+                        )
+                        if not tail_df.empty:
+                            cleaned_tail = clean_stock_data(tail_df, symbol=symbol)
+                            cleaned_tail = cleaned_tail[cleaned_tail["Close"] > 0]
+                            if not cleaned_tail.empty:
+                                combined = pd.concat([local_df, cleaned_tail], ignore_index=True)
+                                combined = combined.drop_duplicates(subset=["Date"], keep="last").sort_values("Date").reset_index(drop=True)
+                                validate_downloaded_data(
+                                    combined,
+                                    expected_start=start_date,
+                                    expected_end=effective_end,
+                                    is_index=False,
+                                    symbol_name=symbol,
+                                )
+                                if save_to_raw:
+                                    parquet_path = RAW_DATA_DIR / f"{symbol}.parquet"
+                                    _atomic_save_parquet(combined, parquet_path)
+                                return combined
+                        return local_df
+                    except Exception as inc_exc:
+                        logger.warning(
+                            "Không thể kéo nến mới đoạn đuôi cho %s: %s. Kích hoạt fallback sử dụng cache cục bộ hiện có.",
+                            symbol,
+                            inc_exc,
+                        )
+                        return local_df
 
-    try:
-        ssi_client = SSIFastConnectClient()
-        df = ssi_client.get_daily_ohlcv(
-            symbol=symbol,
-            start_date=start_date,
-            end_date=effective_end,
-            unit=unit,
+        # 3. Tải mới toàn bộ từ API SSI nếu chưa có cache hoặc force_refresh
+        try:
+            ssi_client = SSIFastConnectClient()
+            df = ssi_client.get_daily_ohlcv(
+                symbol=symbol,
+                start_date=start_date,
+                end_date=effective_end,
+                unit=unit,
+            )
+            if df.empty:
+                raise ValueError(f"SSI không trả về dữ liệu cho mã {symbol}")
+        except Exception as exc:
+            local_df = load_local_data(symbol)
+            if local_df is not None and not local_df.empty:
+                logger.warning(
+                    "Không thể tải từ API cho %s (%s). Kích hoạt fallback sử dụng cache sẵn có.",
+                    symbol,
+                    exc,
+                )
+                return local_df
+            raise RuntimeError(f"Lỗi thu thập dữ liệu mã {symbol}: {exc}") from exc
+
+        cleaned_df = clean_stock_data(df, symbol=symbol)
+        validate_downloaded_data(
+            cleaned_df,
+            expected_start=start_date,
+            expected_end=effective_end,
+            is_index=False,
+            symbol_name=symbol,
         )
-        if df.empty:
-            raise ValueError(f"SSI không trả về dữ liệu cho mã {symbol}")
-    except Exception as exc:
-        local_df = load_local_data(symbol)
-        if local_df is not None and not local_df.empty:
-            logger.warning("Không thể tải từ API cho %s (%s). Sử dụng cache sẵn có.", symbol, exc)
-            return local_df
-        raise RuntimeError(f"Lỗi thu thập dữ liệu mã {symbol}: {exc}") from exc
 
-    cleaned_df = clean_stock_data(df, symbol=symbol)
-    validate_downloaded_data(
-        cleaned_df,
-        expected_start=start_date,
-        expected_end=effective_end,
-        is_index=False,
-        symbol_name=symbol,
-    )
+        if save_to_raw:
+            parquet_path = RAW_DATA_DIR / f"{symbol}.parquet"
+            _atomic_save_parquet(cleaned_df, parquet_path)
 
-    if save_to_raw:
-        parquet_path = RAW_DATA_DIR / f"{symbol}.parquet"
-        _atomic_save_parquet(cleaned_df, parquet_path)
-
-    return cleaned_df
+        return cleaned_df
 
 
 def resolve_target_symbols(symbols: list[str] | str | None = None) -> list[str]:

@@ -136,3 +136,4 @@ docs/
 skills-lock.json
 
 scripts/
+!infra/scripts/
