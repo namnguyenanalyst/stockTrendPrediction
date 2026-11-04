@@ -154,24 +154,6 @@ export interface ModelMetricsSummary {
   [key: string]: unknown;
 }
 
-export interface RetrainResponse {
-  status: string;
-  timestamp: string;
-  horizon: string;
-  horizon_days: number;
-  threshold: number;
-  val_buffer_days: number;
-  scope?: string;
-  symbols_count?: number;
-  symbols?: string[];
-  latest_market_date: string;
-  train_samples: number;
-  val_samples: number;
-  total_samples: number;
-  lightgbm_metrics?: ModelMetricsSummary;
-  lstm_metrics?: ModelMetricsSummary;
-}
-
 export interface PredictionResponse {
   symbol: string;
   date: string;

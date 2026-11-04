@@ -13,7 +13,6 @@ import {
   getStockSummary,
   getStockSymbols,
   getStrategyPresets,
-  retrainProductionModel,
   runAdvancedBacktest,
   runBacktestSimulation,
   syncLivePrediction,
@@ -212,28 +211,6 @@ describe("Web API Client (src/lib/api.ts)", () => {
         })
       );
       expect(res.horizon).toBe("T+3");
-    });
-
-    it("should call retrainProductionModel with custom hyperparameters", async () => {
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ status: "success", horizon: "T+3" }),
-      } as Response);
-
-      const res = await retrainProductionModel(3, 0.02, 40, "VN30");
-      expect(fetch).toHaveBeenCalledWith(
-        "http://localhost:8000/api/predict/retrain",
-        expect.objectContaining({
-          method: "POST",
-          body: JSON.stringify({
-            horizon: 3,
-            threshold: 0.02,
-            val_buffer_days: 40,
-            scope: "VN30",
-          }),
-        })
-      );
-      expect(res.status).toBe("success");
     });
   });
 

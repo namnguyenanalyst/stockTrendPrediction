@@ -2,7 +2,7 @@
 
 Giao diện người dùng Web Dashboard theo phong cách Institutional Trading Terminal phục vụ:
 - **Thị trường & Phân tích kỹ thuật**: Biểu đồ nến tương tác Canvas 60fps qua TradingView Lightweight Charts v5.2, chỉ báo động lượng RSI(14) và lưới 6 chỉ báo kỹ thuật.
-- **Tín hiệu AI & Quỹ đạo $T+3$**: Trực quan hóa phân bổ xác suất Softmax 3 lớp, thẻ khuyến nghị Mua/Bán/Nắm giữ, biểu đồ Quỹ đạo 3 phiên FireAnt bám sát chu kỳ thanh toán bù trừ $T+2.5$ VSDC và Modal Retrain trực tuyến.
+- **Tín hiệu AI & Quỹ đạo $T+3$**: Trực quan hóa phân bổ xác suất Softmax 3 lớp, thẻ khuyến nghị Mua/Bán/Nắm giữ, biểu đồ Quỹ đạo 3 phiên FireAnt bám sát chu kỳ thanh toán bù trừ $T+2.5$ VSDC và cơ chế MLOps tự trị định kỳ.
 - **Phòng Giả lập Chiến lược DNSE EnTrade X 2 Cột**: Bộ điều khiển chiến thuật linh hoạt (ScopeSelector, DateRangePicker, 12 điều kiện mua + 12 điều kiện bán tùy biến qua DualRangeSlider, 8 chiến lược mẫu DNSE, quản lý lưu trữ chiến thuật cá nhân `strategyStorage`).
 - **Thanh Header & Navbar thông minh**: Trạng thái phiên căn cứ (T hoặc T-1) theo mốc 15:00 kết thúc ATC, giờ UTC+7, nút kích hoạt đồng bộ dữ liệu SSI và Quick Stock Switcher rổ VN30.
 

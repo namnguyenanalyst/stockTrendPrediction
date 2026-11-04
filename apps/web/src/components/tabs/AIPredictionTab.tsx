@@ -11,12 +11,11 @@ import {
   History,
   Minus,
   Radio,
-  Sparkles,
   Trash2,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import { getStockHistory, retrainProductionModel, syncLivePrediction } from "@/lib/api";
+import { getStockHistory, syncLivePrediction } from "@/lib/api";
 import { BatchPredictionResponse, PredictionResponse, StockBar } from "@/lib/types";
 import {
   FinancialDetailModal,
@@ -98,8 +97,6 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   const [localPrediction, setLocalPrediction] = useState<PredictionResponse | null>(null);
   const [fallbackBars, setFallbackBars] = useState<StockBar[]>([]);
   const chartBars = bars && bars.length > 0 ? bars : fallbackBars;
-  const [isRetraining, setIsRetraining] = useState(false);
-  const [retrainMsg, setRetrainMsg] = useState<string | null>(null);
 
   // Tải nến dự phòng nếu không nhận được bars từ props
   useEffect(() => {
@@ -249,34 +246,6 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   const isSell = signal.includes("BÁN") || signal.includes("SELL");
 
 
-  // Handler huấn luyện lại mô hình thực chiến T+3 trên toàn bộ rổ VN30
-  const handleRetrain = async () => {
-    try {
-      setIsRetraining(true);
-      setRetrainMsg(null);
-      const res = await retrainProductionModel(3, 0.02, 40, "VN30");
-      const lgbF1 =
-        res.lightgbm_metrics?.macro_f1 != null
-          ? (res.lightgbm_metrics.macro_f1 * 100).toFixed(1)
-          : "0.0";
-      const lstmF1 =
-        res.lstm_metrics?.macro_f1 != null
-          ? (res.lstm_metrics.macro_f1 * 100).toFixed(1)
-          : "0.0";
-      setRetrainMsg(
-        `Huấn luyện thành công toàn bộ rổ VN30! Nến chốt: ${res.latest_market_date} | Mẫu train: ${res.train_samples?.toLocaleString() || 0} | LGB Macro F1: ${lgbF1}% | LSTM Macro F1: ${lstmF1}%`
-      );
-      const updated = await syncLivePrediction(selectedSymbol, modelType);
-      setLocalPrediction(updated);
-    } catch (err: unknown) {
-      console.error("Lỗi khi huấn luyện lại:", err);
-      const errMsg = err instanceof Error ? err.message : String(err);
-      setRetrainMsg(`Lỗi huấn luyện: ${errMsg}`);
-    } finally {
-      setIsRetraining(false);
-    }
-  };
-
   return (
     <div className="space-y-4">
       {/* 1. Header & Bộ điều phối Mô hình Học máy & Live Feed */}
@@ -297,21 +266,8 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           </div>
         </div>
 
-        {/* Nút hành động Live Sync, Retrain & Chuyển đổi Model */}
+        {/* Bộ điều khiển Chuyển đổi Mô hình */}
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          {/* Nút Huấn luyện lại mô hình Thực chiến T+3 trên toàn bộ rổ VN30 */}
-          <button
-            onClick={handleRetrain}
-            disabled={isRetraining || loading}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${isRetraining
-              ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
-              : "border-blue-600 bg-blue-600 text-white hover:bg-blue-500"
-              }`}
-            title="Tự động nạp nến mới nhất và huấn luyện lại LightGBM & LSTM trên toàn bộ 30 mã rổ VN30"
-          >
-            <Sparkles className={`h-3.5 w-3.5 ${isRetraining ? "animate-spin" : ""}`} />
-            <span>{isRetraining ? "Đang huấn luyện VN30..." : "Huấn luyện lại T+3"}</span>
-          </button>
 
 
           {/* Bộ chọn Mô hình kèm Cơ chế Hover 3 Giây Thả Đặc Tả */}
@@ -376,22 +332,6 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Banner thông báo Huấn luyện / Thông tin dữ liệu thực chiến */}
-      {retrainMsg && (
-        <div className="flex items-center justify-between rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3 text-xs text-indigo-300">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-            <span>{retrainMsg}</span>
-          </div>
-          <button
-            onClick={() => setRetrainMsg(null)}
-            className="text-indigo-400 hover:text-indigo-200 text-xs ml-2"
-          >
-            Đóng
-          </button>
-        </div>
-      )}
 
       {/* Thông tin Dữ liệu Huấn luyện & Chân trời Dự phóng */}
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/70 px-4 py-2 text-xs text-slate-400">
