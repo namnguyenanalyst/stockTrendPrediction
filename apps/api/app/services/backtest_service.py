@@ -321,10 +321,15 @@ def run_advanced_backtest(req: AdvancedBacktestRequest) -> PortfolioBacktestResp
         from vn_stock.backtest import run_portfolio_backtest
 
         available_symbols = stock_service.get_available_symbols()
-        metadata = {
-            s.symbol: {"name": s.name, "sector": s.sector}
-            for s in available_symbols
-        }
+        metadata = {}
+        for s in available_symbols:
+            meta_item = {"name": s.name, "sector": s.sector}
+            # Bổ sung các chỉ số cơ bản từ SYMBOL_METADATA nếu có
+            raw_meta = stock_service.SYMBOL_METADATA.get(s.symbol, {})
+            for k in ["pb", "pe", "ps", "roa", "roe", "eps", "growth_eps", "market_cap", "rev_growth", "np_growth"]:
+                if k in raw_meta:
+                    meta_item[k] = raw_meta[k]
+            metadata[s.symbol] = meta_item
 
         buy_dict = req.buy_conditions.model_dump()
         sell_dict = req.sell_conditions.model_dump()
