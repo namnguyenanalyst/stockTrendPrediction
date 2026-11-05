@@ -26,11 +26,8 @@ export const StrategyPresetsList: React.FC<StrategyPresetsListProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-base font-bold text-slate-100 sm:text-lg">
-                Kho Thư viện 8 Chiến thuật Mẫu Thực chiến
+                Danh sách 8 chiến lược mẫu của DNSE Entrade X
               </h3>
-              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400 border border-emerald-500/30">
-                Chuẩn DNSE Entrade X
-              </span>
             </div>
             <p className="text-xs text-slate-400">
               Các kịch bản định lượng mẫu kết hợp chỉ báo kỹ thuật, dòng tiền và quy tắc quản trị rủi ro tự động.

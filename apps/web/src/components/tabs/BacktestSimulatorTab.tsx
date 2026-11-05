@@ -23,6 +23,8 @@ import {
   ChevronDown,
   ChevronUp,
   Settings2,
+  Pencil,
+  Info,
 } from "lucide-react";
 import {
   AdvancedBacktestRequest,
@@ -42,6 +44,7 @@ import {
 } from "@/lib/types";
 import {
   createUserPreset,
+  deleteUserBacktest,
   deleteUserPreset,
   getMarketSyncStatus,
   getRecentStrategySignals,
@@ -69,6 +72,7 @@ import { PortfolioBreakdownTable } from "@/components/backtest/PortfolioBreakdow
 import { SaveStrategyModal } from "@/components/backtest/SaveStrategyModal";
 import { SavedStrategiesManager } from "@/components/backtest/SavedStrategiesManager";
 import { BacktestHistoryTable } from "@/components/backtest/BacktestHistoryTable";
+import { BacktestResultSkeleton } from "@/components/backtest/BacktestResultSkeleton";
 import {
   deleteStrategy,
   getCurrentDateTimeString,
@@ -172,6 +176,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
 
   // Advanced Portfolio Backtest Results state
   const [portfolioResult, setPortfolioResult] = useState<PortfolioBacktestResponse | null>(null);
+  const [hasExecuted, setHasExecuted] = useState<boolean>(false);
   const [isAdvancedLoading, setIsAdvancedLoading] = useState<boolean>(false);
   const [detailSymbol, setDetailSymbol] = useState<string | null>(null);
   const [resultsTab, setResultsTab] = useState<"portfolio" | "signals" | "breakdown" | "trades">("portfolio");
@@ -337,7 +342,54 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
     try {
       const res = await runAdvancedBacktest(payload);
       setPortfolioResult(res);
+      setHasExecuted(true);
       setResultsTab("portfolio");
+
+      // Tự động lưu kết quả vào Sổ nhật ký khi chạy kiểm thử thành công
+      if (res.aggregate_metrics) {
+        try {
+          const targetSymbol =
+            payload.scope_type === "stock"
+              ? payload.symbol
+              : payload.scope_type === "index"
+              ? payload.index_name
+              : payload.scope_type === "sector"
+              ? payload.sector_name
+              : "PORTFOLIO";
+
+          const historyPayload = {
+            symbol: targetSymbol || "VNINDEX",
+            strategy_name: strategyName || `Chiến lược ${targetSymbol}`,
+            strategy_type:
+              modelType === "lstm"
+                ? "Mô hình PyTorch LSTM"
+                : "Mô hình LightGBM",
+            start_date: startDate,
+            end_date: endDate,
+            initial_capital: initialCapital,
+            total_return: res.aggregate_metrics.total_return_pct,
+            sharpe_ratio: res.aggregate_metrics.sharpe_ratio,
+            max_drawdown: res.aggregate_metrics.max_drawdown_pct,
+            win_rate: res.aggregate_metrics.win_rate_pct,
+            equity_curve: res.portfolio_equity_curve || [],
+          };
+
+          if (isAuthenticated) {
+            saveUserBacktest(historyPayload).then((savedItem) => {
+              setBacktestHistories((prev) => [savedItem, ...prev]);
+            }).catch((err) => console.warn("Lỗi auto-save history:", err));
+          } else {
+            const localItem: UserBacktestHistory = {
+              id: "local_" + Date.now(),
+              ...historyPayload,
+              executed_at: new Date().toISOString(),
+            };
+            setBacktestHistories((prev) => [localItem, ...prev]);
+          }
+        } catch (e) {
+          console.warn("Không thể tự động lưu nhật ký:", e);
+        }
+      }
 
       // Cập nhật kết quả vào chiến lược đã lưu nếu đang sửa hoặc cùng tên
       if (res.aggregate_metrics) {
@@ -425,6 +477,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
     setStrategyName(preset.name);
     setModelType(preset.model_type);
 
+    // Xóa kết quả cũ khi nạp preset mới, đợi người dùng tự nhấn chạy kiểm thử
+    setPortfolioResult(null);
+    setHasExecuted(false);
+
     const config = mapPresetToStrategyConfig(preset, sellConditions);
     setScopeType(config.scope_type);
     if (config.symbol) onSelectSymbol(config.symbol);
@@ -434,8 +490,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
     setBuyConditions(config.buy_conditions);
     setSellConditions(config.sell_conditions);
 
-    setSavedToast(`Đã nạp preset "${preset.name}". Nhấn Chạy kiểm thử để bắt đầu!`);
-    setTimeout(() => setSavedToast(null), 3500);
+    setSavedToast(
+      `Đã nạp chiến lược "${preset.name}" với đầy đủ điều kiện kích hoạt. Nhấn "CHẠY KIỂM THỬ" để bắt đầu!`
+    );
+    setTimeout(() => setSavedToast(null), 4000);
   };
 
   // Lưu chiến lược vào danh sách và localStorage (Có xử lý trùng lặp và cập nhật)
@@ -546,6 +604,12 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
     setUseAdvancedSettings(strat.use_advanced_settings ?? false);
     setBuyConditions(strat.buy_conditions);
     setSellConditions(strat.sell_conditions);
+
+    // Xóa kết quả trước đó nếu không chạy ngay
+    if (!runImmediately) {
+      setPortfolioResult(null);
+      setHasExecuted(false);
+    }
 
     // Chuyển sang giao diện Phòng Lab kiểm thử
     setStrategyViewMode("builder");
@@ -727,38 +791,47 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 1. Header Thanh Điều hướng Subtabs chuẩn DNSE */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/80 p-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
+      {/* 1. Header Thanh Điều hướng Subtabs */}
+      <div className="relative flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/90 p-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between shadow-sm">
         <div className="flex flex-wrap items-center gap-1.5">
-          {/* Nút 1: Quản lý chiến thuật (Chuẩn DNSE: Tất cả / Triển khai / Chưa triển khai) */}
+          {/* Nút 1: Quản lý chiến thuật */}
           <button
             type="button"
             onClick={() => {
               setActiveSubtab("my_strategy");
               setStrategyViewMode("manager");
             }}
-            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${activeSubtab === "my_strategy" && strategyViewMode === "manager"
-              ? "bg-slate-800 text-emerald-400 border border-slate-700"
-              : "text-slate-400 hover:text-slate-200"
-              }`}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+              activeSubtab === "my_strategy" && strategyViewMode === "manager"
+                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-sm"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent"
+            }`}
           >
-            <FolderOpen className="h-4 w-4" />
-            <span>Quản lý chiến thuật ({savedStrategies.length})</span>
+            <FolderOpen className="h-4 w-4 shrink-0" />
+            <span>Quản lý chiến thuật</span>
+            <span className="rounded bg-slate-800/80 px-1.5 py-0.5 text-[10px] font-mono text-slate-300 border border-slate-700/60">
+              {savedStrategies.length}
+            </span>
           </button>
 
-          {/* Nút 2: Phòng Lab Cấu hình & Giả lập */}
+          {/* Nút 2: Phòng Lab Kiểm thử */}
           <button
             type="button"
             onClick={() => {
               setActiveSubtab("my_strategy");
               setStrategyViewMode("builder");
+              // Nếu chưa từng chạy kiểm thử, đảm bảo ở trạng thái chờ
+              if (!hasExecuted) {
+                setPortfolioResult(null);
+              }
             }}
-            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${activeSubtab === "my_strategy" && strategyViewMode === "builder"
-              ? "bg-slate-800 text-emerald-400 border border-slate-700"
-              : "text-slate-400 hover:text-slate-200"
-              }`}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+              activeSubtab === "my_strategy" && strategyViewMode === "builder"
+                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-sm"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent"
+            }`}
           >
-            <Sliders className="h-4 w-4" />
+            <Sliders className="h-4 w-4 shrink-0" />
             <span>Phòng Lab Kiểm thử</span>
           </button>
 
@@ -766,12 +839,13 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
           <button
             type="button"
             onClick={() => setActiveSubtab("presets")}
-            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${activeSubtab === "presets"
-              ? "bg-slate-800 text-blue-400 border border-slate-700"
-              : "text-slate-400 hover:text-slate-200"
-              }`}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+              activeSubtab === "presets"
+                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-sm"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent"
+            }`}
           >
-            <Sparkles className="h-4 w-4" />
+            <Sparkles className="h-4 w-4 shrink-0" />
             <span>Chiến thuật mẫu</span>
           </button>
 
@@ -779,61 +853,36 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
           <button
             type="button"
             onClick={() => setActiveSubtab("history")}
-            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${activeSubtab === "history"
-              ? "bg-slate-800 text-amber-400 border border-slate-700"
-              : "text-slate-400 hover:text-slate-200"
-              }`}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+              activeSubtab === "history"
+                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-sm"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent"
+            }`}
           >
-            <History className="h-4 w-4" />
-            <span>Sổ nhật ký ({backtestHistories.length})</span>
+            <History className="h-4 w-4 shrink-0" />
+            <span>Sổ nhật ký</span>
+            <span className="rounded bg-slate-800/80 px-1.5 py-0.5 text-[10px] font-mono text-slate-300 border border-slate-700/60">
+              {backtestHistories.length}
+            </span>
           </button>
         </div>
 
-        {/* Action Buttons: Lưu chiến lược, Lưu nhật ký & Toast */}
-        <div className="flex items-center gap-2">
-          {savedToast && (
-            <div className="flex items-center gap-1.5 rounded-md bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-400 border border-emerald-500/30">
-              <CheckCircle className="h-4 w-4 shrink-0" />
-              <span>{savedToast}</span>
-              {strategyViewMode === "builder" && (
-                <button
-                  type="button"
-                  onClick={() => setStrategyViewMode("manager")}
-                  className="ml-1 text-[11px] underline hover:text-emerald-300 font-bold cursor-pointer"
-                >
-                  [Xem danh sách]
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Nút Lưu vào Sổ nhật ký */}
-          <button
-            type="button"
-            onClick={handleSaveBacktestToHistory}
-            disabled={isSavingHistory}
-            className="flex items-center gap-1.5 rounded-md bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 border border-slate-700 hover:border-amber-500/50 hover:text-amber-400 transition-colors cursor-pointer disabled:opacity-50"
-          >
-            <History className={`h-4 w-4 ${isSavingHistory ? "animate-spin" : "text-amber-400"}`} />
-            <span>{isSavingHistory ? "Đang lưu..." : "Lưu vào sổ nhật ký"}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (!portfolioResult && !backtestResult) {
-                setSavedToast("⚠️ Vui lòng chạy kiểm thử trước khi lưu chiến lược để có số liệu hiệu quả!");
-                setTimeout(() => setSavedToast(null), 4000);
-                return;
-              }
-              setIsSaveModalOpen(true);
-            }}
-            className="flex items-center gap-1.5 rounded-md bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 border border-slate-700 hover:border-emerald-500/50 hover:text-emerald-400 transition-colors cursor-pointer"
-          >
-            <BookmarkCheck className="h-4 w-4 text-emerald-400" />
-            <span>Lưu chiến lược</span>
-          </button>
-        </div>
+        {/* Floating Toast Notification (Tránh layout shift) */}
+        {savedToast && (
+          <div className="absolute top-full right-3 mt-2 z-30 flex items-center gap-2 rounded-lg bg-slate-900 border border-emerald-500/40 px-3.5 py-2 text-xs font-medium text-slate-100 shadow-xl backdrop-blur-md animate-fade-in">
+            <CheckCircle className="h-4 w-4 shrink-0 text-emerald-400" />
+            <span>{savedToast}</span>
+            {strategyViewMode === "builder" && (
+              <button
+                type="button"
+                onClick={() => setStrategyViewMode("manager")}
+                className="ml-1 text-[11px] underline text-emerald-400 hover:text-emerald-300 font-bold cursor-pointer"
+              >
+                [Xem danh sách]
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -867,6 +916,20 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
               }
             }
           }}
+          onDeleteHistories={async (ids) => {
+            // Xóa ở backend nếu đã đăng nhập và id không phải dạng local_
+            if (isAuthenticated) {
+              const apiDeletes = ids
+                .filter((id) => !id.startsWith("local_"))
+                .map((id) => deleteUserBacktest(id).catch((err: unknown) => console.warn("Lỗi xóa record:", id, err)));
+              await Promise.allSettled(apiDeletes);
+            }
+            // Cập nhật state local
+            const idSet = new Set(ids);
+            setBacktestHistories((prev) => prev.filter((item) => !idSet.has(item.id)));
+            setSavedToast(`Đã xóa ${ids.length} bản ghi khỏi Sổ nhật ký!`);
+            setTimeout(() => setSavedToast(null), 3000);
+          }}
         />
       )}
 
@@ -879,6 +942,8 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
           onCreateStrategy={() => {
             setStrategyName("Chiến thuật mới");
             setActiveStrategyId(null);
+            setPortfolioResult(null);
+            setHasExecuted(false);
             setStrategyViewMode("builder");
           }}
           onRunStrategy={(strat) => handleLoadStrategy(strat, true)}
@@ -910,18 +975,19 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                 {/* Header Form: Tên chiến lược & Date Range Picker */}
                 <div className="flex flex-col gap-2.5 pb-3 border-b border-slate-800/80">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400">
-                      <Sliders className="h-4 w-4" />
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                      <Sliders className="h-4 w-4 shrink-0" />
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="group relative flex-1 min-w-0 flex items-center">
                       <input
                         type="text"
                         value={strategyName}
                         onChange={(e) => setStrategyName(e.target.value)}
-                        className="w-full bg-transparent text-sm font-bold text-slate-100 hover:border-b hover:border-slate-600 focus:border-b focus:border-emerald-500 focus:outline-none sm:text-base truncate"
+                        className="w-full bg-transparent text-sm font-bold text-slate-100 pr-7 py-0.5 border-b border-transparent hover:border-slate-700 focus:border-emerald-500 focus:outline-none sm:text-base truncate transition-colors"
                         title="Nhấn để đổi tên chiến lược"
                         placeholder="Nhập tên chiến lược..."
                       />
+                      <Pencil className="pointer-events-none absolute right-1 h-3.5 w-3.5 text-slate-500 group-hover:text-slate-300 transition-colors" />
                     </div>
                   </div>
 
@@ -1050,32 +1116,33 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                     } overflow-hidden`}
                 >
                   <div className="flex items-center justify-between p-2.5 text-xs">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-start gap-2.5">
                       <Settings2
-                        className={`h-4 w-4 ${useAdvancedSettings ? "text-emerald-400" : "text-slate-400"
-                          }`}
+                        className={`h-4 w-4 shrink-0 mt-0.5 ${
+                          useAdvancedSettings ? "text-emerald-400" : "text-slate-400"
+                        }`}
                       />
                       <div>
-                        <div className="font-semibold text-slate-200 flex items-center gap-1.5">
-                          <span>Cài đặt nâng cao (Vốn, AI Model, Trượt giá)</span>
+                        <div className="font-semibold text-slate-200 flex items-center gap-1.5 flex-wrap">
+                          <span>Cài đặt nâng cao (Vốn, Mô hình AI, Trượt giá)</span>
                           {useAdvancedSettings && (
-                            <span className="text-[9px] bg-emerald-500/20 text-emerald-400 font-bold px-1.5 py-0.5 rounded border border-emerald-500/30">
-                              ĐANG ÁP DỤNG
+                            <span className="text-[9px] bg-emerald-500/15 text-emerald-400 font-semibold px-1.5 py-0.5 rounded border border-emerald-500/30">
+                              Đang áp dụng
                             </span>
                           )}
                         </div>
-                        <div className="text-[10px] text-slate-400">
+                        <div className="text-[10px] text-slate-400 mt-0.5">
                           {useAdvancedSettings ? (
                             <span className="text-emerald-400 font-medium">
-                              Vốn {(initialCapital / 1e6).toFixed(0)}tr • {modelType === "lightgbm" ? "LightGBM" : "LSTM"} • Trượt giá {(slippageRate * 100).toFixed(2)}%
+                              Vốn {(initialCapital / 1e6).toFixed(0)} triệu • {modelType === "lightgbm" ? "LightGBM" : "LSTM"} • Trượt giá {(slippageRate * 100).toFixed(2)}%
                             </span>
                           ) : (
-                            <span>Đang tắt: Chuẩn DNSE (Không trượt giá • 100% theo quy tắc)</span>
+                            <span>Đang tắt: Khớp 100% theo quy tắc kỹ thuật (Không tính trượt giá)</span>
                           )}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2 shrink-0">
                       {/* Switch bật / tắt áp dụng nâng cao */}
                       <label className="relative inline-flex items-center cursor-pointer" title={useAdvancedSettings ? "Tắt cài đặt nâng cao" : "Bật cài đặt nâng cao"}>
                         <input
@@ -1088,18 +1155,18 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                           }}
                           className="sr-only peer"
                         />
-                        <div className="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-white"></div>
+                        <div className="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-4 peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-white"></div>
                       </label>
                       <button
                         type="button"
                         onClick={() => setIsAdvancedSettingsOpen(!isAdvancedSettingsOpen)}
-                        className="p-1 hover:bg-slate-800/60 rounded text-slate-400 transition cursor-pointer"
+                        className="flex h-6 w-6 items-center justify-center hover:bg-slate-800/80 rounded-md text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
                         title={isAdvancedSettingsOpen ? "Thu gọn" : "Mở rộng"}
                       >
                         {isAdvancedSettingsOpen ? (
-                          <ChevronUp className="h-4 w-4" />
+                          <ChevronUp className="h-4 w-4 shrink-0" />
                         ) : (
-                          <ChevronDown className="h-4 w-4" />
+                          <ChevronDown className="h-4 w-4 shrink-0" />
                         )}
                       </button>
                     </div>
@@ -1110,7 +1177,8 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                       {!useAdvancedSettings ? (
                         <div className="rounded-lg border border-slate-800/90 bg-slate-900/60 p-2.5 text-[11px] text-slate-400 leading-relaxed">
                           <p className="font-semibold text-slate-300 mb-1 flex items-center gap-1.5">
-                            <span className="text-emerald-400"></span> Cài đặt nâng cao đang kích hoạt:
+                            <Info className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                            <span>Cài đặt mặc định đang kích hoạt:</span>
                           </p>
                           <ul className="list-disc pl-4 space-y-1 text-[10px] text-slate-400">
                             <li>
@@ -1147,31 +1215,31 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                           {/* Mô hình AI */}
                           <div>
                             <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                              Mô hình dự báo tín hiệu
+                              Mô hình dự báo tín hiệu AI
                             </label>
                             <select
                               value={modelType}
                               onChange={(e) => setModelType(e.target.value as "lightgbm" | "lstm")}
                               className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-slate-100 focus:border-emerald-500 focus:outline-none"
                             >
-                              <option value="lightgbm">LightGBM (Production OOS)</option>
-                              <option value="lstm">PyTorch LSTM (Đa biến)</option>
+                              <option value="lightgbm">LightGBM (Kiểm định mẫu ngoài OOS)</option>
+                              <option value="lstm">PyTorch LSTM (Mô hình chuỗi đa biến)</option>
                             </select>
                           </div>
 
                           {/* Trượt giá */}
                           <div>
                             <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                              Trượt giá (Slippage)
+                              Tỷ lệ trượt giá khớp lệnh (Slippage)
                             </label>
                             <select
                               value={slippageRate}
                               onChange={(e) => setSlippageRate(Number(e.target.value))}
                               className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs font-semibold text-slate-100 focus:border-emerald-500 focus:outline-none"
                             >
-                              <option value={0.0005}>0.05% (Thanh khoản cao)</option>
-                              <option value={0.0010}>0.10% (Thanh khoản vừa)</option>
-                              <option value={0.0020}>0.20% (Thị trường biến động)</option>
+                              <option value={0.0005}>0.05% (Thanh khoản cao, nhóm VN30)</option>
+                              <option value={0.0010}>0.10% (Thanh khoản trung bình)</option>
+                              <option value={0.0020}>0.20% (Thị trường biến động lớn)</option>
                             </select>
                           </div>
                         </div>
@@ -1185,22 +1253,22 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                   type="button"
                   onClick={handleRunAdvancedSimulation}
                   disabled={isLoading}
-                  className="flex w-full items-center justify-center gap-2 rounded-md bg-emerald-500 py-2.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 disabled:opacity-50 transition-colors cursor-pointer"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 py-2.5 text-xs font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-50 transition-all shadow-md shadow-emerald-500/10 cursor-pointer"
                 >
                   {isLoading ? (
                     <>
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950 border-t-transparent" />
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950 border-t-transparent shrink-0" />
                       <span>Đang kiểm thử danh mục...</span>
                     </>
                   ) : (
                     <>
-                      <Play className="h-4 w-4 fill-current" />
+                      <Play className="h-4 w-4 fill-current shrink-0" />
                       <span>
                         CHẠY KIỂM THỬ{" "}
                         {scopeType === "index"
                           ? `(${selectedIndex})`
                           : scopeType === "sector"
-                            ? `(Ngành)`
+                            ? `(${selectedSector || "Ngành"})`
                             : scopeType === "portfolio"
                               ? `(${portfolioSymbols.length} mã)`
                               : `(${selectedSymbol})`}
@@ -1218,8 +1286,11 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
               {/* KHU VỰC HIỂN THỊ KẾT QUẢ ĐỊNH LƯỢNG */}
               {/* ===================================================================== */}
 
-              {/* Trường hợp chưa chạy kiểm thử: Hiển thị Mascot và lời nhắc chuẩn DNSE ảnh 1 */}
-              {!portfolioResult && !backtestResult && !isLoading && (
+              {/* 1. Trạng thái đang chạy kiểm thử: Hiển thị Skeleton Loading chuẩn DNSE */}
+              {isLoading && <BacktestResultSkeleton />}
+
+              {/* 2. Trạng thái chưa chạy kiểm thử: Hiển thị Mascot và lời nhắc chuẩn DNSE ảnh 1 */}
+              {!isLoading && (!hasExecuted || !portfolioResult) && (
                 <div className="flex flex-col items-center justify-center rounded-lg border border-slate-800 bg-slate-900 p-8 text-center min-h-[340px]">
                   <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-slate-800 text-blue-400 border border-slate-700 mb-3">
                     <Bot className="h-7 w-7" />
@@ -1234,53 +1305,65 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                 </div>
               )}
 
-              {/* Khi có kết quả: Hiển thị Banner tổng hợp & Lưới chỉ số + Biểu đồ */}
-              {(portfolioResult || backtestResult) && (
+              {/* 3. Khi đã có kết quả thực tế sau khi nhấn kiểm thử: Hiển thị Banner tổng hợp & Lưới chỉ số + Biểu đồ */}
+              {!isLoading && hasExecuted && portfolioResult && (
                 <div className="space-y-4 animate-fade-in">
-                  {/* Banner tóm tắt phạm vi đã kiểm thử */}
+                  {/* Banner tóm tắt phạm vi đã kiểm thử kèm nút Lưu chiến lược */}
                   {portfolioResult && (
-                    <div className="flex flex-col gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 sm:flex-row sm:items-center sm:justify-between text-xs">
+                    <div className="flex flex-col gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 sm:flex-row sm:items-center sm:justify-between text-xs">
                       <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-slate-950 font-bold">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-slate-950 font-bold shrink-0">
                           ✓
                         </span>
                         <div>
-                          <span className="font-bold text-emerald-400 text-sm">
-                            {portfolioResult.scope_target}
-                          </span>
-                          <span className="text-slate-300 ml-2">
-                            ({portfolioResult.symbols_count} cổ phiếu thành phần)
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-emerald-400 text-sm">
+                              {portfolioResult.scope_target}
+                            </span>
+                            <span className="text-slate-300">
+                              ({portfolioResult.symbols_count} cổ phiếu thành phần)
+                            </span>
+                          </div>
+                          <div className="text-slate-400 font-mono text-[11px] mt-0.5">
+                            Dải ngày: <strong>{portfolioResult.start_date}</strong> → <strong>{portfolioResult.end_date}</strong>
+                            {useAdvancedSettings && (
+                              <span>
+                                {" "}• Vốn:{" "}
+                                <strong>{portfolioResult.aggregate_metrics.initial_capital.toLocaleString("vi-VN")} đ</strong>
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-slate-300 font-mono text-[11px]">
-                        Dải ngày: <strong>{portfolioResult.start_date}</strong> →{" "}
-                        <strong>{portfolioResult.end_date}</strong>
-                        {useAdvancedSettings && (
-                          <span>
-                            {" "}• Vốn:{" "}
-                            <strong>{portfolioResult.aggregate_metrics.initial_capital.toLocaleString("vi-VN")} đ</strong>
-                          </span>
-                        )}
-                      </div>
+
+                      {/* Nút Lưu chiến lược theo ngữ cảnh khi đã có kết quả kiểm thử */}
+                      <button
+                        type="button"
+                        onClick={() => setIsSaveModalOpen(true)}
+                        className="flex items-center gap-1.5 self-start sm:self-auto rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500 hover:text-slate-950 transition-all cursor-pointer shrink-0 shadow-sm"
+                        title="Lưu cấu hình chiến lược và kết quả này vào tab Quản lý chiến thuật"
+                      >
+                        <BookmarkCheck className="h-4 w-4 shrink-0" />
+                        <span>Lưu chiến lược</span>
+                      </button>
                     </div>
                   )}
 
                   {/* THẺ TỔNG QUAN HIỆU QUẢ GIAO DỊCH & BIỂU ĐỒ DONUT WIN/LOSS CHUẨN DNSE ENTRADE X */}
                   <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 backdrop-blur-sm">
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                      {/* BÊN TRÁI: BIỂU ĐỒ DONUT TỶ LỆ THẮNG / THUA LỚN CHUẨN DNSE */}
+                      {/* BÊN TRÁI: BIỂU ĐỒ DONUT TỶ LỆ THẮNG / THUA LỚN */}
                       <div className="md:col-span-4 flex flex-col items-center justify-center p-3 rounded-xl bg-slate-950/60 border border-slate-800/80">
                         <div className="relative flex h-24 w-24 items-center justify-center">
                           <svg className="h-24 w-24 -rotate-90 transform" viewBox="0 0 100 100">
-                            {/* Vòng tròn nền (Thua / Đỏ) */}
+                            {/* Vòng tròn nền (Thua / Đỏ nhẹ) */}
                             <circle
                               cx="50"
                               cy="50"
                               r="38"
                               stroke="currentColor"
-                              strokeWidth="9"
-                              className="text-rose-500/80"
+                              strokeWidth="8"
+                              className="text-rose-500/30"
                               fill="transparent"
                             />
                             {/* Cung tròn Thắng (Xanh lá) */}
@@ -1289,7 +1372,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                               cy="50"
                               r="38"
                               stroke="currentColor"
-                              strokeWidth="9"
+                              strokeWidth="8"
                               strokeDasharray={2 * Math.PI * 38}
                               strokeDashoffset={
                                 2 * Math.PI * 38 * (1 - (metrics?.win_rate_pct ?? 0) / 100)
@@ -1304,81 +1387,81 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                               {metrics ? `${metrics.win_rate_pct.toFixed(0)}%` : "0%"}
                             </span>
                             <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                              Thắng
+                              Tỷ lệ thắng
                             </span>
                           </div>
                         </div>
-                        {/* Chú thích Donut: Deal Lãi vs Deal Lỗ */}
+                        {/* Chú thích Donut: Lệnh Lãi vs Lệnh Lỗ */}
                         <div className="mt-2.5 flex items-center gap-3 text-[11px] font-semibold">
                           <div className="flex items-center gap-1.5 text-emerald-400">
-                            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                            <span>{metrics?.winning_trades ?? 0} Deal lãi</span>
+                            <span className="h-2 w-2 rounded-full bg-emerald-400 shrink-0" />
+                            <span>{metrics?.winning_trades ?? 0} Lệnh lãi</span>
                           </div>
                           <div className="flex items-center gap-1.5 text-rose-400">
-                            <span className="h-2 w-2 rounded-full bg-rose-500" />
-                            <span>{metrics?.losing_trades ?? 0} Deal lỗ</span>
+                            <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
+                            <span>{metrics?.losing_trades ?? 0} Lệnh lỗ</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* BÊN PHẢI: 4 THẺ THÔNG SỐ DEAL CỤ THỂ CHỈ ĐÍCH DANH MÃ CỔ PHIẾU */}
+                      {/* BÊN PHẢI: 4 THẺ THÔNG SỐ GIAO DỊCH CHUẨN MỰC TẬP TRUNG */}
                       <div className="md:col-span-8 grid grid-cols-2 gap-2.5">
-                        {/* 1. Lãi nhiều nhất (Deal đỉnh) */}
-                        <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-2.5 hover:border-emerald-500/30 transition-all">
+                        {/* 1. Lãi cao nhất (Lệnh đỉnh) */}
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-2.5 hover:border-slate-700 transition-all">
                           <div className="flex items-center justify-between text-[11px] font-medium text-slate-400">
-                            <span className="truncate">Lãi nhiều nhất (Deal đỉnh)</span>
+                            <span className="truncate">Lãi cao nhất</span>
                             {bestDealInfo.best?.symbol && (
-                              <span className="shrink-0 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-black text-emerald-300 border border-emerald-500/30">
+                              <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 border border-emerald-500/30">
                                 {bestDealInfo.best.symbol}
                               </span>
                             )}
                           </div>
-                          <div className="mt-1 text-base font-black text-emerald-400">
+                          <div className="mt-1 text-base font-bold text-emerald-400 font-mono">
                             {bestDealInfo.best
                               ? `+${bestDealInfo.best.pct.toFixed(2)}%`
                               : metrics?.max_gain_pct
                                 ? `+${metrics.max_gain_pct.toFixed(2)}%`
                                 : "---"}
                           </div>
-                          <p className="mt-0.5 text-[9px] text-slate-500 truncate">Deal hiệu suất cao nhất</p>
+                          <p className="mt-0.5 text-[9px] text-slate-500 truncate">Lệnh đạt tỷ suất lợi nhuận cao nhất</p>
                         </div>
 
                         {/* 2. Lỗ sâu nhất (Max Loss) */}
-                        <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-2.5 hover:border-rose-500/30 transition-all">
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-2.5 hover:border-slate-700 transition-all">
                           <div className="flex items-center justify-between text-[11px] font-medium text-slate-400">
-                            <span className="truncate">Lỗ nhiều nhất (Max Loss)</span>
+                            <span className="truncate">Lỗ sâu nhất</span>
                             {bestDealInfo.worst?.symbol && (
-                              <span className="shrink-0 rounded bg-rose-500/20 px-1.5 py-0.5 text-[10px] font-black text-rose-300 border border-rose-500/30">
+                              <span className="shrink-0 rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300 border border-rose-500/30">
                                 {bestDealInfo.worst.symbol}
                               </span>
                             )}
                           </div>
-                          <div className="mt-1 text-base font-black text-rose-400">
+                          <div className="mt-1 text-base font-bold text-rose-400 font-mono">
                             {bestDealInfo.worst
                               ? `${bestDealInfo.worst.pct.toFixed(2)}%`
                               : metrics?.max_loss_pct
                                 ? `${metrics.max_loss_pct.toFixed(2)}%`
                                 : "---"}
                           </div>
-                          <p className="mt-0.5 text-[9px] text-slate-500 truncate">Kiểm định kỷ luật cắt lỗ</p>
+                          <p className="mt-0.5 text-[9px] text-slate-500 truncate">Mức lỗ tối đa của một giao dịch</p>
                         </div>
 
-                        {/* 3. Lãi bình quân / deal */}
-                        <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-2.5 hover:border-cyan-500/30 transition-all">
-                          <div className="text-[11px] font-medium text-slate-400">Lãi TB / deal</div>
-                          <div className={`mt-1 text-base font-black ${(metrics?.avg_trade_return_pct ?? 0) >= 0 ? "text-cyan-400" : "text-rose-400"}`}>
-                            {metrics ? `${metrics.avg_trade_return_pct.toFixed(2)}%` : "---"}
+                        {/* 3. Lãi bình quân / lệnh */}
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-2.5 hover:border-slate-700 transition-all">
+                          <div className="text-[11px] font-medium text-slate-400">Lãi TB / giao dịch</div>
+                          <div className={`mt-1 text-base font-bold font-mono ${(metrics?.avg_trade_return_pct ?? 0) >= 0 ? "text-slate-100" : "text-rose-400"}`}>
+                            {metrics ? `${(metrics.avg_trade_return_pct >= 0 ? "+" : "")}${metrics.avg_trade_return_pct.toFixed(2)}%` : "---"}
                           </div>
-                          <p className="mt-0.5 text-[9px] text-slate-500 truncate">Kỳ vọng toán học mỗi lệnh</p>
+                          <p className="mt-0.5 text-[9px] text-slate-500 truncate">Kỳ vọng lợi nhuận bình quân mỗi vị thế</p>
                         </div>
 
                         {/* 4. Tỷ lệ Lợi nhuận / Rủi ro */}
-                        <div className="rounded-lg border border-slate-800 bg-slate-950/80 p-2.5 hover:border-blue-500/30 transition-colors">
+                        <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-2.5 hover:border-slate-700 transition-all">
                           <div className="text-[11px] font-medium text-slate-400 truncate">Lợi nhuận / Rủi ro (R:R)</div>
-                          <div className="mt-1 text-base font-bold font-mono text-blue-300">
+                          <div className="mt-1 text-base font-bold font-mono text-slate-100">
                             {metrics?.reward_risk_ratio ? `${metrics.reward_risk_ratio}` : `${metrics?.profit_factor.toFixed(2) || "---"} : 1`}
                           </div>
-                          <p className="mt-0.5 text-[9px] text-slate-500 truncate">Hệ số lãi gộp / lỗ gộp</p>
+                          <p className="mt-0.5 text-[9px] text-slate-500 truncate">Hệ số tương quan lãi gộp / lỗ gộp</p>
                         </div>
                       </div>
                     </div>
@@ -1387,18 +1470,18 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                   {/* Lưới 5 Chỉ số Định lượng cốt lõi */}
                   <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
                     {/* 1. ROI */}
-                    <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3 hover:border-slate-700 transition-all">
                       <div className="flex items-center justify-between text-slate-400 text-[11px] font-medium">
-                        <span>{useAdvancedSettings ? "Lợi nhuận (ROI)" : "Lợi nhuận (ROI)"}</span>
+                        <span>Lợi nhuận (ROI)</span>
                         {(metrics?.total_return_pct ?? 0) >= 0 ? (
-                          <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
+                          <TrendingUp className="h-4 w-4 text-emerald-400 shrink-0" />
                         ) : (
-                          <TrendingDown className="h-3.5 w-3.5 text-rose-400" />
+                          <TrendingDown className="h-4 w-4 text-rose-400 shrink-0" />
                         )}
                       </div>
                       <div className="mt-1 text-base font-bold font-mono">
                         <span className={(metrics?.total_return_pct ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"}>
-                          {metrics ? `${metrics.total_return_pct.toFixed(2)}%` : "---"}
+                          {metrics ? `${metrics.total_return_pct >= 0 ? "+" : ""}${metrics.total_return_pct.toFixed(2)}%` : "---"}
                         </span>
                       </div>
                       <p className="mt-0.5 text-[10px] text-slate-500">
@@ -1407,24 +1490,24 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                     </div>
 
                     {/* 2. Alpha */}
-                    <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3 hover:border-slate-700 transition-all">
                       <div className="flex items-center justify-between text-slate-400 text-[11px] font-medium">
                         <span>Lãi vượt trội (Alpha)</span>
-                        <Sparkles className="h-3.5 w-3.5 text-blue-400" />
+                        <Sparkles className="h-4 w-4 text-emerald-400 shrink-0" />
                       </div>
                       <div className="mt-1 text-base font-bold font-mono">
                         <span className={isAlphaPositive ? "text-emerald-400" : "text-rose-400"}>
-                          {metrics ? `${metrics.excess_return_pct.toFixed(2)}%` : "---"}
+                          {metrics ? `${metrics.excess_return_pct >= 0 ? "+" : ""}${metrics.excess_return_pct.toFixed(2)}%` : "---"}
                         </span>
                       </div>
                       <p className="mt-0.5 text-[10px] text-slate-500">Lãi thêm so với Mua &amp; Giữ</p>
                     </div>
 
                     {/* 3. Sharpe */}
-                    <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3 hover:border-slate-700 transition-all">
                       <div className="flex items-center justify-between text-slate-400 text-[11px] font-medium">
                         <span>Chỉ số Sharpe</span>
-                        <Coins className="h-3.5 w-3.5 text-amber-400" />
+                        <Coins className="h-4 w-4 text-slate-400 shrink-0" />
                       </div>
                       <div className="mt-1 text-base font-bold font-mono text-slate-100">
                         {metrics ? metrics.sharpe_ratio.toFixed(2) : "---"}
@@ -1433,10 +1516,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                     </div>
 
                     {/* 4. MDD */}
-                    <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3 hover:border-slate-700 transition-all">
                       <div className="flex items-center justify-between text-slate-400 text-[11px] font-medium">
                         <span>Sụt giảm tối đa (MDD)</span>
-                        <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
+                        <ShieldAlert className="h-4 w-4 text-rose-400 shrink-0" />
                       </div>
                       <div className="mt-1 text-base font-bold font-mono text-rose-400">
                         {metrics ? `-${Math.abs(metrics.max_drawdown_pct).toFixed(2)}%` : "---"}
@@ -1445,10 +1528,10 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                     </div>
 
                     {/* 5. Chi phí */}
-                    <div className="rounded-lg border border-slate-800 bg-slate-900 p-3 col-span-2 sm:col-span-1">
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-3 col-span-2 sm:col-span-1 hover:border-slate-700 transition-all">
                       <div className="flex items-center justify-between text-slate-400 text-[11px] font-medium">
                         <span>Tổng thuế &amp; phí</span>
-                        <Wallet className="h-3.5 w-3.5 text-slate-400" />
+                        <Wallet className="h-4 w-4 text-slate-400 shrink-0" />
                       </div>
                       <div className="mt-1 text-base font-bold font-mono text-slate-200">
                         {metrics ? `${(metrics.total_costs / 1000).toLocaleString("vi-VN")} k` : "---"}
@@ -1464,24 +1547,26 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                     <button
                       type="button"
                       onClick={() => setResultsTab("portfolio")}
-                      className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all cursor-pointer ${resultsTab === "portfolio"
-                        ? "bg-slate-800 text-emerald-400 border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200"
-                        }`}
+                      className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition-all cursor-pointer ${
+                        resultsTab === "portfolio"
+                          ? "bg-slate-800 text-emerald-400 border border-slate-700 shadow-sm"
+                          : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                      }`}
                     >
-                      <BarChart3 className="h-4 w-4" />
+                      <BarChart3 className="h-4 w-4 shrink-0" />
                       <span>Biểu đồ tài sản</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setResultsTab("signals")}
-                      className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all cursor-pointer ${resultsTab === "signals"
-                        ? "bg-slate-800 text-emerald-400 border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200"
-                        }`}
+                      className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition-all cursor-pointer ${
+                        resultsTab === "signals"
+                          ? "bg-slate-800 text-emerald-400 border border-slate-700 shadow-sm"
+                          : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                      }`}
                     >
-                      <Sparkles className="h-4 w-4" />
+                      <Sparkles className="h-4 w-4 shrink-0" />
                       <span>Tín hiệu AI ({recentSignals.length})</span>
                     </button>
 
@@ -1489,12 +1574,13 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                       <button
                         type="button"
                         onClick={() => setResultsTab("breakdown")}
-                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all cursor-pointer ${resultsTab === "breakdown"
-                          ? "bg-slate-800 text-emerald-400 border border-slate-700"
-                          : "text-slate-400 hover:text-slate-200"
-                          }`}
+                        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition-all cursor-pointer ${
+                          resultsTab === "breakdown"
+                            ? "bg-slate-800 text-emerald-400 border border-slate-700 shadow-sm"
+                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                        }`}
                       >
-                        <Layers className="h-4 w-4" />
+                        <Layers className="h-4 w-4 shrink-0" />
                         <span>Phân rã từng mã ({portfolioResult.symbols_count})</span>
                       </button>
                     )}
@@ -1502,22 +1588,23 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                     <button
                       type="button"
                       onClick={() => setResultsTab("trades")}
-                      className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-bold transition-all cursor-pointer ${resultsTab === "trades"
-                        ? "bg-slate-800 text-emerald-400 border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200"
-                        }`}
+                      className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-semibold transition-all cursor-pointer ${
+                        resultsTab === "trades"
+                          ? "bg-slate-800 text-emerald-400 border border-slate-700 shadow-sm"
+                          : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                      }`}
                     >
-                      <ListFilter className="h-4 w-4" />
-                      <span>Nhật ký lệnh {detailSymbol ? `(${detailSymbol})` : `(${trades.length})`}</span>
+                      <ListFilter className="h-4 w-4 shrink-0" />
+                      <span>Sổ lệnh thực thi {detailSymbol ? `(${detailSymbol})` : `(${trades.length})`}</span>
                     </button>
 
                     {detailSymbol && (
                       <button
                         type="button"
                         onClick={() => setDetailSymbol(null)}
-                        className="ml-auto flex items-center gap-1 rounded bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-cyan-400 hover:bg-slate-700 cursor-pointer"
+                        className="ml-auto flex items-center gap-1 rounded-md bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-emerald-400 hover:bg-slate-700 border border-slate-700 cursor-pointer"
                       >
-                        <ArrowLeft className="h-3 w-3" />
+                        <ArrowLeft className="h-3 w-3 shrink-0" />
                         <span>Quay lại tổng quan danh mục</span>
                       </button>
                     )}
@@ -1527,14 +1614,14 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                   {resultsTab === "portfolio" && (
                     <div className="space-y-3">
                       {detailSymbol && portfolioResult?.individual_results?.[detailSymbol] && (
-                        <div className="flex items-center justify-between rounded-lg bg-cyan-500/10 px-3 py-2 border border-cyan-500/30 text-xs">
-                          <span className="font-bold text-cyan-400">
-                            Đang xem chi tiết riêng mã: {detailSymbol}
+                        <div className="flex items-center justify-between rounded-lg bg-emerald-500/10 px-3.5 py-2 border border-emerald-500/20 text-xs">
+                          <span className="font-semibold text-emerald-400">
+                            Đang xem kết quả riêng mã: <strong className="font-bold text-white ml-1">{detailSymbol}</strong>
                           </span>
                           <button
                             type="button"
                             onClick={() => setDetailSymbol(null)}
-                            className="text-slate-400 hover:text-slate-200 underline cursor-pointer"
+                            className="text-slate-400 hover:text-slate-200 underline cursor-pointer text-[11px]"
                           >
                             Xem lại tổng hợp danh mục
                           </button>
@@ -1596,15 +1683,15 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                       <div className="mb-3 flex items-center justify-between">
                         <div>
                           <h3 className="text-sm font-bold text-slate-100 sm:text-base">
-                            Nhật ký Giao dịch Khớp lệnh Thực tế (Lưu ký T+2)
+                            Sổ Lệnh Khớp Thực Tế (Quy chuẩn T+2)
                           </h3>
                           <p className="text-[11px] text-slate-400">
                             {detailSymbol
-                              ? `Danh sách lệnh giao dịch riêng của mã ${detailSymbol}`
-                              : "Ghi nhận chi tiết từng vòng mua/bán, phân loại rõ lý do thoát lệnh"}
+                              ? `Lịch sử các vòng giao dịch riêng của mã ${detailSymbol}`
+                              : "Chi tiết từng vòng mua và bán, phân loại chuẩn lý do đóng vị thế"}
                           </p>
                         </div>
-                        <span className="rounded bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-300">
+                        <span className="rounded bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-300 border border-slate-700">
                           {trades.length} Giao dịch
                         </span>
                       </div>
@@ -1614,14 +1701,14 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                           <thead className="sticky top-0 border-b border-slate-800 bg-slate-950 text-slate-400">
                             <tr>
                               <th className="px-3 py-2 font-semibold">Mã GD</th>
-                              <th className="px-3 py-2 font-semibold">Loại lệnh</th>
+                              <th className="px-3 py-2 font-semibold">Lệnh</th>
                               <th className="px-3 py-2 font-semibold">Ngày khớp</th>
                               <th className="px-3 py-2 font-semibold">Giá khớp</th>
                               <th className="px-3 py-2 font-semibold">Khối lượng</th>
                               <th className="px-3 py-2 font-semibold">Phí + Thuế</th>
                               <th className="px-3 py-2 font-semibold">Lãi/Lỗ ròng</th>
-                              <th className="px-3 py-2 font-semibold">Hiệu suất (%)</th>
-                              <th className="px-3 py-2 text-right font-semibold">Lý do</th>
+                              <th className="px-3 py-2 font-semibold">Hiệu suất</th>
+                              <th className="px-3 py-2 text-right font-semibold">Lý do đóng vị thế</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800/60">
@@ -1632,31 +1719,35 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                               const isStopLoss = tr.reason === "STOP_LOSS";
                               const isTakeProfit = tr.reason === "TAKE_PROFIT";
                               const isTrailing = tr.reason === "TRAILING_STOP";
+                              const isClosePosition = tr.reason === "CLOSE_POSITION";
+                              const isMaxHolding = tr.reason === "MAX_HOLDING_DAYS";
+                              const isSignalExit = tr.reason === "SIGNAL_EXIT";
 
                               return (
                                 <tr key={tr.trade_id} className="hover:bg-slate-800/30 transition-colors">
                                   <td className="px-3 py-2 font-mono text-slate-400">#{tr.trade_id}</td>
                                   <td className="px-3 py-2">
                                     <span
-                                      className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold ${isBuy
-                                        ? "bg-emerald-500/10 text-emerald-400"
-                                        : "bg-rose-500/10 text-rose-400"
-                                        }`}
+                                      className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold ${
+                                        isBuy
+                                          ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                                          : "bg-rose-500/15 text-rose-400 border border-rose-500/20"
+                                      }`}
                                     >
-                                      {tr.order_type}
+                                      {isBuy ? "MUA" : "BÁN"}
                                     </span>
                                   </td>
                                   <td className="px-3 py-2 font-mono text-slate-300">{tr.exec_date}</td>
-                                  <td className="px-3 py-2 font-semibold text-slate-200">
+                                  <td className="px-3 py-2 font-semibold text-slate-200 font-mono">
                                     {(tr.exec_price * 1000).toLocaleString("vi-VN")} đ
                                   </td>
                                   <td className="px-3 py-2 font-mono text-slate-300">
                                     {tr.shares.toLocaleString("vi-VN")} CP
                                   </td>
-                                  <td className="px-3 py-2 text-slate-400">
+                                  <td className="px-3 py-2 text-slate-400 font-mono">
                                     {((tr.fee + tr.tax) / 1000).toLocaleString("vi-VN")} k
                                   </td>
-                                  <td className="px-3 py-2 font-semibold">
+                                  <td className="px-3 py-2 font-semibold font-mono">
                                     {tr.realized_pnl !== null ? (
                                       <span className={isPnlPositive ? "text-emerald-400" : "text-rose-400"}>
                                         {isPnlPositive ? "+" : ""}
@@ -1666,7 +1757,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                                       <span className="text-slate-500">---</span>
                                     )}
                                   </td>
-                                  <td className="px-3 py-2 font-semibold">
+                                  <td className="px-3 py-2 font-semibold font-mono">
                                     {tr.realized_return_pct !== null ? (
                                       <span className={isPnlPositive ? "text-emerald-400" : "text-rose-400"}>
                                         {isPnlPositive ? "+" : ""}
@@ -1678,20 +1769,32 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                                   </td>
                                   <td className="px-3 py-2 text-right">
                                     {isStopLoss ? (
-                                      <span className="rounded bg-rose-500/20 px-2 py-0.5 text-[10px] font-bold text-rose-300 border border-rose-500/30">
+                                      <span className="inline-block rounded bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-300 border border-rose-500/30">
                                         Cắt lỗ (Stop Loss)
                                       </span>
                                     ) : isTakeProfit ? (
-                                      <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/30">
+                                      <span className="inline-block rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 border border-emerald-500/30">
                                         Chốt lời (Take Profit)
                                       </span>
                                     ) : isTrailing ? (
-                                      <span className="rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30">
-                                        Trailing Stop
+                                      <span className="inline-block rounded bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300 border border-amber-500/30">
+                                        Chặn lỗ động (Trailing)
+                                      </span>
+                                    ) : isClosePosition ? (
+                                      <span className="inline-block rounded bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-300 border border-slate-700">
+                                        Đóng vị thế cuối kỳ
+                                      </span>
+                                    ) : isMaxHolding ? (
+                                      <span className="inline-block rounded bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-300 border border-slate-700">
+                                        Hết thời gian nắm giữ
+                                      </span>
+                                    ) : isSignalExit ? (
+                                      <span className="inline-block rounded bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-300 border border-slate-700">
+                                        Tín hiệu đảo chiều
                                       </span>
                                     ) : (
                                       <span className="font-mono text-[11px] text-slate-400">
-                                        {tr.reason}
+                                        {tr.reason || "---"}
                                       </span>
                                     )}
                                   </td>

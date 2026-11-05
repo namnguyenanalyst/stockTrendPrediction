@@ -4,11 +4,14 @@ import React, { useState } from "react";
 import {
   ArrowDownRight,
   ArrowUpRight,
+  Check,
+  CheckCircle2,
   Clock,
   Eye,
   History,
   LineChart,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { EquityCurveChart } from "@/components/charts/EquityCurveChart";
 import { UserBacktestHistory } from "@/lib/types";
@@ -19,6 +22,7 @@ interface BacktestHistoryTableProps {
   onSelectHistory?: (item: UserBacktestHistory) => void;
   selectedHistoryId?: string | null;
   onRefresh?: () => void;
+  onDeleteHistories?: (ids: string[]) => Promise<void> | void;
 }
 
 export const BacktestHistoryTable: React.FC<BacktestHistoryTableProps> = ({
@@ -27,14 +31,64 @@ export const BacktestHistoryTable: React.FC<BacktestHistoryTableProps> = ({
   onSelectHistory,
   selectedHistoryId,
   onRefresh,
+  onDeleteHistories,
 }) => {
   const [activePreview, setActivePreview] = useState<UserBacktestHistory | null>(
     null
   );
+  const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+
+  const handleToggleSelectOne = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedIds.size === histories.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(histories.map((h) => h.id)));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0 || !onDeleteHistories) return;
+    const count = selectedIds.size;
+    const confirmed = window.confirm(
+      `Bạn có chắc chắn muốn xóa ${count} bản ghi nhật ký kiểm thử đã chọn không?`
+    );
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      await onDeleteHistories(Array.from(selectedIds));
+      if (activePreview && selectedIds.has(activePreview.id)) {
+        setActivePreview(null);
+      }
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleRowClick = (item: UserBacktestHistory) => {
-    setActivePreview(item);
-    onSelectHistory?.(item);
+    if (isSelectionMode) {
+      handleToggleSelectOne(item.id);
+    } else {
+      setActivePreview(item);
+      onSelectHistory?.(item);
+    }
   };
 
   return (
@@ -55,17 +109,74 @@ export const BacktestHistoryTable: React.FC<BacktestHistoryTableProps> = ({
           </div>
         </div>
 
-        {onRefresh && (
-          <button
-            type="button"
-            onClick={onRefresh}
-            disabled={isLoading}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1 text-xs text-slate-300 hover:border-slate-700 hover:text-white transition-all disabled:opacity-50"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-            <span>Làm mới</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Nút bật chế độ Chọn để xóa */}
+          {histories.length > 0 && (
+            <>
+              {isSelectionMode ? (
+                <div className="flex items-center gap-1.5 animate-fade-in">
+                  <button
+                    type="button"
+                    onClick={handleToggleSelectAll}
+                    className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs text-slate-200 hover:text-white transition-all cursor-pointer"
+                  >
+                    <span>
+                      {selectedIds.size === histories.length
+                        ? "Bỏ chọn tất cả"
+                        : "Chọn tất cả"}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelected}
+                    disabled={selectedIds.size === 0 || isDeleting}
+                    className="flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-2.5 py-1 text-xs font-semibold text-rose-300 hover:bg-rose-500 hover:text-white transition-all disabled:opacity-50 cursor-pointer shadow-sm"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>
+                      {isDeleting
+                        ? "Đang xóa..."
+                        : `Xóa (${selectedIds.size})`}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSelectionMode(false);
+                      setSelectedIds(new Set());
+                    }}
+                    className="rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1 text-xs text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
+                  >
+                    Hủy
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsSelectionMode(true)}
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-800/80 px-2.5 py-1 text-xs font-medium text-slate-300 hover:border-rose-500/40 hover:text-rose-300 hover:bg-rose-500/10 transition-all cursor-pointer"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Xóa bản ghi</span>
+                </button>
+              )}
+            </>
+          )}
+
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={isLoading}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1 text-xs text-slate-300 hover:border-slate-700 hover:text-white transition-all disabled:opacity-50 cursor-pointer"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+              <span>Làm mới</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Preview Biểu đồ Equity Curve khi chọn dòng */}
@@ -138,8 +249,8 @@ export const BacktestHistoryTable: React.FC<BacktestHistoryTableProps> = ({
             Sổ nhật ký kiểm thử đang trống
           </p>
           <p className="mt-1 text-slate-500 max-w-md mx-auto text-[11px]">
-            Chạy kiểm thử chiến lược định lượng tại Phòng Lab, sau đó nhấn nút &quot;Lưu vào
-            sổ nhật ký&quot; để ghi nhận kết quả và so sánh đường cong vốn.
+            Khi bạn chạy kiểm thử chiến lược tại Phòng Lab, hệ thống sẽ tự động ghi nhận
+            kết quả và đường cong vốn vào đây để bạn tiện theo dõi và so sánh hiệu quả qua các lần thử nghiệm.
           </p>
         </div>
       ) : (
@@ -147,7 +258,29 @@ export const BacktestHistoryTable: React.FC<BacktestHistoryTableProps> = ({
           <table className="w-full text-left text-xs">
             <thead className="border-b border-slate-800 bg-slate-950/80 text-[11px] font-bold text-slate-400">
               <tr>
-                <th className="py-2.5 pl-4 pr-2">THỜI GIAN THỰC THI</th>
+                {isSelectionMode && (
+                  <th className="py-2.5 pl-3 pr-1 w-9 text-center">
+                    <button
+                      type="button"
+                      onClick={handleToggleSelectAll}
+                      className="cursor-pointer inline-flex items-center justify-center p-0.5 rounded text-slate-400 hover:text-white"
+                      title={selectedIds.size === histories.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                    >
+                      <div
+                        className={`h-4 w-4 rounded-full border transition-all flex items-center justify-center ${
+                          selectedIds.size === histories.length && histories.length > 0
+                            ? "border-rose-500 bg-rose-500 text-white"
+                            : selectedIds.size > 0
+                            ? "border-rose-400 bg-rose-500/30 text-rose-300"
+                            : "border-slate-600 hover:border-slate-400"
+                        }`}
+                      >
+                        {selectedIds.size > 0 && <Check className="h-2.5 w-2.5 stroke-[3]" />}
+                      </div>
+                    </button>
+                  </th>
+                )}
+                <th className={`py-2.5 pr-2 ${isSelectionMode ? "pl-2" : "pl-4"}`}>THỜI GIAN THỰC THI</th>
                 <th className="px-3 py-2.5">MÃ / CHIẾN LƯỢC</th>
                 <th className="px-3 py-2.5">GIAI ĐOẠN</th>
                 <th className="px-3 py-2.5 text-right">VỐN ĐẦU TƯ</th>
@@ -162,6 +295,7 @@ export const BacktestHistoryTable: React.FC<BacktestHistoryTableProps> = ({
               {histories.map((item) => {
                 const isSelected =
                   selectedHistoryId === item.id || activePreview?.id === item.id;
+                const isChecked = selectedIds.has(item.id);
                 const isUp = item.total_return >= 0;
                 const dateStr = item.executed_at
                   ? new Date(item.executed_at).toLocaleString("vi-VN", {
@@ -178,12 +312,31 @@ export const BacktestHistoryTable: React.FC<BacktestHistoryTableProps> = ({
                     key={item.id}
                     onClick={() => handleRowClick(item)}
                     className={`group cursor-pointer transition-colors ${
-                      isSelected
+                      isChecked
+                        ? "bg-rose-500/10 hover:bg-rose-500/15"
+                        : isSelected
                         ? "bg-emerald-500/15 hover:bg-emerald-500/20"
                         : "hover:bg-slate-800/60"
                     }`}
                   >
-                    <td className="py-2.5 pl-4 pr-2 text-slate-400">
+                    {isSelectionMode && (
+                      <td
+                        className="py-2.5 pl-3 pr-1 text-center"
+                        onClick={(e) => handleToggleSelectOne(item.id, e)}
+                      >
+                        <div
+                          className={`mx-auto h-4 w-4 rounded-full border transition-all flex items-center justify-center cursor-pointer ${
+                            isChecked
+                              ? "border-rose-500 bg-rose-500 text-white shadow-sm shadow-rose-500/40"
+                              : "border-slate-600 group-hover:border-slate-400 bg-slate-900"
+                          }`}
+                        >
+                          {isChecked && <Check className="h-2.5 w-2.5 stroke-[3]" />}
+                        </div>
+                      </td>
+                    )}
+
+                    <td className={`py-2.5 pr-2 text-slate-400 ${isSelectionMode ? "pl-2" : "pl-4"}`}>
                       <div className="flex items-center gap-1.5">
                         <Clock className="h-3.5 w-3.5 text-slate-500" />
                         <span className="font-mono text-[11px]">{dateStr}</span>

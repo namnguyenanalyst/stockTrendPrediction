@@ -369,15 +369,18 @@ export function mapPresetToStrategyConfig(
   let sector_name: string | undefined = undefined;
   let portfolio_symbols: string[] | undefined = undefined;
 
-  if (preset.category.includes("VN30")) {
+  const catLower = preset.category.toLowerCase();
+  const condLower = (preset.conditions_summary || "").toLowerCase();
+
+  if (catLower.includes("vn30") || preset.target_symbols.includes("VN30")) {
     scope_type = "index";
     index_name = "VN30";
     symbol = undefined;
-  } else if (preset.category.includes("VN100")) {
+  } else if (catLower.includes("vn100") || preset.target_symbols.includes("VN100")) {
     scope_type = "index";
     index_name = "VN100";
     symbol = undefined;
-  } else if (preset.category.includes("Ngân hàng")) {
+  } else if (catLower.includes("ngân hàng") || condLower.includes("ngân hàng")) {
     scope_type = "sector";
     sector_name = "Ngân hàng";
     symbol = undefined;
@@ -401,75 +404,124 @@ export function mapPresetToStrategyConfig(
   };
 
   switch (preset.id) {
+    // 1. Thuận xu hướng (Break out EMA 20): Giá cắt lên EMA 20 • %KLGD đột biến ≥ 50% • Khối ngoại mua ròng
+    case "preset_ema20_breakout":
     case "dnse-01":
       updatedBuy = {
         ...updatedBuy,
-        use_ema: true,
-        use_volume_spike: true,
         use_price_cross: true,
+        price_cross_operator: "Cắt lên",
+        price_cross_target: "EMA 20",
+        use_volume_spike: true,
+        vol_spike_period: 10,
+        min_vol_spike_pct: 50,
         foreign_net_buy: true,
       };
       break;
+
+    // 2. Xu hướng tăng mạnh kèm KLGD đột biến: RSI(14) 70 - 100 • %KLGD đột biến 30% - 70%
+    case "preset_rsi_momentum":
     case "dnse-02":
       updatedBuy = {
         ...updatedBuy,
         use_rsi: true,
+        rsi_min: 70,
+        rsi_max: 100,
         rsi_threshold: 70,
         use_volume_spike: true,
+        vol_spike_period: 10,
+        min_vol_spike_pct: 30,
+        max_vol_spike_pct: 70,
       };
       break;
+
+    // 3. Định giá hợp lý & Dòng tiền xác nhận: P/E: 12 - 16 • Giá mở cửa T0 > T-1 • Khối ngoại gom ròng
+    case "preset_fair_val_flow":
     case "dnse-03":
       updatedBuy = {
         ...updatedBuy,
         use_pe: true,
+        min_pe: 12,
         max_pe: 16,
         use_price_increase: true,
+        price_t0_field: "Giá mở cửa T0",
+        price_t0_operator: ">",
+        price_t1_field: "Giá mở cửa T-1",
         foreign_net_buy: true,
       };
       break;
+
+    // 4. CP tăng trưởng, định giá hợp lý (Mini-Canslim): Vốn hóa ≥ 2.000 tỷ • GTGD ≥ 10 tỷ • ROE trượt ≥ 5% • EPS tăng ≥ 15%
+    case "preset_semi_canslim":
     case "dnse-04":
       updatedBuy = {
         ...updatedBuy,
-        use_stock_price: true,
-        min_stock_price: 10.0,
         use_market_cap: true,
         min_market_cap: 2000,
-        use_pe: true,
+        use_avg_trading_val: true,
+        avg_trading_val_period: 10,
+        min_avg_trading_val: 10,
+        use_roe: true,
         min_roe: 5.0,
         growth_eps: true,
+        min_growth_eps: 15.0,
       };
       break;
+
+    // 5. Định giá ngân hàng rẻ (P/B < 1) & GTGD 10 tỷ: P/B: 0.00 - 1.00 • GTGD 10 phiên ≥ 10 tỷ • Nhóm Ngân hàng
+    case "preset_cheap_bank":
     case "dnse-05":
       updatedBuy = {
         ...updatedBuy,
         use_pb: true,
+        min_pb: 0.0,
         max_pb: 1.0,
         use_avg_trading_val: true,
+        avg_trading_val_period: 10,
         min_avg_trading_val: 10,
       };
       break;
+
+    // 6. Dò tín hiệu tăng sớm: %KLGD đột biến 10 phiên ≥ 30% • Giá mở cửa T0 > Giá mở cửa T-1
+    case "preset_t_plus_surge":
     case "dnse-06":
       updatedBuy = {
         ...updatedBuy,
-        use_price_increase: true,
         use_volume_spike: true,
+        vol_spike_period: 10,
+        min_vol_spike_pct: 30,
+        use_price_increase: true,
+        price_t0_field: "Giá mở cửa T0",
+        price_t0_operator: ">",
+        price_t1_field: "Giá mở cửa T-1",
       };
       break;
+
+    // 7. Cổ phiếu chuyển từ sideway sang breakout: ADX(14): 0 - 20 • Giá cắt lên dải trên Bollinger Bands
+    case "preset_sideway_breakout":
     case "dnse-07":
       updatedBuy = {
         ...updatedBuy,
         use_adx: true,
-        use_bb: true,
+        min_adx: 0,
+        max_adx: 20,
+        use_price_cross: true,
+        price_cross_operator: "Cắt lên",
+        price_cross_target: "BB Trên",
       };
       break;
+
+    // 8. Xác nhận đảo chiều khỏi vùng giảm dài hạn: Giá cắt lên EMA 200 • Thoát đáy giảm trung dài hạn
+    case "preset_ema200_reversal":
     case "dnse-08":
       updatedBuy = {
         ...updatedBuy,
         use_price_cross: true,
-        use_rsi: true,
-        rsi_threshold: 57,
+        price_cross_operator: "Cắt lên",
+        price_cross_target: "EMA 200",
       };
       break;
+
     default:
       updatedBuy = {
         ...updatedBuy,

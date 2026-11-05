@@ -842,7 +842,7 @@ describe("Strategy Storage & Laboratory Logic (strategyStorage.ts)", () => {
       const config = mapPresetToStrategyConfig(preset);
 
       // Assert
-      expect(config.buy_conditions.use_stock_price).toBe(true);
+      expect(config.buy_conditions.use_market_cap).toBe(true);
       expect(config.buy_conditions.min_market_cap).toBe(2000);
       expect(config.buy_conditions.min_roe).toBe(5.0);
       expect(config.buy_conditions.growth_eps).toBe(true);
@@ -878,15 +878,16 @@ describe("Strategy Storage & Laboratory Logic (strategyStorage.ts)", () => {
 
       // Assert
       expect(config.buy_conditions.use_adx).toBe(true);
-      expect(config.buy_conditions.use_bb).toBe(true);
+      expect(config.buy_conditions.use_price_cross).toBe(true);
+      expect(config.buy_conditions.price_cross_target).toBe("BB Trên");
     });
 
-    it("should configure buy conditions for dnse-08 (Giao cắt RSI)", () => {
+    it("should configure buy conditions for dnse-08 (Giao cắt EMA 200)", () => {
       // Arrange
       const preset: StrategyPresetItem = {
         ...basePreset,
         id: "dnse-08",
-        category: "Tín hiệu RSI",
+        category: "Tín hiệu Đảo chiều",
       };
 
       // Act
@@ -894,8 +895,116 @@ describe("Strategy Storage & Laboratory Logic (strategyStorage.ts)", () => {
 
       // Assert
       expect(config.buy_conditions.use_price_cross).toBe(true);
-      expect(config.buy_conditions.use_rsi).toBe(true);
-      expect(config.buy_conditions.rsi_threshold).toBe(57);
+      expect(config.buy_conditions.price_cross_target).toBe("EMA 200");
+    });
+
+    it("should accurately map all 8 production presets (preset_* from Backend API)", () => {
+      const presetsToTest: { id: string; name: string; verify: (c: ReturnType<typeof mapPresetToStrategyConfig>) => void }[] = [
+        {
+          id: "preset_ema20_breakout",
+          name: "Thuận xu hướng (Break out EMA 20)",
+          verify: (c) => {
+            expect(c.buy_conditions.use_price_cross).toBe(true);
+            expect(c.buy_conditions.price_cross_target).toBe("EMA 20");
+            expect(c.buy_conditions.price_cross_operator).toBe("Cắt lên");
+            expect(c.buy_conditions.use_volume_spike).toBe(true);
+            expect(c.buy_conditions.min_vol_spike_pct).toBe(50);
+            expect(c.buy_conditions.foreign_net_buy).toBe(true);
+          },
+        },
+        {
+          id: "preset_rsi_momentum",
+          name: "Xu hướng tăng mạnh kèm KLGD đột biến",
+          verify: (c) => {
+            expect(c.buy_conditions.use_rsi).toBe(true);
+            expect(c.buy_conditions.rsi_min).toBe(70);
+            expect(c.buy_conditions.rsi_max).toBe(100);
+            expect(c.buy_conditions.use_volume_spike).toBe(true);
+            expect(c.buy_conditions.min_vol_spike_pct).toBe(30);
+            expect(c.buy_conditions.max_vol_spike_pct).toBe(70);
+          },
+        },
+        {
+          id: "preset_fair_val_flow",
+          name: "Định giá hợp lý & Dòng tiền xác nhận xu hướng",
+          verify: (c) => {
+            expect(c.buy_conditions.use_pe).toBe(true);
+            expect(c.buy_conditions.min_pe).toBe(12);
+            expect(c.buy_conditions.max_pe).toBe(16);
+            expect(c.buy_conditions.use_price_increase).toBe(true);
+            expect(c.buy_conditions.price_t0_field).toBe("Giá mở cửa T0");
+            expect(c.buy_conditions.price_t1_field).toBe("Giá mở cửa T-1");
+            expect(c.buy_conditions.foreign_net_buy).toBe(true);
+          },
+        },
+        {
+          id: "preset_semi_canslim",
+          name: "CP tăng trưởng, định giá hợp lý (Mini-Canslim)",
+          verify: (c) => {
+            expect(c.buy_conditions.use_market_cap).toBe(true);
+            expect(c.buy_conditions.min_market_cap).toBe(2000);
+            expect(c.buy_conditions.use_avg_trading_val).toBe(true);
+            expect(c.buy_conditions.min_avg_trading_val).toBe(10);
+            expect(c.buy_conditions.use_roe).toBe(true);
+            expect(c.buy_conditions.min_roe).toBe(5.0);
+            expect(c.buy_conditions.growth_eps).toBe(true);
+            expect(c.buy_conditions.min_growth_eps).toBe(15.0);
+          },
+        },
+        {
+          id: "preset_cheap_bank",
+          name: "Định giá ngân hàng rẻ (P/B < 1) & GTGD 10 tỷ",
+          verify: (c) => {
+            expect(c.buy_conditions.use_pb).toBe(true);
+            expect(c.buy_conditions.min_pb).toBe(0.0);
+            expect(c.buy_conditions.max_pb).toBe(1.0);
+            expect(c.buy_conditions.use_avg_trading_val).toBe(true);
+            expect(c.buy_conditions.min_avg_trading_val).toBe(10);
+          },
+        },
+        {
+          id: "preset_t_plus_surge",
+          name: "Dò tín hiệu tăng sớm, xác nhận KLGD đột biến",
+          verify: (c) => {
+            expect(c.buy_conditions.use_volume_spike).toBe(true);
+            expect(c.buy_conditions.vol_spike_period).toBe(10);
+            expect(c.buy_conditions.min_vol_spike_pct).toBe(30);
+            expect(c.buy_conditions.use_price_increase).toBe(true);
+            expect(c.buy_conditions.price_t0_field).toBe("Giá mở cửa T0");
+            expect(c.buy_conditions.price_t1_field).toBe("Giá mở cửa T-1");
+          },
+        },
+        {
+          id: "preset_sideway_breakout",
+          name: "Cổ phiếu chuyển từ sideway sang breakout",
+          verify: (c) => {
+            expect(c.buy_conditions.use_adx).toBe(true);
+            expect(c.buy_conditions.min_adx).toBe(0);
+            expect(c.buy_conditions.max_adx).toBe(20);
+            expect(c.buy_conditions.use_price_cross).toBe(true);
+            expect(c.buy_conditions.price_cross_target).toBe("BB Trên");
+          },
+        },
+        {
+          id: "preset_ema200_reversal",
+          name: "Xác nhận đảo chiều khỏi vùng giảm dài hạn",
+          verify: (c) => {
+            expect(c.buy_conditions.use_price_cross).toBe(true);
+            expect(c.buy_conditions.price_cross_target).toBe("EMA 200");
+            expect(c.buy_conditions.price_cross_operator).toBe("Cắt lên");
+          },
+        },
+      ];
+
+      for (const item of presetsToTest) {
+        const preset: StrategyPresetItem = {
+          ...basePreset,
+          id: item.id,
+          name: item.name,
+        };
+        const config = mapPresetToStrategyConfig(preset);
+        item.verify(config);
+      }
     });
   });
 });
