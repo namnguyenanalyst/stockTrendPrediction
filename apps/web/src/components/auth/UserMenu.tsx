@@ -100,23 +100,17 @@ export const UserMenu: React.FC = () => {
           {initial}
         </div>
 
-        <div className="hidden sm:flex flex-col text-left">
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-slate-100 max-w-[110px] truncate leading-tight">
-              {displayName}
-            </span>
-            <span
-              className={`rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
-                user.role === "admin"
-                  ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
-                  : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+        <div className="hidden sm:flex items-center gap-1.5">
+          <span className="font-semibold text-slate-100 max-w-[120px] truncate leading-none">
+            {displayName}
+          </span>
+          <span
+            className={`inline-flex items-center justify-center leading-none rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${user.role === "admin"
+              ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
+              : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
               }`}
-            >
-              {user.role === "admin" ? "ADMIN" : "TRADER"}
-            </span>
-          </div>
-          <span className="text-[10px] text-slate-400 truncate max-w-[110px]">
-            {user.email}
+          >
+            {user.role === "admin" ? "ADMIN" : "TRADER"}
           </span>
         </div>
 
@@ -151,11 +145,10 @@ export const UserMenu: React.FC = () => {
 
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
               <span
-                className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${
-                  user.role === "admin"
-                    ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
-                    : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
-                }`}
+                className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${user.role === "admin"
+                  ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
+                  : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                  }`}
               >
                 Vai trò: {user.role === "admin" ? "ADMIN" : "TRADER"}
               </span>

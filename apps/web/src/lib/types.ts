@@ -654,6 +654,45 @@ export interface AdminStatsResponse {
   online_users: number;
 }
 
+export interface AdminUserItem {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: "admin" | "trader";
+  risk_profile: "conservative" | "balanced" | "aggressive";
+  is_active: boolean;
+  created_at: string;
+  last_seen_at: string | null;
+  total_backtests: number;
+}
+
+export interface AdminUserListResponse {
+  items: AdminUserItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface AdminUpdateUserRequest {
+  is_active?: boolean;
+  role?: "admin" | "trader";
+}
+
+export interface AdminActivityItem {
+  id: string;
+  timestamp: string;
+  event_type: "backtest" | "ai_audit" | "user_registration";
+  title: string;
+  description: string;
+  actor: string | null;
+  status: "success" | "warning" | "info";
+  metadata?: Record<string, unknown>;
+}
+
+export interface AdminActivityResponse {
+  items: AdminActivityItem[];
+}
+
 export interface PredictStatusResponse {
   last_atc_session_date: string;
   last_retrain_at: string | null;

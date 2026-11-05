@@ -4,7 +4,11 @@
  */
 
 import {
+  AdminActivityResponse,
   AdminStatsResponse,
+  AdminUpdateUserRequest,
+  AdminUserItem,
+  AdminUserListResponse,
   AdvancedBacktestRequest,
   BacktestHistoryCreateRequest,
   BacktestRequest,
@@ -354,6 +358,38 @@ export async function deleteUserBacktest(id: string): Promise<void> {
 
 export async function getAdminStats(): Promise<AdminStatsResponse> {
   return fetchJson<AdminStatsResponse>("/api/v1/admin/stats");
+}
+
+export async function getAdminUsers(params?: {
+  search?: string;
+  role?: string;
+  is_active?: boolean;
+  page?: number;
+  page_size?: number;
+}): Promise<AdminUserListResponse> {
+  const query = new URLSearchParams();
+  if (params?.search) query.set("search", params.search);
+  if (params?.role) query.set("role", params.role);
+  if (params?.is_active !== undefined) query.set("is_active", String(params.is_active));
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.page_size) query.set("page_size", String(params.page_size));
+
+  const qs = query.toString();
+  return fetchJson<AdminUserListResponse>(`/api/v1/admin/users${qs ? `?${qs}` : ""}`);
+}
+
+export async function updateAdminUser(
+  userId: string,
+  payload: AdminUpdateUserRequest
+): Promise<AdminUserItem> {
+  return fetchJson<AdminUserItem>(`/api/v1/admin/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getAdminActivityLogs(limit: number = 25): Promise<AdminActivityResponse> {
+  return fetchJson<AdminActivityResponse>(`/api/v1/admin/activity-logs?limit=${limit}`);
 }
 
 export async function getPredictStatus(): Promise<PredictStatusResponse> {

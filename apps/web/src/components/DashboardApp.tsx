@@ -110,7 +110,7 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
       setLoadingBacktest(true);
 
       try {
-        const [boardRes, histRes, indRes, sumRes, singlePred, batchPred, btRes] =
+        const [boardRes, histRes, indRes, sumRes, singlePred, batchPred] =
           await Promise.allSettled([
             getMarketBoard(),
             getStockHistory(selectedSymbol),
@@ -118,11 +118,6 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
             getStockSummary(selectedSymbol),
             getPredictionSignal(selectedSymbol, modelType),
             getBatchPrediction(modelType),
-            runBacktestSimulation({
-              symbol: selectedSymbol,
-              model_type: modelType,
-              initial_capital: 100_000_000,
-            }),
           ]);
 
         if (ignore) return;
@@ -144,9 +139,6 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
         }
         if (batchPred.status === "fulfilled") {
           setBatchPrediction(batchPred.value);
-        }
-        if (btRes.status === "fulfilled") {
-          setBacktestResult(btRes.value);
         }
       } catch (err) {
         console.warn("Lỗi đồng bộ Dashboard:", err);

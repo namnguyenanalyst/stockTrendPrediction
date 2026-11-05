@@ -33,12 +33,12 @@ const TAB_TITLES = {
   },
   backtest: {
     title: "Kiểm thử chiến lược",
-    subtitle: "Mô phỏng vi cấu trúc HOSE/HNX, trừ phí thuế và đo lường Sharpe, MDD",
+    subtitle: "Phòng giả lập kiểm thử chiến lược đầu tư",
     icon: History,
   },
   "admin-stats": {
-    title: "Thống kê hệ thống & Giám sát Định danh",
-    subtitle: "Phân quyền bảo mật PoLP & Thống kê vĩ mô cấp hệ thống",
+    title: "Phòng kiểm soát của Quản trị viên",
+    subtitle: "Giám sát tài khoản người dùng & nhật ký hoạt động hệ thống",
     icon: ShieldCheck,
   },
 };
@@ -179,8 +179,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                     }}
                     onFocus={() => setIsSearchOpen(true)}
                     onKeyDown={handleSearchKeyDown}
-                    placeholder={`Nhập mã CP (${selectedSymbol})...`}
-                    className="h-8 w-36 rounded-lg border border-slate-800 bg-slate-900/90 pl-8 pr-7 text-xs font-bold uppercase text-slate-100 placeholder:text-slate-500 placeholder:font-normal focus:border-emerald-500/60 focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 sm:w-48 transition-all"
+                    placeholder={`Chọn mã cổ phiếu (${selectedSymbol})...`}
+                    className="h-8 w-44 rounded-lg border border-slate-800 bg-slate-900/90 pl-8 pr-7 text-xs font-bold uppercase text-slate-100 placeholder:text-slate-500 placeholder:font-normal placeholder:normal-case focus:border-emerald-500/60 focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 sm:w-56 transition-all"
                   />
                   <button
                     type="button"
@@ -209,11 +209,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                             e.stopPropagation();
                             setSelectedCategory(cat.id);
                           }}
-                          className={`rounded-md px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap transition-colors ${
-                            selectedCategory === cat.id
-                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                              : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
-                          }`}
+                          className={`rounded-md px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap transition-colors ${selectedCategory === cat.id
+                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                            : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                            }`}
                         >
                           {cat.label}
                         </button>
@@ -226,11 +225,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                           <button
                             key={item.symbol}
                             onClick={() => handleSelectSymbol(item.symbol)}
-                            className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition ${
-                              selectedSymbol === item.symbol
-                                ? "bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30"
-                                : "text-slate-300 hover:bg-slate-900 hover:text-white"
-                            }`}
+                            className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition ${selectedSymbol === item.symbol
+                              ? "bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30"
+                              : "text-slate-300 hover:bg-slate-900 hover:text-white"
+                              }`}
                           >
                             <div className="flex items-center gap-1.5 min-w-0">
                               <span className="font-bold text-slate-100">{item.symbol}</span>

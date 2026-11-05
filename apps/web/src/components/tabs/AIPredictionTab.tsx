@@ -8,13 +8,16 @@ import {
   CheckCircle2,
   Clock,
   Cpu,
+  Eye,
   HelpCircle,
   History,
   Minus,
   Radio,
+  RotateCcw,
   Trash2,
   TrendingDown,
   TrendingUp,
+  X,
 } from "lucide-react";
 import { getPredictStatus, getStockHistory, syncLivePrediction } from "@/lib/api";
 import {
@@ -283,10 +286,13 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   const maxProb = Math.max(probUp, probHold, probDown);
   const confidencePct = (maxProb * 100).toFixed(1);
 
-  // Phân màu tín hiệu
-  const signal = activePred?.signal || "ĐANG TÍNH TOÁN";
-  const isBuy = signal.includes("MUA") || signal.includes("BUY");
-  const isSell = signal.includes("BÁN") || signal.includes("SELL");
+  // Phân màu tín hiệu & chuẩn hóa tiếng Việt đồng bộ
+  const rawSignal = activePred?.signal || "ĐANG TÍNH TOÁN";
+  const normalizedSignal = rawSignal.includes("HOLD") || rawSignal.includes("GIỮ") || rawSignal.includes("NGANG")
+    ? "NẮM GIỮ (TÍCH LŨY)"
+    : rawSignal;
+  const isBuy = rawSignal.includes("MUA") || rawSignal.includes("BUY") || rawSignal.includes("TĂNG");
+  const isSell = rawSignal.includes("BÁN") || rawSignal.includes("SELL") || rawSignal.includes("GIẢM");
 
 
   return (
@@ -310,21 +316,21 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <div
                 data-testid="autonomous-status-badge"
-                className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-950/40 px-3 py-1 text-[11px] font-medium text-emerald-300 shadow-sm backdrop-blur-sm"
+                className="inline-flex flex-wrap items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/40 px-3 py-1 text-[11px] font-medium text-emerald-300 shadow-sm backdrop-blur-sm"
               >
-                <span className="relative flex h-2 w-2">
+                <span className="relative flex h-2 w-2 shrink-0">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
                 </span>
-                <Bot className="h-3.5 w-3.5 text-emerald-400" />
+                <Bot className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
                 <span>
-                  Mô hình AI tự động cập nhật định kỳ hàng tuần | Căn cứ phiên chốt:{" "}
+                  Học máy tự trị | Phiên căn cứ:{" "}
                   <strong className="text-emerald-200">
                     {predictStatus?.last_atc_session_date || "..."}
                   </strong>
                 </span>
-                <span className="text-emerald-400/70">
-                  (Lần cập nhật gần nhất: {formatRetrainTime(predictStatus?.last_retrain_at)})
+                <span className="text-emerald-400/70 text-[10px]">
+                  (Cập nhật: {formatRetrainTime(predictStatus?.last_retrain_at)})
                 </span>
               </div>
             </div>
@@ -345,7 +351,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               onMouseEnter={() => startHoverTimer("lightgbm")}
               onMouseLeave={cancelHoverTimer}
               className={`relative flex items-center gap-1.5 overflow-hidden rounded px-2.5 py-1 text-xs font-semibold transition-colors ${modelType === "lightgbm"
-                ? "bg-blue-600 text-white"
+                ? "bg-emerald-600 text-white shadow-sm"
                 : "text-slate-400 hover:text-slate-200"
                 }`}
               title="Giữ chuột 3 giây để xem cửa sổ đặc tả mô hình LightGBM"
@@ -355,7 +361,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               {/* Thanh đếm giờ 3 giây trực quan */}
               {hoveredModel === "lightgbm" && activeTooltipModel !== "lightgbm" && (
                 <span
-                  className="absolute bottom-0 left-0 h-0.5 bg-blue-400"
+                  className="absolute bottom-0 left-0 h-0.5 bg-emerald-400"
                   style={{
                     animation: "fillProgress 3s linear forwards",
                   }}
@@ -370,7 +376,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               onMouseEnter={() => startHoverTimer("lstm")}
               onMouseLeave={cancelHoverTimer}
               className={`relative flex items-center gap-1.5 overflow-hidden rounded px-2.5 py-1 text-xs font-semibold transition-colors ${modelType === "lstm"
-                ? "bg-blue-600 text-white"
+                ? "bg-emerald-600 text-white shadow-sm"
                 : "text-slate-400 hover:text-slate-200"
                 }`}
               title="Giữ chuột 3 giây để xem cửa sổ đặc tả mô hình PyTorch LSTM"
@@ -380,7 +386,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               {/* Thanh đếm giờ 3 giây trực quan */}
               {hoveredModel === "lstm" && activeTooltipModel !== "lstm" && (
                 <span
-                  className="absolute bottom-0 left-0 h-0.5 bg-sky-400"
+                  className="absolute bottom-0 left-0 h-0.5 bg-emerald-400"
                   style={{
                     animation: "fillProgress 3s linear forwards",
                   }}
@@ -395,25 +401,6 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               }
             `}</style>
           </div>
-        </div>
-      </div>
-
-      {/* Thông tin Dữ liệu Huấn luyện & Chân trời Dự phóng */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/70 px-4 py-2 text-xs text-slate-400">
-        <div className="flex items-center gap-2">
-          <span className="flex h-2 w-2 rounded-full bg-emerald-400" />
-          <span>
-            Dữ liệu căn cứ: <strong className="text-slate-200">Phiên {activePred?.data_as_of_date || activePred?.date || "gần nhất"}</strong>
-          </span>
-          {activePred?.market_session_label && (
-            <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-400 border border-emerald-500/20">
-              {activePred.market_session_label}
-            </span>
-          )}
-          <span className="text-slate-600">•</span>
-          <span>
-            Kỳ hạn: <strong className="text-blue-300 font-mono">3 phiên tiếp theo (T+3)</strong>
-          </span>
         </div>
       </div>
 
@@ -475,7 +462,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                       Tín hiệu chu kỳ T+3
                     </span>
                     <h3 className="text-lg font-bold tracking-tight sm:text-xl">
-                      {activePred?.signal || "NẮM GIỮ (HOLD)"}
+                      {normalizedSignal}
                     </h3>
                   </div>
                 </div>
@@ -484,7 +471,9 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                   <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
                     <span className="text-slate-400">Xu hướng phân loại:</span>
                     <span className="font-semibold text-slate-200">
-                      {activePred?.class_name || "ĐI NGANG"}
+                      {activePred?.class_name === "ĐI NGANG"
+                        ? "TÍCH LŨY / ĐI NGANG"
+                        : activePred?.class_name || "TÍCH LŨY / ĐI NGANG"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
@@ -495,11 +484,11 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                   </div>
                   <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
                     <span className="text-slate-400">Thị giá đóng cửa phiên t:</span>
-                    <span className="font-mono font-semibold text-slate-200">
+                    <span className="font-mono font-semibold text-slate-200 whitespace-nowrap">
                       {activePred
                         ? (activePred.current_price * 1000).toLocaleString("vi-VN")
                         : "---"}{" "}
-                      VNĐ
+                      đ
                     </span>
                   </div>
                   <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
@@ -543,7 +532,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               <div>
                 <div className="flex items-center justify-between text-xs font-medium mb-1">
                   <span className="flex items-center gap-1.5 text-emerald-400">
-                    <TrendingUp className="h-3.5 w-3.5" /> Xu hướng TĂNG (Up)
+                    <TrendingUp className="h-3.5 w-3.5" /> Kịch bản TĂNG GIÁ
                   </span>
                   <span className="font-mono font-bold text-emerald-400">
                     {(probUp * 100).toFixed(1)}%
@@ -561,7 +550,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               <div>
                 <div className="flex items-center justify-between text-xs font-medium mb-1">
                   <span className="flex items-center gap-1.5 text-amber-400">
-                    <Minus className="h-3.5 w-3.5" /> Xu hướng ĐI NGANG (Neutral)
+                    <Minus className="h-3.5 w-3.5" /> Kịch bản TÍCH LŨY / ĐI NGANG
                   </span>
                   <span className="font-mono font-bold text-amber-400">
                     {(probHold * 100).toFixed(1)}%
@@ -579,7 +568,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               <div>
                 <div className="flex items-center justify-between text-xs font-medium mb-1">
                   <span className="flex items-center gap-1.5 text-rose-400">
-                    <TrendingDown className="h-3.5 w-3.5" /> Xu hướng GIẢM (Down)
+                    <TrendingDown className="h-3.5 w-3.5" /> Kịch bản GIẢM GIÁ
                   </span>
                   <span className="font-mono font-bold text-rose-400">
                     {(probDown * 100).toFixed(1)}%
@@ -608,12 +597,9 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           <div className="flex items-center gap-2">
             <Activity className="h-4 w-4 text-blue-400" />
             <h3 className="text-sm font-semibold text-slate-100 sm:text-base">
-              Biểu đồ Nến & Quỹ đạo Dự phóng Xu hướng (T+1 → T+3)
+              Biểu đồ nến và Dự báo xu hướng
             </h3>
           </div>
-          <span className="text-xs text-slate-400">
-            Mô phỏng chu kỳ thanh toán T+2.5 và đường cong kỳ vọng giá AI ({modelType.toUpperCase()})
-          </span>
         </div>
 
         {/* Biểu đồ Nến Kỹ thuật & Quỹ đạo Dự phóng Xu hướng T+1 -> T+3 chuẩn FireAnt */}
@@ -633,7 +619,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
             <div className="flex items-center gap-2">
               <History className="h-4 w-4 text-blue-400" />
               <h3 className="text-sm font-semibold text-slate-100 sm:text-base">
-                Nhật ký Lịch sử Dự báo & Phân tích Mô hình
+                Lịch sử dự báo
               </h3>
             </div>
             <p className="text-[11px] text-slate-400">
@@ -671,12 +657,12 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 <th className="px-3 py-2.5 font-semibold">Mã CP</th>
                 <th className="px-3 py-2.5 font-semibold">Mô hình</th>
                 <th className="px-3 py-2.5 font-semibold">Nến căn cứ</th>
-                <th className="px-3 py-2.5 font-semibold">Thị giá</th>
-                <th className="px-3 py-2.5 font-semibold">Tín hiệu Khuyến nghị</th>
-                <th className="px-3 py-2.5 font-semibold">Xác suất Tăng</th>
-                <th className="px-3 py-2.5 font-semibold">Xác suất Giảm</th>
-                <th className="px-3 py-2.5 font-semibold">Độ tin cậy</th>
-                <th className="px-3 py-2.5 text-right font-semibold">Hành động</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Thị giá</th>
+                <th className="px-3 py-2.5 text-center font-semibold">Tín hiệu Khuyến nghị</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Xác suất Tăng</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Xác suất Giảm</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Độ tin cậy</th>
+                <th className="px-3 py-2.5 text-center font-semibold">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -685,103 +671,106 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                   const isItemBuy = item.signal.includes("MUA") || item.signal.includes("BUY");
                   const isItemSell = item.signal.includes("BÁN") || item.signal.includes("SELL");
 
-                    return (
-                      <tr
-                        key={item.id}
-                        onClick={() => {
-                          onSelectSymbol(item.symbol);
-                          setDetailModalItem({
-                            symbol: item.symbol,
-                            currentValue: item.current_price,
-                            isIndex: item.symbol.includes("VNINDEX") || item.symbol.includes("VN30"),
-                          });
-                          setIsDetailModalOpen(true);
-                        }}
-                        title={`Nhấn để mở biểu đồ nến chi tiết của ${item.symbol}`}
-                        className={`group cursor-pointer transition-colors ${selectedSymbol === item.symbol
-                          ? "bg-emerald-500/10 hover:bg-emerald-500/15"
-                          : "hover:bg-slate-800/60"
-                          }`}
-                      >
-                        <td className="px-3 py-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <Clock className="h-3 w-3 text-slate-500" />
-                            <span>{item.timestamp}</span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3 font-bold text-slate-100 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                            <span className="font-mono group-hover:text-emerald-400 transition-colors">
-                              {item.symbol}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold border ${item.model_type === "lightgbm"
-                              ? "border-blue-500/30 bg-blue-500/10 text-blue-300"
-                              : "border-sky-500/30 bg-sky-500/10 text-sky-300"
-                              }`}
-                          >
-                            {item.model_type === "lightgbm" ? (
-                              <Cpu className="h-2.5 w-2.5" />
-                            ) : (
-                              <Brain className="h-2.5 w-2.5" />
-                            )}
-                            {item.model_type.toUpperCase()}
+                  return (
+                    <tr
+                      key={item.id}
+                      onClick={() => {
+                        onSelectSymbol(item.symbol);
+                        setDetailModalItem({
+                          symbol: item.symbol,
+                          currentValue: item.current_price,
+                          isIndex: item.symbol.includes("VNINDEX") || item.symbol.includes("VN30"),
+                        });
+                        setIsDetailModalOpen(true);
+                      }}
+                      title={`Nhấn để mở biểu đồ nến chi tiết của ${item.symbol}`}
+                      className={`group cursor-pointer transition-colors ${selectedSymbol === item.symbol
+                        ? "bg-emerald-500/10 hover:bg-emerald-500/15"
+                        : "hover:bg-slate-800/60"
+                        }`}
+                    >
+                      <td className="px-3 py-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-3 w-3 text-slate-500" />
+                          <span>{item.timestamp}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 font-bold text-slate-100 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
+                          <span className="font-mono group-hover:text-emerald-400 transition-colors">
+                            {item.symbol}
                           </span>
-                        </td>
-                        <td className="px-3 py-3 font-mono text-slate-300 whitespace-nowrap">
-                          {item.data_date}
-                        </td>
-                        <td className="px-3 py-3 font-mono font-semibold text-slate-200 whitespace-nowrap">
-                          {(item.current_price * 1000).toLocaleString("vi-VN")} đ
-                        </td>
-                        <td className="px-3 py-3 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold ${isItemBuy
-                              ? "bg-emerald-500/10 text-emerald-400"
-                              : isItemSell
-                                ? "bg-rose-500/10 text-rose-400"
-                                : "bg-amber-500/10 text-amber-400"
-                              }`}
-                          >
-                            {isItemBuy ? (
-                              <TrendingUp className="h-3 w-3" />
-                            ) : isItemSell ? (
-                              <TrendingDown className="h-3 w-3" />
-                            ) : (
-                              <Minus className="h-3 w-3" />
-                            )}
-                            {item.signal}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 font-mono text-emerald-400 whitespace-nowrap">
-                          {(item.prob_up * 100).toFixed(1)}%
-                        </td>
-                        <td className="px-3 py-3 font-mono text-rose-400 whitespace-nowrap">
-                          {(item.prob_down * 100).toFixed(1)}%
-                        </td>
-                        <td className="px-3 py-3 font-mono font-semibold text-blue-400 whitespace-nowrap">
-                          {(item.confidence * 100).toFixed(1)}%
-                        </td>
-                        <td className="px-3 py-3 text-right whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onSelectSymbol(item.symbol);
-                              onChangeModelType(item.model_type);
-                            }}
-                            className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:border-blue-500 hover:bg-blue-600 hover:text-white transition-colors"
-                            title={`Nạp lại dự báo mã ${item.symbol} (${item.model_type.toUpperCase()})`}
-                          >
-                            <span>Xem lại</span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold border ${item.model_type === "lightgbm"
+                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                            : "border-sky-500/30 bg-sky-500/10 text-sky-300"
+                            }`}
+                        >
+                          {item.model_type === "lightgbm" ? (
+                            <Cpu className="h-2.5 w-2.5" />
+                          ) : (
+                            <Brain className="h-2.5 w-2.5" />
+                          )}
+                          {item.model_type.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 font-mono text-slate-300 whitespace-nowrap">
+                        {item.data_date}
+                      </td>
+                      <td className="px-3 py-3 text-right font-mono font-semibold text-slate-200 whitespace-nowrap">
+                        {(item.current_price * 1000).toLocaleString("vi-VN")} đ
+                      </td>
+                      <td className="px-3 py-3 text-center whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-md px-2.5 py-0.5 text-[10px] font-bold border ${isItemBuy
+                            ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                            : isItemSell
+                              ? "bg-rose-500/15 border-rose-500/30 text-rose-400"
+                              : "bg-amber-500/15 border-amber-500/30 text-amber-400"
+                            }`}
+                        >
+                          {isItemBuy ? (
+                            <TrendingUp className="h-3 w-3" />
+                          ) : isItemSell ? (
+                            <TrendingDown className="h-3 w-3" />
+                          ) : (
+                            <Minus className="h-3 w-3" />
+                          )}
+                          {item.signal.includes("HOLD") || item.signal.includes("GIỮ") || item.signal.includes("NGANG")
+                            ? "TÍCH LŨY"
+                            : item.signal}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-right font-mono text-emerald-400 whitespace-nowrap">
+                        {(item.prob_up * 100).toFixed(1)}%
+                      </td>
+                      <td className="px-3 py-3 text-right font-mono text-rose-400 whitespace-nowrap">
+                        {(item.prob_down * 100).toFixed(1)}%
+                      </td>
+                      <td className="px-3 py-3 text-right font-mono font-semibold text-blue-400 whitespace-nowrap">
+                        {(item.confidence * 100).toFixed(1)}%
+                      </td>
+                      <td className="px-3 py-3 text-center whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectSymbol(item.symbol);
+                            onChangeModelType(item.model_type);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/90 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:border-emerald-500/50 hover:bg-emerald-500/10 hover:text-emerald-300 transition-all"
+                          title={`Nạp lại dự báo mã ${item.symbol} (${item.model_type.toUpperCase()})`}
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          <span>Xem lại</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
                 })
               ) : (
                 <tr>
@@ -848,7 +837,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors"
                 title="Đóng cửa sổ (hoặc bấm Esc / bấm vùng ngoài)"
               >
-                <span className="text-xl font-bold leading-none">&times;</span>
+                <X className="h-5 w-5" />
               </button>
             </div>
 

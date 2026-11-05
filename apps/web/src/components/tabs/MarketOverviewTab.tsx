@@ -532,8 +532,8 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
                   className={`group relative whitespace-nowrap px-3.5 py-2.5 text-xs font-semibold transition-all ${isActive
-                      ? "text-emerald-400 font-bold"
-                      : "text-slate-400 hover:text-slate-200"
+                    ? "text-emerald-400 font-bold"
+                    : "text-slate-400 hover:text-slate-200"
                     }`}
                 >
                   <span>{cat.label}</span>
@@ -648,8 +648,8 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                     key={exch.id}
                     onClick={() => setSelectedExchange(exch.id)}
                     className={`h-8 rounded-lg px-2.5 text-xs font-semibold transition-all border ${isActive
-                        ? "bg-slate-800 text-emerald-400 border-emerald-500/40 shadow-sm"
-                        : "bg-slate-900/70 text-slate-400 border-slate-800/80 hover:bg-slate-800 hover:text-slate-200"
+                      ? "bg-slate-800 text-emerald-400 border-emerald-500/40 shadow-sm"
+                      : "bg-slate-900/70 text-slate-400 border-slate-800/80 hover:bg-slate-800 hover:text-slate-200"
                       }`}
                   >
                     {exch.label}
@@ -667,50 +667,50 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                 Thống kê biến động:
               </span>
 
-              <div className="flex items-center gap-1 text-xs font-bold">
+              <div className="flex items-center gap-1 text-xs font-semibold">
                 {/* Trần */}
                 <div
-                  title="Số mã chạm giá Trần (Ceiling)"
-                  className="flex items-center gap-1 rounded-md border border-purple-500/30 bg-purple-950/40 px-2 py-1 text-purple-400 shadow-sm"
+                  title="Số mã chạm giá Trần"
+                  className="flex items-center gap-1 rounded-md border border-purple-500/20 bg-slate-900/90 px-2 py-1 text-purple-400"
                 >
-                  <ArrowUpRight className="h-3 w-3" />
-                  <span>{breadthStats.ceiling}</span>
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                  <span className="font-bold">{breadthStats.ceiling}</span>
                 </div>
 
                 {/* Tăng */}
                 <div
-                  title="Số mã Tăng giá (Advancing)"
-                  className="flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-950/40 px-2 py-1 text-emerald-400 shadow-sm"
+                  title="Số mã Tăng giá"
+                  className="flex items-center gap-1 rounded-md border border-emerald-500/20 bg-slate-900/90 px-2 py-1 text-emerald-400"
                 >
-                  <TrendingUp className="h-3 w-3" />
-                  <span>{breadthStats.advancing}</span>
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  <span className="font-bold">{breadthStats.advancing}</span>
                 </div>
 
                 {/* Tham chiếu */}
                 <div
-                  title="Số mã Đứng giá / Tham chiếu (Unchanged)"
-                  className="flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-950/40 px-2 py-1 text-amber-400 shadow-sm"
+                  title="Số mã Đứng giá / Tham chiếu"
+                  className="flex items-center gap-1 rounded-md border border-amber-500/20 bg-slate-900/90 px-2 py-1 text-amber-400"
                 >
-                  <Minus className="h-3 w-3" />
-                  <span>{breadthStats.unchanged}</span>
+                  <Minus className="h-3.5 w-3.5" />
+                  <span className="font-bold">{breadthStats.unchanged}</span>
                 </div>
 
                 {/* Giảm */}
                 <div
-                  title="Số mã Giảm giá (Declining)"
-                  className="flex items-center gap-1 rounded-md border border-rose-500/30 bg-rose-950/40 px-2 py-1 text-rose-400 shadow-sm"
+                  title="Số mã Giảm giá"
+                  className="flex items-center gap-1 rounded-md border border-rose-500/20 bg-slate-900/90 px-2 py-1 text-rose-400"
                 >
-                  <TrendingDown className="h-3 w-3" />
-                  <span>{breadthStats.declining}</span>
+                  <TrendingDown className="h-3.5 w-3.5" />
+                  <span className="font-bold">{breadthStats.declining}</span>
                 </div>
 
                 {/* Sàn */}
                 <div
-                  title="Số mã chạm giá Sàn (Floor)"
-                  className="flex items-center gap-1 rounded-md border border-cyan-500/30 bg-cyan-950/40 px-2 py-1 text-cyan-400 shadow-sm"
+                  title="Số mã chạm giá Sàn"
+                  className="flex items-center gap-1 rounded-md border border-cyan-500/20 bg-slate-900/90 px-2 py-1 text-cyan-400"
                 >
-                  <ArrowDownRight className="h-3 w-3" />
-                  <span>{breadthStats.floor}</span>
+                  <ArrowDownRight className="h-3.5 w-3.5" />
+                  <span className="font-bold">{breadthStats.floor}</span>
                 </div>
               </div>
             </div>
@@ -720,8 +720,8 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
               <button
                 onClick={() => setViewMode("split")}
                 className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${viewMode === "split"
-                    ? "bg-slate-800 text-emerald-400 shadow-sm border border-emerald-500/30"
-                    : "text-slate-400 hover:text-slate-200"
+                  ? "bg-slate-800 text-emerald-400 shadow-sm border border-emerald-500/30"
+                  : "text-slate-400 hover:text-slate-200"
                   }`}
                 title="Chế độ Kết hợp Bảng giá & Biểu đồ"
               >
@@ -730,8 +730,8 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
               <button
                 onClick={() => setViewMode("board")}
                 className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${viewMode === "board"
-                    ? "bg-slate-800 text-emerald-400 shadow-sm border border-emerald-500/30"
-                    : "text-slate-400 hover:text-slate-200"
+                  ? "bg-slate-800 text-emerald-400 shadow-sm border border-emerald-500/30"
+                  : "text-slate-400 hover:text-slate-200"
                   }`}
                 title="Chỉ Bảng giá Điện tử"
               >
@@ -740,8 +740,8 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
               <button
                 onClick={() => setViewMode("chart")}
                 className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${viewMode === "chart"
-                    ? "bg-slate-800 text-emerald-400 shadow-sm border border-emerald-500/30"
-                    : "text-slate-400 hover:text-slate-200"
+                  ? "bg-slate-800 text-emerald-400 shadow-sm border border-emerald-500/30"
+                  : "text-slate-400 hover:text-slate-200"
                   }`}
                 title="Chuyên sâu Biểu đồ nến kỹ thuật"
               >
@@ -767,9 +767,9 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                     <th className="px-3 py-2.5 text-right">GIÁ KHỚP</th>
                     <th className="px-3 py-2.5 text-right">BIẾN ĐỘNG</th>
                     <th className="px-3 py-2.5 text-right">KLGD</th>
-                    <th className="px-3 py-2.5 text-center">BIỂU ĐỒ 10P</th>
-                    <th className="px-3 py-2.5 text-center">LỰC MUA / BÁN</th>
-                    <th className="py-2.5 pl-3 pr-4 text-center">AI BIAS</th>
+                    <th className="px-3 py-2.5 text-center min-w-[90px]">BIỂU ĐỒ 10P</th>
+                    <th className="px-3 py-2.5 text-center min-w-[110px]">LỰC MUA / BÁN</th>
+                    <th className="py-2.5 pl-3 pr-4 text-center min-w-[95px] whitespace-nowrap">DỰ BÁO</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/40">
@@ -807,11 +807,10 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                           });
                         }}
                         title={`Nhấn để mở biểu đồ nến chi tiết của ${stock.symbol}`}
-                        className={`group cursor-pointer transition-colors ${
-                          isSelected
+                        className={`group cursor-pointer transition-colors ${isSelected
                             ? "bg-emerald-500/10 hover:bg-emerald-500/15"
                             : "hover:bg-slate-800/60"
-                        }`}
+                          }`}
                       >
                         {/* 1. Mã chứng khoán & Logo */}
                         <td className="py-2 pl-4 pr-3">
@@ -824,25 +823,24 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                                   ? "Bỏ ghim khỏi danh mục theo dõi"
                                   : "Ghim vào danh mục theo dõi"
                               }
-                              className="p-1 rounded hover:bg-slate-700/60 transition-colors shrink-0"
+                              className="flex h-6 w-6 items-center justify-center rounded hover:bg-slate-800 transition-colors shrink-0"
                             >
                               <Star
-                                className={`h-3.5 w-3.5 ${
-                                  pinnedSymbols.includes(stock.symbol.toUpperCase())
+                                className={`h-3.5 w-3.5 ${pinnedSymbols.includes(stock.symbol.toUpperCase())
                                     ? "fill-amber-400 text-amber-400"
                                     : "text-slate-600 hover:text-amber-400"
-                                }`}
+                                  }`}
                               />
                             </button>
-                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 font-black text-slate-200 ring-1 ring-slate-700/60 group-hover:ring-emerald-500/50 transition-all">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-800/90 font-bold text-[11px] text-slate-300 border border-slate-700/50 group-hover:border-emerald-500/40 transition-all shrink-0">
                               {stock.symbol.slice(0, 2)}
                             </div>
-                            <div>
+                            <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <span className="font-extrabold tracking-tight text-slate-100 group-hover:text-emerald-400 transition-colors">
                                   {stock.symbol}
                                 </span>
-                                <span className="rounded bg-slate-800 px-1 py-0.2 text-[9px] text-slate-400">
+                                <span className="rounded bg-slate-800/80 px-1 py-0.2 text-[9px] text-slate-400 font-medium">
                                   {stock.exchange}
                                 </span>
                               </div>
@@ -863,71 +861,69 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                         {/* 3. Biến động */}
                         <td className="px-3 py-2 text-right">
                           <div
-                            className={`flex items-center justify-end gap-0.5 font-semibold ${
-                              isUp
+                            className={`inline-flex items-center justify-end gap-1 font-semibold ${isUp
                                 ? "text-emerald-400"
                                 : isRef
-                                ? "text-amber-400"
-                                : "text-rose-400"
-                            }`}
+                                  ? "text-amber-400"
+                                  : "text-rose-400"
+                              }`}
                           >
-                            {isUp && <ArrowUpRight className="h-3 w-3 stroke-[2.5]" />}
+                            {isUp && <ArrowUpRight className="h-3.5 w-3.5 shrink-0 stroke-[2.25]" />}
                             {!isUp && !isRef && (
-                              <ArrowDownRight className="h-3 w-3 stroke-[2.5]" />
+                              <ArrowDownRight className="h-3.5 w-3.5 shrink-0 stroke-[2.25]" />
                             )}
-                            <span>
+                            <span className="tabular-nums">
                               {isUp ? "+" : ""}
                               {stock.change_pct.toFixed(2)}%
                             </span>
                           </div>
-                          <p className="text-[10px] text-slate-500">
+                          <p className="text-[10px] text-slate-500 tabular-nums">
                             {isUp ? "+" : ""}
                             {stock.change.toFixed(2)}
                           </p>
                         </td>
 
                         {/* 4. Tổng khối lượng */}
-                        <td className="px-3 py-2 text-right font-medium text-slate-200">
+                        <td className="px-3 py-2 text-right font-medium text-slate-200 tabular-nums">
                           {stock.volume.toLocaleString("vi-VN")}
                         </td>
 
                         {/* 5. Biểu đồ mini */}
-                        <td className="px-3 py-2 text-center">
+                        <td className="px-3 py-2 text-center min-w-[90px]">
                           <div className="inline-block">
                             <TableSparkline data={stock.sparkline} isUp={isUp} />
                           </div>
                         </td>
 
                         {/* 6. Lực Mua / Bán chủ động */}
-                        <td className="px-3 py-2">
+                        <td className="px-3 py-2 min-w-[110px]">
                           <div className="mx-auto w-24">
-                            <div className="flex justify-between text-[9px] font-bold">
+                            <div className="flex justify-between text-[9px] font-semibold mb-0.5">
                               <span className="text-emerald-400">{stock.buy_ratio}%</span>
                               <span className="text-rose-400">{stock.sell_ratio}%</span>
                             </div>
-                            <div className="mt-0.5 flex h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+                            <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-800 gap-0.5">
                               <div
                                 style={{ width: `${stock.buy_ratio}%` }}
-                                className="bg-emerald-500 transition-all"
+                                className="bg-emerald-500 transition-all rounded-l-full"
                               />
                               <div
                                 style={{ width: `${stock.sell_ratio}%` }}
-                                className="bg-rose-500 transition-all"
+                                className="bg-rose-500 transition-all rounded-r-full"
                               />
                             </div>
                           </div>
                         </td>
 
-                        {/* 7. AI Bias */}
-                        <td className="py-2 pl-3 pr-4 text-center">
+                        {/* 7. Dự báo AI */}
+                        <td className="py-2 pl-3 pr-4 text-center min-w-[95px]">
                           <span
-                            className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                              stock.ai_bias === "TĂNG"
+                            className={`inline-block whitespace-nowrap rounded-md px-2.5 py-0.5 text-[10px] font-bold ${stock.ai_bias === "TĂNG"
                                 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                                 : stock.ai_bias === "GIẢM"
-                                ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                                : "bg-slate-800 text-slate-300 border border-slate-700/50"
-                            }`}
+                                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                  : "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                              }`}
                           >
                             {stock.ai_bias}
                           </span>
@@ -984,7 +980,7 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
               <div className="mt-3 flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2">
                 <div className="text-[11px]">
                   <p className="font-semibold text-emerald-300">Xem Tín hiệu Học máy?</p>
-                  <p className="text-[10px] text-slate-400">LightGBM & PyTorch LSTM</p>
+                  <p className="text-[10px] text-slate-400">Mô hình LightGBM & PyTorch LSTM</p>
                 </div>
                 <button
                   onClick={onGoToPrediction}
@@ -1085,8 +1081,8 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                 {summary && (
                   <span
                     className={`flex items-center gap-0.5 rounded-md px-2 py-0.5 text-xs font-bold ${isPriceUp
-                        ? "bg-emerald-500/10 text-emerald-400"
-                        : "bg-rose-500/10 text-rose-400"
+                      ? "bg-emerald-500/10 text-emerald-400"
+                      : "bg-rose-500/10 text-rose-400"
                       }`}
                   >
                     {isPriceUp ? (
@@ -1109,8 +1105,8 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                   key={tf}
                   onClick={() => setTimeframe(tf)}
                   className={`rounded px-2.5 py-1 text-xs font-semibold transition-all ${timeframe === tf
-                      ? "bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/30 font-bold"
-                      : "text-slate-400 hover:text-slate-200"
+                    ? "bg-emerald-500 text-slate-950 shadow-sm shadow-emerald-500/30 font-bold"
+                    : "text-slate-400 hover:text-slate-200"
                     }`}
                 >
                   {tf === "ALL" ? "Tất cả" : tf}
@@ -1147,11 +1143,11 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
             <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
               <div className="flex items-center justify-between text-slate-400">
                 <span className="text-[11px] font-medium">Lệch SMA(20)</span>
-                <Layers className="h-3 w-3" />
+                <Layers className="h-3.5 w-3.5" />
               </div>
               <div className="mt-1">
                 <span
-                  className={`text-sm font-bold ${(summary?.sma_20_dev ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
+                  className={`text-sm font-bold tabular-nums ${(summary?.sma_20_dev ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
                     }`}
                 >
                   {summary ? `${(summary.sma_20_dev * 100).toFixed(2)}%` : "---"}
@@ -1163,11 +1159,11 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
             <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
               <div className="flex items-center justify-between text-slate-400">
                 <span className="text-[11px] font-medium">Lệch SMA(50)</span>
-                <Layers className="h-3 w-3" />
+                <Layers className="h-3.5 w-3.5" />
               </div>
               <div className="mt-1">
                 <span
-                  className={`text-sm font-bold ${(summary?.sma_50_dev ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
+                  className={`text-sm font-bold tabular-nums ${(summary?.sma_50_dev ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
                     }`}
                 >
                   {summary ? `${(summary.sma_50_dev * 100).toFixed(2)}%` : "---"}
@@ -1179,10 +1175,10 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
             <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
               <div className="flex items-center justify-between text-slate-400">
                 <span className="text-[11px] font-medium">Biến động CV(50)</span>
-                <Percent className="h-3 w-3" />
+                <Percent className="h-3.5 w-3.5" />
               </div>
               <div className="mt-1">
-                <span className="text-sm font-bold text-slate-200">
+                <span className="text-sm font-bold text-slate-200 tabular-nums">
                   {latestInd ? `${(latestInd.cv_50 * 100).toFixed(2)}%` : "---"}
                 </span>
               </div>
@@ -1191,33 +1187,33 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
 
             <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
               <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-medium">Vol Ratio</span>
-                <BarChart2 className="h-3 w-3" />
+                <span className="text-[11px] font-medium">Tỷ lệ KL / TB20</span>
+                <BarChart2 className="h-3.5 w-3.5" />
               </div>
               <div className="mt-1">
                 <span
-                  className={`text-sm font-bold ${(latestInd?.vol_ratio ?? 1) >= 1.2
-                      ? "text-emerald-400"
-                      : (latestInd?.vol_ratio ?? 1) <= 0.8
-                        ? "text-amber-400"
-                        : "text-slate-200"
+                  className={`text-sm font-bold tabular-nums ${(latestInd?.vol_ratio ?? 1) >= 1.2
+                    ? "text-emerald-400"
+                    : (latestInd?.vol_ratio ?? 1) <= 0.8
+                      ? "text-amber-400"
+                      : "text-slate-200"
                     }`}
                 >
                   {latestInd ? `${latestInd.vol_ratio.toFixed(2)}x` : "---"}
                 </span>
               </div>
-              <p className="mt-0.5 text-[9px] text-slate-500">So với TB 20 phiên</p>
+              <p className="mt-0.5 text-[9px] text-slate-500">So với mức bình quân</p>
             </div>
 
             <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
               <div className="flex items-center justify-between text-slate-400">
                 <span className="text-[11px] font-medium">Khối lượng GD</span>
-                <BarChart2 className="h-3 w-3" />
+                <BarChart2 className="h-3.5 w-3.5" />
               </div>
               <div className="mt-1">
-                <span className="text-sm font-bold text-slate-200">
+                <span className="text-sm font-bold text-slate-200 tabular-nums">
                   {summary ? (summary.volume / 1000).toLocaleString("vi-VN") : "---"}{" "}
-                  <span className="text-[10px] font-normal text-slate-400">k CP</span>
+                  <span className="text-[10px] font-normal text-slate-400">nghìn CP</span>
                 </span>
               </div>
               <p className="mt-0.5 text-[9px] text-slate-500">Khớp phiên gần nhất</p>
@@ -1225,18 +1221,18 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
 
             <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
               <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-medium">VN-Index 1D</span>
+                <span className="text-[11px] font-medium">VN-Index (1 Phiên)</span>
                 {(latestInd?.vnindex_return_1d ?? 0) >= 0 ? (
-                  <TrendingUp className="h-3 w-3 text-emerald-400" />
+                  <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
                 ) : (
-                  <TrendingDown className="h-3 w-3 text-rose-400" />
+                  <TrendingDown className="h-3.5 w-3.5 text-rose-400" />
                 )}
               </div>
               <div className="mt-1">
                 <span
-                  className={`text-sm font-bold ${(latestInd?.vnindex_return_1d ?? 0) >= 0
-                      ? "text-emerald-400"
-                      : "text-rose-400"
+                  className={`text-sm font-bold tabular-nums ${(latestInd?.vnindex_return_1d ?? 0) >= 0
+                    ? "text-emerald-400"
+                    : "text-rose-400"
                     }`}
                 >
                   {latestInd

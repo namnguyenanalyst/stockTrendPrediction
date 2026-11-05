@@ -33,14 +33,14 @@ const BASE_NAV_ITEMS = [
     id: "prediction" as const,
     label: "Tín hiệu dự báo xu hướng",
     shortLabel: "Dự báo",
-    description: "Tín hiệu xu hướng từ mô hình AI",
+    description: "Tín hiệu xu hướng từ mô hình",
     icon: BrainCircuit,
   },
   {
     id: "backtest" as const,
     label: "Kiểm thử chiến lược",
     shortLabel: "Kiểm thử",
-    description: "Giả lập T+2 & Quản trị Rủi ro",
+    description: "Giả lập chiến lược & quản trị rủi ro",
     icon: History,
   },
 ];
@@ -58,14 +58,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ...BASE_NAV_ITEMS,
     ...(isAdmin
       ? [
-          {
-            id: "admin-stats" as const,
-            label: "Thống kê hệ thống",
-            shortLabel: "Thống kê",
-            description: "Giám sát định danh & PoLP",
-            icon: ShieldCheck,
-          },
-        ]
+        {
+          id: "admin-stats" as const,
+          label: "Phòng kiểm soát của QTV",
+          shortLabel: "Thống kê",
+          description: "Theo dõi hệ thống",
+          icon: ShieldCheck,
+        },
+      ]
       : []),
   ];
   // Kích hoạt dispatch sự kiện resize để các biểu đồ Lightweight Charts tự động cập nhật độ rộng mượt mà
@@ -80,15 +80,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       aria-label="Thanh điều hướng chính"
-      className={`sticky top-0 h-screen flex flex-col border-r border-slate-800 bg-slate-950/95 backdrop-blur-md z-40 transition-all duration-300 ease-in-out shrink-0 select-none ${
-        isCollapsed ? "w-20" : "w-64"
-      }`}
+      className={`sticky top-0 h-screen flex flex-col border-r border-slate-800 bg-slate-950/95 backdrop-blur-md z-40 transition-all duration-300 ease-in-out shrink-0 select-none ${isCollapsed ? "w-20" : "w-64"
+        }`}
     >
       {/* 1. Phần Đầu: Branding & Nút Đóng/Mở Xổ ra vào */}
       <div
-        className={`flex items-center border-b border-slate-800/80 h-[73px] transition-all duration-300 ${
-          isCollapsed ? "justify-center px-2" : "justify-between px-4"
-        }`}
+        className={`flex items-center border-b border-slate-800/80 h-[73px] transition-all duration-300 ${isCollapsed ? "justify-center px-2" : "justify-between px-4"
+          }`}
       >
         {!isCollapsed ? (
           <>
@@ -141,16 +139,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 aria-selected={isActive}
                 onClick={() => setActiveTab(item.id)}
                 title={isCollapsed ? `${item.label} — ${item.description}` : undefined}
-                className={`group relative flex items-center gap-3 rounded-xl px-3 py-3 text-left transition-all ${
-                  isActive
-                    ? "bg-emerald-500/10 text-emerald-400 font-semibold shadow-sm shadow-emerald-500/5 border border-emerald-500/30"
-                    : "text-slate-400 hover:bg-slate-900 hover:text-slate-200 border border-transparent"
-                } ${isCollapsed ? "justify-center px-0" : ""}`}
+                className={`group relative flex items-center gap-3 rounded-xl px-3 py-3 text-left transition-all ${isActive
+                  ? "bg-emerald-500/10 text-emerald-400 font-semibold shadow-sm shadow-emerald-500/5 border border-emerald-500/30"
+                  : "text-slate-400 hover:bg-slate-900 hover:text-slate-200 border border-transparent"
+                  } ${isCollapsed ? "justify-center px-0" : ""}`}
               >
                 <Icon
-                  className={`h-5 w-5 shrink-0 transition-transform group-hover:scale-110 ${
-                    isActive ? "text-emerald-400" : "text-slate-400 group-hover:text-slate-200"
-                  }`}
+                  className={`h-5 w-5 shrink-0 transition-transform group-hover:scale-110 ${isActive ? "text-emerald-400" : "text-slate-400 group-hover:text-slate-200"
+                    }`}
                 />
 
                 {!isCollapsed && (
