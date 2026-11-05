@@ -1,9 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Plus,
 } from "lucide-react";
 import { IndexOverview, StockBoardItem } from "@/lib/types";
@@ -31,7 +33,7 @@ const MiniSparkline: React.FC<{ data: number[]; isUp: boolean }> = ({ data, isUp
   const color = isUp ? "#10b981" : "#ef4444";
 
   return (
-    <svg width={width} height={height} className="overflow-visible">
+    <svg width={width} height={height} className="overflow-visible pointer-events-none">
       <polyline
         fill="none"
         stroke={color}
@@ -256,6 +258,162 @@ const DEFAULT_FALLBACK_CARDS: Record<string, DisplayRibbonCard> = {
       };
     });
 
+  // Quản lý vuốt / kéo trượt và các nút điều hướng của thanh chỉ số
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  // Kéo chuột để trượt (Drag-to-scroll trên Desktop)
+  const isDownRef = useRef(false);
+  const startXRef = useRef(0);
+  const scrollLeftStartRef = useRef(0);
+  const hasDraggedRef = useRef(false);
+  const [isDraggingState, setIsDraggingState] = useState(false);
+
+  // Kiểm tra khả năng cuộn trái/phải để bật/tắt nút mũi tên điều hướng
+  const updateScrollButtons = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const { scrollLeft, scrollWidth, clientWidth } = container;
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    updateScrollButtons();
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    container.addEventListener("scroll", updateScrollButtons, { passive: true });
+    window.addEventListener("resize", updateScrollButtons);
+    return () => {
+      container.removeEventListener("scroll", updateScrollButtons);
+      window.removeEventListener("resize", updateScrollButtons);
+    };
+  }, [updateScrollButtons, displayCards.length]);
+
+  // Hỗ trợ cuộn chuột lăn ngang (Mouse Wheel) mượt mà khi di chuột trên thanh
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (container.scrollWidth <= container.clientWidth) return;
+
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        const atStart = container.scrollLeft <= 0;
+        const atEnd = container.scrollLeft >= container.scrollWidth - container.clientWidth - 1;
+
+        if ((e.deltaY < 0 && !atStart) || (e.deltaY > 0 && !atEnd)) {
+          e.preventDefault();
+          container.scrollLeft += e.deltaY;
+        }
+      }
+    };
+
+    container.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      container.removeEventListener("wheel", onWheel);
+    };
+  }, [displayCards.length]);
+
+  // Lắng nghe mouseup toàn cục khi người dùng nhả chuột ngoài vùng container
+  useEffect(() => {
+    const onGlobalMouseUp = () => {
+      if (isDownRef.current) {
+        isDownRef.current = false;
+        setIsDraggingState(false);
+        setTimeout(() => {
+          hasDraggedRef.current = false;
+        }, 50);
+      }
+    };
+
+    window.addEventListener("mouseup", onGlobalMouseUp);
+    return () => {
+      window.removeEventListener("mouseup", onGlobalMouseUp);
+    };
+  }, []);
+
+  // Hàm trượt 1 card khi bấm nút mũi tên
+  const scroll = (direction: "left" | "right") => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const firstCard = container.querySelector<HTMLElement>("[data-ribbon-card]");
+    const cardWidth = firstCard ? firstCard.offsetWidth + 8 : 230;
+    container.scrollBy({
+      left: direction === "left" ? -cardWidth : cardWidth,
+      behavior: "smooth",
+    });
+  };
+
+  // Xử lý sự kiện kéo chuột
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    isDownRef.current = true;
+    hasDraggedRef.current = false;
+    startXRef.current = e.pageX - container.offsetLeft;
+    scrollLeftStartRef.current = container.scrollLeft;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDownRef.current) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const x = e.pageX - container.offsetLeft;
+    const walk = x - startXRef.current;
+    if (Math.abs(walk) > 5) {
+      hasDraggedRef.current = true;
+      if (!isDraggingState) setIsDraggingState(true);
+      container.scrollLeft = scrollLeftStartRef.current - walk;
+    }
+  };
+
+  const handleMouseUp = () => {
+    isDownRef.current = false;
+    setIsDraggingState(false);
+    setTimeout(() => {
+      hasDraggedRef.current = false;
+    }, 50);
+  };
+
+  const handleMouseLeave = () => {
+    if (isDownRef.current) {
+      isDownRef.current = false;
+      setIsDraggingState(false);
+      setTimeout(() => {
+        hasDraggedRef.current = false;
+      }, 50);
+    }
+  };
+
+  // Nhấp vào card để mở chi tiết (chỉ gọi khi không phải là thao tác vuốt/kéo)
+  const handleCardClick = (card: DisplayRibbonCard) => {
+    if (hasDraggedRef.current) return;
+    onSelectCard(card);
+  };
+
+  // Xác định độ rộng của từng card:
+  // - Nếu > 5 card: cố định tỷ lệ để luôn hiển thị vừa vặn 5 card trên desktop và cho phép vuốt/trượt các card còn lại
+  // - Nếu = 5 card: trải đều 5 card trên màn hình desktop, cho phép vuốt trên màn hình nhỏ
+  // - Nếu < 5 card: co giãn hợp lý mà không bị kéo bè quá khổ
+  const getCardWidthClass = (totalCards: number) => {
+    if (totalCards > 5) {
+      return "w-[calc((100%-32px)/5)] min-w-[215px] shrink-0";
+    }
+    if (totalCards === 5) {
+      return "w-[calc((100%-32px)/5)] min-w-[215px] shrink-0 lg:flex-1";
+    }
+    if (totalCards === 4) {
+      return "flex-1 min-w-[215px] shrink-0";
+    }
+    return "flex-1 min-w-[215px] max-w-[280px] shrink-0";
+  };
+
   // Nếu đang ở trạng thái thu gọn ("Đóng") - Hiển thị dải ngang chỉ số rút gọn chuẩn DNSE
   if (isCollapsed) {
     return (
@@ -327,101 +485,156 @@ const DEFAULT_FALLBACK_CARDS: Record<string, DisplayRibbonCard> = {
 
   return (
     <div className="relative flex items-stretch gap-2 transition-all">
-      {/* KHỐI 1: DANH SÁCH CÁC CARD CHỈ SỐ (CUỘN NGANG HOẶC CO GIÃN) */}
-      <div className="flex-1 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5">
-        {displayCards.map((card) => {
-          const isUp = card.change >= 0;
-          return (
-            <div
-              key={card.symbol}
-              onClick={() => onSelectCard(card)}
-              className="group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/70 p-3 shadow-md backdrop-blur-sm transition-all hover:border-emerald-500/50 hover:bg-slate-900/90 hover:shadow-emerald-500/10"
-              title={`Nhấp để mở biểu đồ nến chi tiết của ${card.symbol}`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold tracking-tight text-slate-200 group-hover:text-emerald-400 transition-colors">
-                    {card.name}
-                  </span>
-                  {card.symbol === "VNINDEX" && (
-                    <span className="rounded bg-emerald-500/10 px-1.5 py-0.2 text-[9px] font-bold text-emerald-400">
-                      HOSE
-                    </span>
-                  )}
-                  {card.isStock && (
-                    <span className="rounded bg-slate-800 px-1 py-0.2 text-[8px] font-bold text-slate-400">
-                      CP
-                    </span>
-                  )}
-                </div>
-                <span
-                  className={`flex items-center text-xs font-bold ${
-                    isUp ? "text-emerald-400" : "text-rose-400"
-                  }`}
-                >
-                  {isUp ? "+" : ""}
-                  {card.changePct.toFixed(2)}%
-                </span>
-              </div>
+      {/* KHỐI 1: DANH SÁCH CÁC CARD CHỈ SỐ (CUỘN/TRƯỢT NGANG MƯỢT MÀ) */}
+      <div className="relative flex-1 min-w-0 group/ribbon">
+        {/* Nút mũi tên trượt sang trái */}
+        {canScrollLeft && (
+          <button
+            type="button"
+            onClick={() => scroll("left")}
+            className="absolute left-1.5 top-1/2 -translate-y-1/2 z-20 flex h-7 w-7 items-center justify-center rounded-full border border-slate-700/80 bg-slate-900/95 text-slate-300 shadow-xl backdrop-blur-md transition-all hover:scale-110 hover:border-emerald-500 hover:bg-emerald-500/20 hover:text-emerald-400 active:scale-95"
+            title="Trượt sang trái"
+            aria-label="Trượt sang trái"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        )}
 
-              <div className="mt-1 flex items-baseline justify-between">
-                <div>
+        {/* Lớp phủ chuyển màu (gradient) mờ cạnh trái khi có nội dung cuộn */}
+        {canScrollLeft && (
+          <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-slate-950 via-slate-950/70 to-transparent z-10 rounded-l-xl" />
+        )}
+
+        {/* Nút mũi tên trượt sang phải */}
+        {canScrollRight && (
+          <button
+            type="button"
+            onClick={() => scroll("right")}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 z-20 flex h-7 w-7 items-center justify-center rounded-full border border-slate-700/80 bg-slate-900/95 text-slate-300 shadow-xl backdrop-blur-md transition-all hover:scale-110 hover:border-emerald-500 hover:bg-emerald-500/20 hover:text-emerald-400 active:scale-95"
+            title="Trượt sang phải"
+            aria-label="Trượt sang phải"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* Lớp phủ chuyển màu (gradient) mờ cạnh phải khi có nội dung cuộn */}
+        {canScrollRight && (
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-slate-950 via-slate-950/70 to-transparent z-10 rounded-r-xl" />
+        )}
+
+        {/* Khay trượt chứa các card chỉ số/cổ phiếu */}
+        <div
+          ref={scrollContainerRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+          className={`flex items-stretch gap-2 overflow-x-auto py-0.5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] touch-pan-x select-none ${
+            isDraggingState
+              ? "cursor-grabbing"
+              : displayCards.length > 5 || canScrollRight || canScrollLeft
+              ? "cursor-grab"
+              : ""
+          }`}
+        >
+          {displayCards.map((card) => {
+            const isUp = card.change >= 0;
+            return (
+              <div
+                key={card.symbol}
+                data-ribbon-card
+                onClick={() => handleCardClick(card)}
+                className={`group relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/70 p-3 shadow-md backdrop-blur-sm transition-all hover:border-emerald-500/50 hover:bg-slate-900/90 hover:shadow-emerald-500/10 ${getCardWidthClass(
+                  displayCards.length
+                )}`}
+                title={`Nhấp để mở biểu đồ nến chi tiết của ${card.symbol}`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold tracking-tight text-slate-200 group-hover:text-emerald-400 transition-colors">
+                      {card.name}
+                    </span>
+                    {card.symbol === "VNINDEX" && (
+                      <span className="rounded bg-emerald-500/10 px-1.5 py-0.2 text-[9px] font-bold text-emerald-400">
+                        HOSE
+                      </span>
+                    )}
+                    {card.isStock && (
+                      <span className="rounded bg-slate-800 px-1 py-0.2 text-[8px] font-bold text-slate-400">
+                        CP
+                      </span>
+                    )}
+                  </div>
                   <span
-                    className={`text-lg font-black tracking-tight ${
-                      isUp ? "text-emerald-400" : "text-rose-400"
-                    }`}
-                  >
-                    {card.value.toLocaleString("vi-VN", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
-                  <span
-                    className={`ml-1 text-[11px] font-medium ${
+                    className={`flex items-center text-xs font-bold ${
                       isUp ? "text-emerald-400" : "text-rose-400"
                     }`}
                   >
                     {isUp ? "+" : ""}
-                    {card.change.toFixed(2)}
+                    {card.changePct.toFixed(2)}%
                   </span>
                 </div>
 
-                {/* Sparkline mini */}
-                <div className="opacity-90 transition-opacity group-hover:opacity-100">
-                  <MiniSparkline data={card.sparkline} isUp={isUp} />
+                <div className="mt-1 flex items-baseline justify-between">
+                  <div>
+                    <span
+                      className={`text-lg font-black tracking-tight ${
+                        isUp ? "text-emerald-400" : "text-rose-400"
+                      }`}
+                    >
+                      {card.value.toLocaleString("vi-VN", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                    <span
+                      className={`ml-1 text-[11px] font-medium ${
+                        isUp ? "text-emerald-400" : "text-rose-400"
+                      }`}
+                    >
+                      {isUp ? "+" : ""}
+                      {card.change.toFixed(2)}
+                    </span>
+                  </div>
+
+                  {/* Sparkline mini */}
+                  <div className="opacity-90 transition-opacity group-hover:opacity-100">
+                    <MiniSparkline data={card.sparkline} isUp={isUp} />
+                  </div>
                 </div>
+
+                {/* Khối lượng & Giá trị giao dịch */}
+                <div className="mt-1.5 flex items-center justify-between border-t border-slate-800/60 pt-1 text-[10px] text-slate-400">
+                  <span>{card.volumeStr}</span>
+                  <span className="font-semibold text-slate-300">{card.valueStr}</span>
+                </div>
+
+                {/* Thống kê độ rộng thị trường mini (với chỉ số sàn) */}
+                {card.advancing !== undefined && card.advancing > 0 && (
+                  <div className="mt-1 flex items-center gap-1 text-[9px]">
+                    <span className="flex items-center gap-0.5 text-emerald-400 font-medium">
+                      ▲{card.advancing}
+                      {card.ceiling ? (
+                        <span className="text-purple-400 font-bold">({card.ceiling})</span>
+                      ) : null}
+                    </span>
+                    <span className="text-amber-400 font-medium">■{card.unchanged}</span>
+                    <span className="flex items-center gap-0.5 text-rose-400 font-medium">
+                      ▼{card.declining}
+                      {card.floor ? (
+                        <span className="text-cyan-400 font-bold">({card.floor})</span>
+                      ) : null}
+                    </span>
+                  </div>
+                )}
               </div>
-
-              {/* Khối lượng & Giá trị giao dịch */}
-              <div className="mt-1.5 flex items-center justify-between border-t border-slate-800/60 pt-1 text-[10px] text-slate-400">
-                <span>{card.volumeStr}</span>
-                <span className="font-semibold text-slate-300">{card.valueStr}</span>
-              </div>
-
-              {/* Thống kê độ rộng thị trường mini (với chỉ số sàn) */}
-              {card.advancing !== undefined && card.advancing > 0 && (
-                <div className="mt-1 flex items-center gap-1 text-[9px]">
-                  <span className="flex items-center gap-0.5 text-emerald-400 font-medium">
-                    ▲{card.advancing}
-                    {card.ceiling ? (
-                      <span className="text-purple-400 font-bold">({card.ceiling})</span>
-                    ) : null}
-                  </span>
-                  <span className="text-amber-400 font-medium">■{card.unchanged}</span>
-                  <span className="flex items-center gap-0.5 text-rose-400 font-medium">
-                    ▼{card.declining}
-                    {card.floor ? (
-                      <span className="text-cyan-400 font-bold">({card.floor})</span>
-                    ) : null}
-                  </span>
-                </div>
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
-      {/* KHỐI 2: CỤM ĐIỀU KHIỂN BÊN PHẢI (NÚT "ĐÓNG" + NÚT "+") - CHUẨN SCREENSHOT 2 */}
+      {/* KHỐI 2: CỤM ĐIỀU KHIỂN BÊN PHẢI (NÚT "ĐÓNG" + NÚT "+") */}
       <div className="flex w-[52px] flex-col items-center justify-between rounded-xl border border-slate-800/80 bg-slate-900/60 p-2 shadow-md backdrop-blur-sm">
         {/* Nút "Đóng" kèm icon thu gọn */}
         <button
@@ -432,6 +645,16 @@ const DEFAULT_FALLBACK_CARDS: Record<string, DisplayRibbonCard> = {
           <ChevronUp className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5" />
           <span className="text-[10px] font-bold">Đóng</span>
         </button>
+
+        {/* Huy hiệu số lượng biểu đồ nếu > 5 */}
+        {displayCards.length > 5 && (
+          <span
+            className="rounded bg-slate-800/80 px-1 py-0.5 text-[9px] font-semibold text-slate-400"
+            title={`Đang hiển thị ${displayCards.length} chỉ số / cổ phiếu`}
+          >
+            {displayCards.length}
+          </span>
+        )}
 
         {/* Nút tròn dấu cộng "+" để thêm/bớt biểu đồ */}
         <button

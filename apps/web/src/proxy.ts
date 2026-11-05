@@ -20,7 +20,7 @@ function extractRoleFromJwt(jwtToken: string): string | null {
   }
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token =
     request.cookies.get("access_token")?.value ||
@@ -71,6 +71,9 @@ export function middleware(request: NextRequest) {
 
   return NextResponse.next();
 }
+
+// Tương thích ngược cho các unit test
+export const middleware = proxy;
 
 export const config = {
   matcher: [

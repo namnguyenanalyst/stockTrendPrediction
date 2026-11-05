@@ -51,11 +51,8 @@ export const SystemStatsTab: React.FC = () => {
             </div>
             <div>
               <h1 className="text-lg font-bold tracking-tight text-slate-100 sm:text-xl">
-                Bảng Điều khiển Giám sát Định danh &amp; Thống kê Hệ thống
+                Bảng điều khiển
               </h1>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Nguyên tắc Đặc quyền Tối thiểu (PoLP): Chỉ tổng hợp dữ liệu vĩ mô, tuyệt đối không hiển thị thông tin hay chiến lược của người dùng khác.
-              </p>
             </div>
           </div>
         </div>
@@ -109,9 +106,6 @@ export const SystemStatsTab: React.FC = () => {
             <div className="text-3xl font-extrabold tracking-tight text-slate-100">
               {loading && !stats ? "—" : stats?.total_users.toLocaleString("vi-VN")}
             </div>
-            <p className="mt-1 text-[11px] text-slate-500">
-              Tất cả tài khoản trong cơ sở dữ liệu
-            </p>
           </div>
         </div>
 

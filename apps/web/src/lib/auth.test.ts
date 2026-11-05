@@ -13,7 +13,7 @@ import {
   removeTokenCookie,
   setTokenCookie,
 } from "../context/AuthContext";
-import { middleware } from "../middleware";
+import { proxy as middleware } from "../proxy";
 import { NextRequest } from "next/server";
 
 describe("Frontend Auth Suite (src/lib/auth.test.ts)", () => {

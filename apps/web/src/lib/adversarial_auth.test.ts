@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { middleware } from "../middleware";
+import { proxy as middleware } from "../proxy";
 import {
   getTokenFromCookie,
   removeTokenCookie,
