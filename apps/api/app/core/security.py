@@ -1,5 +1,7 @@
 """Bảo mật, băm mật khẩu Bcrypt và tạo/giải mã JWT Authentication."""
 
+import base64
+import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -9,25 +11,31 @@ import jwt
 
 from app.core.config import settings
 
+PASSWORD_HASH_PREFIX = "bcrypt-sha256-v1$"
+
+
+def _password_material(password: str) -> bytes:
+    return base64.b64encode(hashlib.sha256(password.encode("utf-8")).digest())
+
 
 def get_password_hash(password: str) -> str:
-    """Băm mật khẩu sử dụng bcrypt trực tiếp với utf-8 và giới hạn 72 bytes.
-
-    Bcrypt có giới hạn tối đa 72 bytes cho đầu vào, việc cắt lát [:72] trên chuỗi
-    đã mã hóa utf-8 ngăn chặn lỗi ValueError từ thư viện bcrypt.
-    """
-    password_bytes = password.encode("utf-8")[:72]
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password_bytes, salt).decode("utf-8")
+    """Versioned bcrypt of a base64 SHA-256 digest: all UTF-8 bytes participate."""
+    return PASSWORD_HASH_PREFIX + bcrypt.hashpw(_password_material(password), bcrypt.gensalt()).decode()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Kiểm tra mật khẩu plain-text với chuỗi hash bcrypt đã lưu."""
     try:
-        plain_bytes = plain_password.encode("utf-8")[:72]
+        if hashed_password.startswith(PASSWORD_HASH_PREFIX):
+            plain_bytes = _password_material(plain_password)
+            hashed_password = hashed_password[len(PASSWORD_HASH_PREFIX):]
+        else:
+            plain_bytes = plain_password.encode("utf-8")
+            if len(plain_bytes) > 72:
+                return False  # Legacy truncated hashes cannot authenticate an unambiguous long secret.
         hashed_bytes = hashed_password.encode("utf-8")
         return bcrypt.checkpw(plain_bytes, hashed_bytes)
-    except (ValueError, TypeError, RuntimeError):
+    except (ValueError, TypeError, RuntimeError, AttributeError):
         return False
 
 
@@ -50,7 +58,7 @@ def create_access_token(
         "exp": int(expire.timestamp()),
     }
     if extra_claims:
-        to_encode.update(extra_claims)
+        to_encode = {**extra_claims, **to_encode}
 
     return jwt.encode(
         to_encode,
@@ -74,11 +82,12 @@ def create_refresh_token(
     to_encode: dict[str, Any] = {
         "sub": str(subject),
         "type": "refresh",
+        "jti": uuid.uuid4().hex,
         "iat": int(now.timestamp()),
         "exp": int(expire.timestamp()),
     }
     if extra_claims:
-        to_encode.update(extra_claims)
+        to_encode = {**extra_claims, **to_encode}
 
     return jwt.encode(
         to_encode,
@@ -97,4 +106,5 @@ def decode_token(token: str) -> dict[str, Any]:
         token,
         settings.JWT_SECRET_KEY,
         algorithms=[settings.JWT_ALGORITHM],
+        options={"require": ["sub", "type", "iat", "exp"]},
     )

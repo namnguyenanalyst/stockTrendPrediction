@@ -2,7 +2,7 @@
 
 import json
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
@@ -31,7 +31,7 @@ class BatchPredictionRequest(BaseModel):
     summary="Dự báo xu hướng chu kỳ T+3 và Quỹ đạo 3 phiên cho một mã cổ phiếu (GET)",
     description="Thực hiện suy luận bằng mô hình LightGBM hoặc PyTorch Global LSTM, trả về xác suất 3 lớp và khuyến nghị Mua/Bán.",
 )
-async def predict_signal(
+def predict_signal(
     symbol: str = Query("VIC", description="Mã cổ phiếu cần dự báo (ví dụ: VIC, HPG, FPT)"),
     model_type: str = Query("lightgbm", description="Loại mô hình AI ('lightgbm' hoặc 'lstm')"),
 ) -> PredictionResponse:
@@ -48,7 +48,7 @@ async def predict_signal(
     summary="Dự báo xu hướng chu kỳ T+3 và Quỹ đạo 3 phiên cho một mã cổ phiếu (POST)",
     description="Thực hiện suy luận bằng mô hình LightGBM hoặc PyTorch Global LSTM nhận body JSON.",
 )
-async def predict_signal_post(request: PredictionSignalRequest) -> PredictionResponse:
+def predict_signal_post(request: PredictionSignalRequest) -> PredictionResponse:
     """Endpoint suy luận tín hiệu đầu tư cho một mã qua POST body."""
     return prediction_service.predict_stock_signal(
         symbol=request.symbol,
@@ -62,7 +62,7 @@ async def predict_signal_post(request: PredictionSignalRequest) -> PredictionRes
     summary="Dự báo đồng loạt cho danh mục cổ phiếu (GET)",
     description="Chạy dự báo xu hướng song song cho danh mục cổ phiếu (mặc định toàn bộ 30 mã VN30 hoặc 5 mã CORE).",
 )
-async def predict_batch(
+def predict_batch(
     model_type: str = Query("lightgbm", description="Loại mô hình AI ('lightgbm' hoặc 'lstm')"),
     scope: str = Query("VN30", description="Phạm vi danh mục: 'VN30' hoặc 'CORE'"),
 ) -> BatchPredictionResponse:
@@ -76,7 +76,7 @@ async def predict_batch(
     summary="Dự báo đồng loạt cho danh mục cổ phiếu (POST)",
     description="Chạy dự báo xu hướng song song cho danh mục cổ phiếu qua POST body.",
 )
-async def predict_batch_post(
+def predict_batch_post(
     request: BatchPredictionRequest,
 ) -> BatchPredictionResponse:
     """Endpoint dự báo danh mục cổ phiếu qua POST."""
@@ -93,7 +93,7 @@ async def predict_batch_post(
     summary="Đồng bộ dữ liệu phiên gần nhất và dự báo Live chu kỳ T+3 (POST)",
     description="Kết nối dữ liệu mới nhất (Near-realtime) và xuất tín hiệu khuyến nghị cho chu kỳ T+3 cùng Quỹ đạo 3 phiên.",
 )
-async def predict_live_post(request: LiveSyncRequest) -> PredictionResponse:
+def predict_live_post(request: LiveSyncRequest) -> PredictionResponse:
     """Endpoint đồng bộ và suy luận trực tuyến nhận body JSON."""
     return prediction_service.sync_live_and_predict(
         symbol=request.symbol,
@@ -107,7 +107,7 @@ async def predict_live_post(request: LiveSyncRequest) -> PredictionResponse:
     summary="Đồng bộ dữ liệu phiên gần nhất và dự báo Live chu kỳ T+3 (GET)",
     description="Kết nối dữ liệu mới nhất (Near-realtime) và xuất tín hiệu khuyến nghị cho chu kỳ T+3 cùng Quỹ đạo 3 phiên qua GET query.",
 )
-async def predict_live_get(
+def predict_live_get(
     symbol: str = Query("VIC", description="Mã cổ phiếu cần dự báo (ví dụ: VIC, HPG, FPT)"),
     model_type: str = Query("lightgbm", description="Loại mô hình AI ('lightgbm' hoặc 'lstm')"),
 ) -> PredictionResponse:
@@ -119,10 +119,10 @@ async def predict_live_get(
 
 
 class RetrainRequest(BaseModel):
-    horizon: int = Field(default=3, description="Chân trời dự báo (mặc định 3 phiên T+3)")
-    threshold: float = Field(default=0.02, description="Ngưỡng biến động giá (mặc định 2.0%)")
-    val_buffer_days: int = Field(default=40, description="Số phiên đệm validation Early Stopping")
-    scope: str = Field(default="VN30", description="Phạm vi danh mục ('VN30' toàn bộ 30 mã)")
+    horizon: int = Field(default=3, ge=1, le=20, description="Chân trời dự báo (mặc định 3 phiên T+3)")
+    threshold: float = Field(default=0.02, gt=0, lt=1, description="Ngưỡng biến động giá (mặc định 2.0%)")
+    val_buffer_days: int = Field(default=40, ge=5, le=252, description="Số phiên đệm validation Early Stopping")
+    scope: str = Field(default="VN30", pattern="^(VN30|CORE)$", description="Phạm vi danh mục")
 
 
 @router.post(
@@ -131,7 +131,7 @@ class RetrainRequest(BaseModel):
     summary="Huấn luyện lại mô hình thực chiến T+3 (POST)",
     description="Tự động thu thập dữ liệu tới phiên T-1 (hoặc T sau 15:00) và huấn luyện lại LightGBM + PyTorch LSTM trên toàn bộ dữ liệu tích lũy.",
 )
-async def retrain_model_endpoint(
+def retrain_model_endpoint(
     request: RetrainRequest = RetrainRequest(),
 ) -> dict:
     """Endpoint kích hoạt huấn luyện lại mô hình sản xuất."""
@@ -154,7 +154,7 @@ class PredictStatusResponse(BaseModel):
     summary="Trạng thái phiên ATC và thời điểm retrain mô hình",
     description="Truy vấn ngày chốt nến ATC gần nhất và thời điểm huấn luyện lại mô hình gần nhất.",
 )
-async def get_predict_status(
+def get_predict_status(
     current_user: User = Depends(get_current_active_user),
 ) -> PredictStatusResponse:
     """Endpoint trả về ngày chốt nến ATC và thời điểm retrain gần nhất."""
@@ -164,6 +164,13 @@ async def get_predict_status(
 
     last_retrain = None
     prod_info_file = settings.MODELS_DIR / "production_training_info_t3.json"
+    bundle = settings.MODELS_DIR / "production_bundle_t3.json"
+    if bundle.exists():
+        from vn_stock.modeling.artifacts import resolve_bundle
+        try:
+            prod_info_file = resolve_bundle(settings.MODELS_DIR, 3)["production_training_info_t3.json"]
+        except (OSError, ValueError, KeyError):
+            raise HTTPException(503, "Không thể xác minh bộ mô hình hiện tại.") from None
     if prod_info_file.exists():
         try:
             content = prod_info_file.read_text(encoding="utf-8")

@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -90,6 +91,15 @@ class Settings(BaseSettings):
 
     # Khóa bí mật phục vụ quy trình retrain tự trị nội bộ (Gói 2/3)
     INTERNAL_WORKER_SECRET: str | None = None
+
+    @model_validator(mode="after")
+    def validate_production_secret(self):
+        if self.ENVIRONMENT.lower() == "production" and (
+            self.JWT_SECRET_KEY == type(self).model_fields["JWT_SECRET_KEY"].default
+            or len(self.JWT_SECRET_KEY.encode()) < 32
+        ):
+            raise ValueError("Production requires a dedicated JWT_SECRET_KEY of at least 32 bytes")
+        return self
 
     @property
     def async_db_url(self) -> str:

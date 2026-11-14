@@ -106,14 +106,7 @@ async def test_token_with_missing_type_claim(
     async_client: httpx.AsyncClient,
     db_session: AsyncSession,
 ):
-    """Auditing token behavior when 'type' claim is completely omitted.
-
-    In apps/api/app/core/deps.py:
-        token_type = payload.get('type')
-        if token_type and token_type != 'access':
-    If 'type' is None, the condition evaluates to False.
-    This test verifies whether a token lacking 'type' is tolerated or processed.
-    """
+    """A correctly signed token still requires the explicit access-token type."""
     user_info, _, _ = await _create_active_user(async_client, prefix="type_omitted")
     user_id = user_info["id"]
 
@@ -130,9 +123,7 @@ async def test_token_with_missing_type_claim(
         "/api/v1/auth/me",
         headers={"Authorization": f"Bearer {raw_token}"},
     )
-    # Documents empirical behavior: deps.py allows tokens with omitted 'type' if signature & sub match
-    assert res.status_code == 200
-    assert res.json()["id"] == user_id
+    assert res.status_code == 401
 
 
 @pytest.mark.asyncio

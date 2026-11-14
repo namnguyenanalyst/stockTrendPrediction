@@ -7,6 +7,7 @@ import pandas as pd
 from fastapi import HTTPException
 
 from app.core.config import settings
+from app.core.validation import normalize_symbol
 from app.models.schemas import (
     AdvancedBacktestRequest,
     BacktestMetricsSchema,
@@ -43,7 +44,7 @@ def run_backtest_simulation(req: BacktestRequest) -> BacktestResponse:
     - Khấu trừ phí môi giới và thuế chuyển nhượng thực tế
     - Khớp lệnh theo lô chẵn 100 cổ phiếu
     """
-    clean_sym = req.symbol.upper()
+    clean_sym = normalize_symbol(req.symbol)
     model_clean = req.model_type.lower()
 
     if model_clean not in ["lightgbm", "lstm"]:
@@ -323,6 +324,7 @@ def run_advanced_backtest(req: AdvancedBacktestRequest) -> PortfolioBacktestResp
             target_symbols = ["VIC", "HPG", "FPT"]
         scope_target = f"Danh mục ({len(target_symbols)} mã)"
 
+    target_symbols = [normalize_symbol(symbol) for symbol in target_symbols]
     # 2. Chuẩn bị metadata và gọi engine
     try:
         from vn_stock.backtest import run_portfolio_backtest

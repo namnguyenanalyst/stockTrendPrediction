@@ -1,7 +1,8 @@
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
+from app.core.deps import get_current_active_user
 from app.models.schemas import (
     MarketBoardResponse,
     StockHistoryResponse,
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/stocks", tags=["Stocks Data"])
     summary="Lấy danh sách mã cổ phiếu hỗ trợ",
     description="Trả về danh sách các mã cổ phiếu trong rổ VN30 và thông tin công ty niêm yết.",
 )
-async def list_symbols() -> list[StockSymbolInfo]:
+def list_symbols() -> list[StockSymbolInfo]:
     """Endpoint trả về danh sách các mã cổ phiếu hợp lệ."""
     return stock_service.get_available_symbols()
 
@@ -30,7 +31,7 @@ async def list_symbols() -> list[StockSymbolInfo]:
     summary="Lấy danh sách các nhóm ngành và mã cổ phiếu",
     description="Trả về danh sách nhóm ngành kèm các mã cổ phiếu thành phần phục vụ kiểm thử theo ngành.",
 )
-async def list_sectors() -> list[dict[str, Any]]:
+def list_sectors() -> list[dict[str, Any]]:
     """Endpoint lấy danh sách nhóm ngành và các mã thành phần."""
     return stock_service.get_available_sectors()
 
@@ -42,7 +43,7 @@ async def list_sectors() -> list[dict[str, Any]]:
     summary="Truy vấn dữ liệu nến lịch sử OHLCV",
     description="Lấy chuỗi dữ liệu nến lịch sử có phân trang và lọc theo khoảng thời gian.",
 )
-async def get_history(
+def get_history(
     symbol: str = Query("VIC", description="Mã cổ phiếu (ví dụ: VIC, HPG, FPT)"),
     start_date: str | None = Query(None, description="Ngày bắt đầu (YYYY-MM-DD)"),
     end_date: str | None = Query(None, description="Ngày kết thúc (YYYY-MM-DD)"),
@@ -63,7 +64,7 @@ async def get_history(
     summary="Truy vấn các chỉ báo kỹ thuật tương đối",
     description="Lấy chuỗi 13 đặc trưng kỹ thuật tương đối phục vụ vẽ đồ thị và phân tích định lượng.",
 )
-async def get_indicators(
+def get_indicators(
     symbol: str = Query("VIC", description="Mã cổ phiếu"),
     limit: int = Query(1500, ge=1, le=5000, description="Số phiên tối đa"),
 ) -> StockIndicatorsResponse:
@@ -77,7 +78,7 @@ async def get_indicators(
     summary="Tóm tắt thông tin thị giá phiên gần nhất",
     description="Trả về thị giá đóng cửa phiên gần nhất, tỷ lệ thay đổi, khối lượng và RSI 14.",
 )
-async def get_summary(
+def get_summary(
     symbol: str = Query("VIC", description="Mã cổ phiếu"),
 ) -> StockSummaryResponse:
     """Endpoint tóm tắt thông tin phiên gần nhất."""
@@ -90,7 +91,7 @@ async def get_summary(
     summary="Bảng giá điện tử thông minh và tổng quan thị trường",
     description="Trả về dữ liệu bảng giá phong cách Terminal DNSE: các chỉ số thị trường (VNINDEX, VN30...), độ rộng thị trường, danh sách cổ phiếu cùng biểu đồ sparkline, tỷ lệ mua/bán chủ động và nhận định AI.",
 )
-async def get_market_board() -> MarketBoardResponse:
+def get_market_board() -> MarketBoardResponse:
     """Endpoint truy vấn bảng giá thị trường toàn diện."""
     return stock_service.get_market_board_data()
 
@@ -100,7 +101,7 @@ async def get_market_board() -> MarketBoardResponse:
     summary="Kiểm tra trạng thái phiên giao dịch và đồng bộ nến thị trường",
     description="Trả về ngày chốt phiên gần nhất (T hoặc T-1) và thông tin phiên.",
 )
-async def get_sync_status() -> dict:
+def get_sync_status() -> dict:
     """Endpoint lấy trạng thái phiên thị trường và nến chốt."""
     from app.services.prediction_service import get_market_sync_status
 
@@ -109,10 +110,11 @@ async def get_sync_status() -> dict:
 
 @router.post(
     "/sync",
+    dependencies=[Depends(get_current_active_user)],
     summary="Kích hoạt đồng bộ nến thị trường mới nhất từ SSI FC-Data",
     description="Chủ động kéo nến mới nhất cho VNINDEX và các mã cổ phiếu.",
 )
-async def trigger_sync() -> dict:
+def trigger_sync() -> dict:
     """Endpoint kích hoạt đồng bộ dữ liệu thị trường."""
     from app.services.prediction_service import trigger_market_sync
 

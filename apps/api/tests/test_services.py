@@ -361,7 +361,7 @@ def test_get_market_sync_status_exception_returns_unknown_dict():
     with patch("vn_stock.market_session.get_target_market_session_info", side_effect=RuntimeError("Session failed")):
         res = prediction_service.get_market_sync_status()
         assert res["status"] == "unknown"
-        assert "Session failed" in res["error"]
+        assert "Session failed" not in str(res)
 
 
 def test_trigger_market_sync_exception_raises_http_500():
@@ -369,7 +369,7 @@ def test_trigger_market_sync_exception_raises_http_500():
     with patch("vn_stock.data_ingestion.sync_latest_market_data", side_effect=RuntimeError("Network down")):
         with pytest.raises(HTTPException) as exc_info:
             prediction_service.trigger_market_sync(force=True)
-        assert exc_info.value.status_code == 500
+        assert exc_info.value.status_code == 503
         assert "Lỗi khi đồng bộ dữ liệu" in exc_info.value.detail
 
 

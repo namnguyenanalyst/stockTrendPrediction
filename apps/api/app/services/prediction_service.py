@@ -6,8 +6,10 @@ import sys
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 from fastapi import HTTPException
+import pandas as pd
 
 from app.core.config import settings
+from app.core.validation import normalize_symbol
 from app.models.schemas import BatchPredictionResponse, PredictionResponse
 
 logger = logging.getLogger(__name__)
@@ -31,7 +33,7 @@ def predict_stock_signal(
     Returns:
         PredictionResponse chứa nhãn, tên xu hướng, khuyến nghị Mua/Bán, xác suất 3 lớp và Quỹ đạo 3 phiên (T+1 -> T+3).
     """
-    clean_sym = symbol.upper()
+    clean_sym = normalize_symbol(symbol)
     model_clean = model_type.lower()
     if model_clean not in ["lightgbm", "lstm"]:
         raise HTTPException(
@@ -73,14 +75,16 @@ def predict_stock_signal(
     except FileNotFoundError as fnf_err:
         logger.error("Không tìm thấy model artifact: %s", fnf_err)
         raise HTTPException(
-            status_code=500,
-            detail=f"Chưa tìm thấy artifact mô hình tại {settings.MODELS_DIR}. Hãy chạy huấn luyện trước.",
+            status_code=503,
+            detail="Chưa tìm thấy artifact mô hình. Hãy chạy huấn luyện trước.",
         )
-    except Exception as err:
+    except HTTPException:
+        raise
+    except Exception:
         logger.exception("Lỗi suy luận dự báo cho %s", clean_sym)
         raise HTTPException(
             status_code=500,
-            detail=f"Lỗi khi thực hiện suy luận dự báo: {err!s}",
+            detail="Lỗi khi thực hiện suy luận dự báo.",
         )
 
 
@@ -91,7 +95,7 @@ def sync_live_and_predict(
     """
     Thực hiện đồng bộ dữ liệu phiên giao dịch gần nhất từ SSI FastConnect và suy luận tín hiệu Live.
     """
-    clean_sym = symbol.upper()
+    clean_sym = normalize_symbol(symbol)
     model_clean = model_type.lower()
     if model_clean not in ["lightgbm", "lstm"]:
         raise HTTPException(
@@ -101,13 +105,18 @@ def sync_live_and_predict(
 
     try:
         from vn_stock.data_ingestion import fetch_stock_data
+        from vn_stock.market_session import get_target_market_date
         from vn_stock.modeling import predict_trend
 
-        # 1. Kích hoạt đồng bộ nến mới nhất tới T hoặc T-1 qua data_ingestion
+        # Do not label a fallback cache prediction as a successful live sync.
+        target_date = get_target_market_date()
         try:
-            fetch_stock_data(clean_sym)
+            synced = fetch_stock_data(clean_sym)
         except Exception as sync_err:
-            logger.warning("Không thể kéo SSI trực tiếp cho %s, sử dụng dữ liệu cục bộ: %s", clean_sym, sync_err)
+            logger.warning("Không thể kéo SSI trực tiếp cho %s: %s", clean_sym, sync_err)
+            raise HTTPException(503, "Không thể đồng bộ dữ liệu live; hãy dùng dự báo từ cache.") from None
+        if synced is None or synced.empty or pd.to_datetime(synced["Date"]).max() < pd.Timestamp(target_date):
+            raise HTTPException(503, "Dữ liệu chưa cập nhật tới phiên chốt gần nhất.")
 
         # 2. Thực hiện suy luận với cờ đánh dấu is_live_synced=True
         res = predict_trend(
@@ -116,6 +125,8 @@ def sync_live_and_predict(
             models_dir=settings.MODELS_DIR,
             is_live_synced=True,
         )
+        if res.get("data_as_of_date", res["date"]) != target_date:
+            raise HTTPException(503, "Dự báo chưa sử dụng đủ dữ liệu của phiên chốt gần nhất.")
 
         session_info = get_market_sync_status()
         session_label = session_info.get("status_label", "")
@@ -139,11 +150,13 @@ def sync_live_and_predict(
             summary_guidance=res.get("summary_guidance", ""),
             training_info=res.get("training_info"),
         )
-    except Exception as err:
+    except HTTPException:
+        raise
+    except Exception:
         logger.exception("Lỗi đồng bộ live cho %s", clean_sym)
         raise HTTPException(
             status_code=500,
-            detail=f"Lỗi khi đồng bộ dữ liệu live: {err!s}",
+            detail="Lỗi khi đồng bộ dữ liệu live.",
         )
 
 
@@ -172,11 +185,11 @@ def retrain_production_system(
             models_dir=settings.MODELS_DIR,
         )
         return summary
-    except Exception as err:
+    except Exception:
         logger.exception("Lỗi khi huấn luyện lại mô hình thực chiến")
         raise HTTPException(
             status_code=500,
-            detail=f"Lỗi khi huấn luyện lại mô hình thực chiến: {err!s}",
+            detail="Lỗi khi huấn luyện lại mô hình thực chiến.",
         )
 
 
@@ -186,8 +199,14 @@ def predict_batch_signals(
     scope: str = "VN30",
 ) -> BatchPredictionResponse:
     """Thực hiện dự báo đồng loạt cho danh mục cổ phiếu (mặc định toàn bộ 30 mã VN30 hoặc 5 mã CORE)."""
+    if model_type.lower() not in ("lightgbm", "lstm"):
+        raise HTTPException(400, "Mô hình không hợp lệ.")
+    if scope.upper() not in ("CORE", "VN30"):
+        raise HTTPException(400, "Phạm vi không hợp lệ.")
     if symbols is not None and len(symbols) > 0:
-        target_symbols = [s.upper() for s in symbols]
+        if len(symbols) > 100:
+            raise HTTPException(400, "Danh mục tối đa 100 mã.")
+        target_symbols = list(dict.fromkeys(normalize_symbol(s) for s in symbols))
     elif scope.upper() == "CORE":
         target_symbols = settings.CORE_SYMBOLS
     else:
@@ -215,7 +234,7 @@ def get_market_sync_status() -> dict:
         return get_target_market_session_info()
     except Exception as e:
         logger.warning("Không thể lấy session info: %s", e)
-        return {"status": "unknown", "error": str(e)}
+        return {"status": "unknown"}
 
 
 def trigger_market_sync(force: bool = False) -> dict:
@@ -223,6 +242,6 @@ def trigger_market_sync(force: bool = False) -> dict:
     try:
         from vn_stock.data_ingestion import sync_latest_market_data
         return sync_latest_market_data(force=force)
-    except Exception as e:
+    except Exception:
         logger.exception("Lỗi kích hoạt đồng bộ thị trường")
-        raise HTTPException(status_code=500, detail=f"Lỗi khi đồng bộ dữ liệu: {e}")
+        raise HTTPException(status_code=503, detail="Lỗi khi đồng bộ dữ liệu.")

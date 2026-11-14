@@ -7,16 +7,23 @@ Tích hợp toàn diện:
 - Endpoint kiểm tra sức khỏe hệ thống: /health
 """
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
+from app.core.errors import install_error_handlers
+from app.db.models.refresh_session import RefreshSession
+from app.db.session import get_db
 from app.models.schemas import HealthResponse
 from app.routers import (
     admin_router,
@@ -47,7 +54,7 @@ async def run_startup_sync():
             session["session_name"],
         )
         from vn_stock.data_ingestion import sync_latest_market_data
-        res = sync_latest_market_data(force=False)
+        res = await run_in_threadpool(sync_latest_market_data, force=False)
         logger.info("Hoàn tất kiểm tra đồng bộ nến thị trường: %s", res.get("status"))
     except Exception as exc:
         logger.warning("Không thể tự động đồng bộ khi khởi động (sử dụng cache hiện có): %s", exc)
@@ -78,6 +85,7 @@ app = FastAPI(
     redoc_url="/redoc",
     openapi_url="/openapi.json",
 )
+install_error_handlers(app)
 
 # Cấu hình CORS cho phép kết nối từ Frontend Next.js Dashboard
 app.add_middleware(
@@ -114,6 +122,17 @@ async def health_check() -> HealthResponse:
         version=settings.VERSION,
         environment=settings.ENVIRONMENT,
     )
+
+
+@app.get("/ready", tags=["Monitoring"], summary="Kiểm tra kết nối và schema phiên CSDL")
+async def readiness(db: AsyncSession = Depends(get_db)) -> dict:
+    # Unlike /health (liveness), this fails if PostgreSQL or migration 003 is missing.
+    try:
+        await asyncio.wait_for(db.execute(select(RefreshSession.token_hash).limit(1)), timeout=5)
+    except (OSError, asyncio.TimeoutError) as exc:
+        logger.warning("Readiness database connection failed: %s", type(exc).__name__)
+        raise HTTPException(503, "Database unavailable") from None
+    return {"status": "ready", "database": "reachable", "session_schema": "available"}
 
 
 if __name__ == "__main__":

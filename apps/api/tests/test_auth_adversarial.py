@@ -292,13 +292,13 @@ async def test_sqli_in_personalization_inputs_handled_safely(
         "/api/v1/user/watchlists",
         json={
             "name": "Watchlist'; DROP TABLE users;--",
-            "symbols": ["HPG'; DROP TABLE users;--", "VIC"],
+            "symbols": ["HPG';--", "VIC"],
         },
         headers=headers,
     )
     assert wl_res.status_code == 201
     assert wl_res.json()["name"] == "Watchlist'; DROP TABLE users;--"
-    assert "HPG'; DROP TABLE USERS;--" in wl_res.json()["symbols"]
+    assert "HPG';--" in wl_res.json()["symbols"]
 
     # 2. SQLi trong preset name và JSON parameters
     preset_res = await async_client.post(
@@ -317,7 +317,7 @@ async def test_sqli_in_personalization_inputs_handled_safely(
     bt_res = await async_client.post(
         "/api/v1/user/backtests",
         json={
-            "symbol": "HPG'; DROP TABLE users;--",
+            "symbol": "HPG';--",
             "strategy_name": "Strat' OR '1'='1",
             "strategy_type": "type';--",
             "start_date": "2023-01-01",
@@ -332,7 +332,7 @@ async def test_sqli_in_personalization_inputs_handled_safely(
         headers=headers,
     )
     assert bt_res.status_code == 201
-    assert bt_res.json()["symbol"] == "HPG'; DROP TABLE USERS;--"
+    assert bt_res.json()["symbol"] == "HPG';--"
 
     # 4. SQLi trong path parameter (UUID injection) -> Phải trả về 404
     path_sqli = await async_client.delete(
@@ -351,11 +351,7 @@ async def test_sqli_in_personalization_inputs_handled_safely(
 async def test_password_longer_than_72_bytes_handled_without_crash(
     async_client: httpx.AsyncClient,
 ):
-    """Mật khẩu dài vượt quá 72 bytes (ví dụ 120 ký tự) đăng ký và đăng nhập bình thường.
-
-    Đồng thời kiểm chứng đặc tính cắt lát 72-byte của Bcrypt: mật khẩu trùng 72 bytes đầu
-    sẽ được coi là hợp lệ (đặc tính kỹ thuật đã ghi nhận của Bcrypt không kèm SHA256 pre-hash).
-    """
+    """Long passwords authenticate in full; matching 72-byte prefixes are insufficient."""
     uid = uuid.uuid4().hex[:8]
     email = f"longpwd_{uid}@quant.vn"
 
@@ -381,8 +377,7 @@ async def test_password_longer_than_72_bytes_handled_without_crash(
         "/api/v1/auth/login",
         json={"email": email, "password": base_72 + "DIFFERENT_TAIL"},
     )
-    # Xác nhận tính nhất quán thực nghiệm của cơ chế bcrypt[:72]
-    assert login_same_prefix.status_code == 200
+    assert login_same_prefix.status_code == 401
 
     # Nhưng mật khẩu khác trong 72 ký tự đầu phải bị từ chối 401
     login_diff_prefix = await async_client.post(
@@ -453,13 +448,8 @@ async def test_password_massive_length_stress(async_client: httpx.AsyncClient):
         "/api/v1/auth/register",
         json={"email": email, "password": massive_pwd},
     )
-    assert reg_res.status_code == 201
-
-    login_res = await async_client.post(
-        "/api/v1/auth/login",
-        json={"email": email, "password": massive_pwd},
-    )
-    assert login_res.status_code == 200
+    assert reg_res.status_code == 422
+    assert massive_pwd not in reg_res.text
 
 
 @pytest.mark.asyncio
@@ -694,13 +684,8 @@ async def test_timing_discrepancy_observation(async_client: httpx.AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_refresh_token_multi_use_stateless_replay(async_client: httpx.AsyncClient):
-    """Kiểm tra đặc tính stateless của JWT Refresh Token:
-
-    Do không lưu refresh token vào database (không có token rotation hay blacklist),
-    cùng một refresh token có thể được dùng nhiều lần liên tiếp để xin access token mới.
-    Đây là đặc tính kiến trúc JWT stateless đã ghi nhận.
-    """
+async def test_refresh_token_replay_is_rejected(async_client: httpx.AsyncClient):
+    """A consumed refresh token cannot mint a second access token."""
     _, _, refresh_token = await _create_test_user(async_client, prefix="replay")
     assert refresh_token is not None
 
@@ -710,12 +695,10 @@ async def test_refresh_token_multi_use_stateless_replay(async_client: httpx.Asyn
     assert res1.status_code == 200
     token1 = res1.json()["access_token"]
 
-    # Lần 2: Cấp tiếp access token thứ 2 từ cùng refresh token
+    # Replay the already-consumed credential.
     res2 = await async_client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
-    assert res2.status_code == 200
-    token2 = res2.json()["access_token"]
-
-    assert token1 is not None and token2 is not None
+    assert res2.status_code == 401
+    assert token1 is not None
 
 
 @pytest.mark.asyncio

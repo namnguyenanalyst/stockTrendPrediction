@@ -5,6 +5,8 @@ from typing import Any
 import pandas as pd
 from fastapi import HTTPException
 
+from app.core.validation import normalize_symbol
+
 from app.core.config import settings
 from app.models.schemas import (
     IndexOverview,
@@ -188,7 +190,7 @@ def _get_market_daily_volume_map() -> dict[str, int]:
 
 def load_stock_dataframe(symbol: str, allow_remote_fetch: bool = True) -> pd.DataFrame:
     """Nạp DataFrame lịch sử của một mã cổ phiếu từ panel interim, raw parquet hoặc tải on-demand từ SSI."""
-    clean_sym = symbol.upper()
+    clean_sym = normalize_symbol(symbol)
 
     # 1. Hỗ trợ các chỉ số thị trường (VNINDEX, VN30, HNX30, VN30F1M, HNX, VN100, UPCOM)
     index_factors = {
@@ -510,12 +512,10 @@ def get_market_board_data() -> MarketBoardResponse:
         vni_prev = round(float(vni_df.iloc[-2][c_col]), 2)
         vni_chg = round(vni_close - vni_prev, 2)
         vni_pct = round((vni_chg / vni_prev) * 100, 2) if vni_prev > 0 else 0.0
-        vni_sparkline = [round(float(x), 2) for x in vni_df[c_col].tail(10).tolist()]
     else:
         vni_close = 1760.63
         vni_chg = 21.96
         vni_pct = 1.26
-        vni_sparkline = [1690.0, 1695.5, 1702.0, 1698.3, 1705.9, 1689.8, 1691.9, 1738.67, 1760.63]
 
     # 1. Danh sách 7 chỉ số thị trường chuẩn khớp với tab Chỉ số
     index_configs = [

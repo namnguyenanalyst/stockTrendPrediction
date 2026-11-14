@@ -26,6 +26,7 @@ dependencies = [
     "pyarrow>=14.0.0,<18.0.0",
     "fastparquet",
     "vn-stock",
+    "torch==2.14.1",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -44,6 +45,12 @@ known-first-party = ["app"]
 
 [tool.uv.sources]
 vn-stock = { path = "../ml", editable = true }
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux' and python_full_version >= '3.11'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

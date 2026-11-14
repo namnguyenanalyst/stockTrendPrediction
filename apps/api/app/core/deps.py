@@ -57,16 +57,16 @@ async def get_current_user(
             detail="Token has expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except (jwt.PyJWTError, ValueError) as exc:
+    except (jwt.PyJWTError, ValueError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid or expired token: {exc!s}",
+            detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     # Đảm bảo token được cung cấp là Access Token chứ không phải Refresh Token
     token_type = payload.get("type")
-    if token_type and token_type != "access":
+    if token_type != "access":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token type: access token required",
@@ -148,13 +148,14 @@ async def verify_internal_worker_secret(
     x_internal_worker_secret: str | None = Header(None, alias="X-Internal-Worker-Secret"),
 ) -> None:
     """Xác thực secret nội bộ cho các tác vụ worker tự trị (fail-closed)."""
-    expected = settings.INTERNAL_WORKER_SECRET
-    if not expected or not x_internal_worker_secret:
+    expected = (settings.INTERNAL_WORKER_SECRET or "").strip().encode("utf-8")
+    supplied = (x_internal_worker_secret or "").strip().encode("utf-8")
+    if not expected or not supplied:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Invalid or missing internal worker secret",
         )
-    if not hmac.compare_digest(x_internal_worker_secret.strip(), expected.strip()):
+    if not hmac.compare_digest(supplied, expected):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Invalid or missing internal worker secret",

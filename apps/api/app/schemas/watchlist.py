@@ -9,8 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class WatchlistCreateRequest(BaseModel):
     """Payload tạo mới danh mục theo dõi."""
 
-    name: str = Field(..., min_length=1, description="Tên danh mục theo dõi")
-    symbols: list[str] = Field(..., min_length=1, description="Danh sách mã cổ phiếu")
+    name: str = Field(..., min_length=1, max_length=100, description="Tên danh mục theo dõi")
+    symbols: list[str] = Field(..., min_length=1, max_length=100, description="Danh sách mã cổ phiếu")
 
     @field_validator("name")
     @classmethod
@@ -29,6 +29,8 @@ class WatchlistCreateRequest(BaseModel):
         for item in v:
             if not isinstance(item, str) or not item.strip():
                 raise ValueError("Invalid symbol in list")
+            if len(item.strip()) > 20:
+                raise ValueError("Symbol exceeds 20 characters")
             cleaned_symbols.append(item.strip().upper())
         return cleaned_symbols
 

@@ -6,12 +6,14 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.schemas.validation import validate_json_payload
+
 
 class PresetCreateRequest(BaseModel):
     """Payload tạo mới mẫu cấu hình chiến lược."""
 
-    name: str = Field(..., min_length=1, description="Tên mẫu chiến lược")
-    description: str | None = Field(default=None, description="Mô tả chiến lược")
+    name: str = Field(..., min_length=1, max_length=100, description="Tên mẫu chiến lược")
+    description: str | None = Field(default=None, max_length=4000, description="Mô tả chiến lược")
     parameters: dict[str, Any] = Field(..., description="Từ điển các tham số định lượng")
 
     @field_validator("name")
@@ -27,7 +29,7 @@ class PresetCreateRequest(BaseModel):
     def validate_parameters(cls, v: Any) -> dict[str, Any]:
         if not isinstance(v, dict):
             raise TypeError("Parameters must be a JSON dictionary")
-        return v
+        return validate_json_payload(v)
 
 
 class PresetResponse(BaseModel):

@@ -12,9 +12,9 @@ EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 class UserRegisterRequest(BaseModel):
     """Payload đăng ký tài khoản người dùng mới."""
 
-    email: str
-    password: str = Field(..., min_length=8, description="Mật khẩu tối thiểu 8 ký tự")
-    full_name: str | None = None
+    email: str = Field(max_length=255)
+    password: str = Field(..., min_length=8, max_length=1024, description="Mật khẩu từ 8 đến 1024 ký tự")
+    full_name: str | None = Field(default=None, max_length=255)
     risk_profile: str | None = Field(
         default="balanced", description="conservative | balanced | aggressive"
     )
@@ -43,14 +43,14 @@ class UserRegisterRequest(BaseModel):
 class UserLoginRequest(BaseModel):
     """Payload đăng nhập tài khoản."""
 
-    email: str
-    password: str
+    email: str = Field(max_length=255)
+    password: str = Field(max_length=1024)
 
 
 class RefreshRequest(BaseModel):
     """Payload cấp mới access token từ refresh token."""
 
-    refresh_token: str | None = None
+    refresh_token: str | None = Field(default=None, max_length=4096)
 
 
 class TokenResponse(BaseModel):

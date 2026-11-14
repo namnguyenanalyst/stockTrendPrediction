@@ -22,7 +22,7 @@ router = APIRouter(prefix="/backtest", tags=["Backtesting Engine"])
     summary="Chạy kiểm thử chiến lược toàn diện cho Rổ chỉ số, Ngành hoặc Danh mục (chuẩn DNSE)",
     description="Kiểm thử trên phạm vi Rổ chỉ số (VN30, VN100), Cổ phiếu đơn lẻ, Ngành nghề hoặc Danh mục tự chọn trong dải ngày <= 1 năm kèm bộ điều kiện Mua/Bán chi tiết.",
 )
-async def run_advanced_simulation(
+def run_advanced_simulation(
     request: AdvancedBacktestRequest,
 ) -> PortfolioBacktestResponse:
     """Endpoint thực thi backtest danh mục đa mã và bộ lọc điều kiện theo chuẩn DNSE."""
@@ -36,7 +36,7 @@ async def run_advanced_simulation(
     summary="Danh mục 8 chiến thuật mẫu chuẩn DNSE",
     description="Truy vấn danh mục 8 chiến thuật mẫu thực chiến có sẵn cấu hình và chỉ số hiệu suất.",
 )
-async def get_presets() -> StrategyPresetsResponse:
+def get_presets() -> StrategyPresetsResponse:
     """Endpoint cung cấp danh sách chiến thuật mẫu."""
     return backtest_service.get_presets_service()
 
@@ -47,7 +47,7 @@ async def get_presets() -> StrategyPresetsResponse:
     summary="Danh sách tín hiệu Mua/Bán mới nhất near-realtime",
     description="Truy vấn các tín hiệu giao dịch mới phát sinh theo chuẩn bảng tín hiệu DNSE.",
 )
-async def get_recent_signals() -> RecentSignalsResponse:
+def get_recent_signals() -> RecentSignalsResponse:
     """Endpoint cung cấp bảng tín hiệu giao dịch mới nhất."""
     return backtest_service.get_recent_signals_service()
 
@@ -58,7 +58,7 @@ async def get_recent_signals() -> RecentSignalsResponse:
     summary="Chạy mô phỏng Backtesting chiến lược đầu tư thực tế",
     description="Chạy kiểm thử có tính toán chu kỳ thanh toán T+2, thuế bán 0.10%, phí mua/bán 0.15%, lô chẵn 100 và quy tắc quản trị rủi ro Stop Loss, Take Profit, Trailing Stop.",
 )
-async def run_simulation(
+def run_simulation(
     request: BacktestRequest,
 ) -> BacktestResponse:
     """Endpoint thực thi backtest tương tác từ Dashboard."""
@@ -71,7 +71,7 @@ async def run_simulation(
     summary="Bảng tổng hợp hiệu quả Backtest OOS trên các mã cổ phiếu",
     description="Truy vấn kết quả so sánh ROI, Sharpe, Sortino, MDD và Win Rate trên danh mục cổ phiếu (mặc định VN30 hoặc CORE).",
 )
-async def get_summary(
+def get_summary(
     model_type: str = Query("lightgbm", description="Loại mô hình AI ('lightgbm' hoặc 'lstm')"),
     scope: str = Query("CORE", description="Phạm vi danh mục: 'CORE' (5 mã trọng tâm) hoặc 'VN30' (toàn bộ 30 mã)"),
 ) -> BacktestSummaryResponse:

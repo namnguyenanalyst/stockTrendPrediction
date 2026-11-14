@@ -10,7 +10,7 @@ Bao gồm:
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ============================================================================
@@ -207,14 +207,15 @@ class BatchPredictionResponse(BaseModel):
 # 4. BACKTESTING SCHEMAS
 # ============================================================================
 class BacktestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     symbol: str = Field(default="VIC", description="Mã cổ phiếu cần kiểm thử")
     model_type: str = Field(
         default="lightgbm", description="Loại mô hình AI ('lightgbm' hoặc 'lstm')"
     )
-    initial_capital: float = Field(default=100_000_000.0, description="Vốn đầu tư ban đầu (VNĐ)")
-    slippage_rate: float = Field(default=0.0005, description="Tỷ lệ trượt giá khớp lệnh (0.05%)")
-    fee_rate: float = Field(default=0.0015, description="Phí môi giới mỗi chiều (0.15%)")
-    tax_rate: float = Field(default=0.0010, description="Thuế chuyển nhượng khi bán (0.10%)")
+    initial_capital: float = Field(default=100_000_000.0, gt=0, allow_inf_nan=False, description="Vốn đầu tư ban đầu (VNĐ)")
+    slippage_rate: float = Field(default=0.0005, ge=0, lt=1, description="Tỷ lệ trượt giá khớp lệnh (0.05%)")
+    fee_rate: float = Field(default=0.0015, ge=0, lt=1, description="Phí môi giới mỗi chiều (0.15%)")
+    tax_rate: float = Field(default=0.0010, ge=0, lt=1, description="Thuế chuyển nhượng khi bán (0.10%)")
     lot_size: int = Field(default=100, description="Quy cách lô chẵn (100 cổ phiếu)")
     settlement_delay: int = Field(default=2, description="Chu kỳ thanh toán (T+2)")
     execution_price: str = Field(default="open", description="Giá khớp lệnh ('open' hoặc 'close')")
@@ -516,11 +517,11 @@ class AdvancedBacktestRequest(BaseModel):
     portfolio_symbols: list[str] | None = Field(default=None, description="Danh sách mã cổ phiếu nếu scope_type == 'portfolio'")
     start_date: str = Field(..., description="Ngày bắt đầu (YYYY-MM-DD)")
     end_date: str = Field(..., description="Ngày kết thúc (YYYY-MM-DD, cách start_date không quá 365 ngày)")
-    initial_capital: float = Field(default=100_000_000.0, description="Vốn khởi điểm danh mục (VNĐ)")
+    initial_capital: float = Field(default=100_000_000.0, gt=0, allow_inf_nan=False, description="Vốn khởi điểm danh mục (VNĐ)")
     model_type: str = Field(default="lightgbm", description="Mô hình AI ('lightgbm', 'lstm', hoặc 'none')")
-    slippage_rate: float = Field(default=0.0005, description="Tỷ lệ trượt giá (0.05%)")
-    fee_rate: float = Field(default=0.0015, description="Phí môi giới mỗi chiều (0.15%)")
-    tax_rate: float = Field(default=0.0010, description="Thuế chuyển nhượng khi bán (0.10%)")
+    slippage_rate: float = Field(default=0.0005, ge=0, lt=1, description="Tỷ lệ trượt giá (0.05%)")
+    fee_rate: float = Field(default=0.0015, ge=0, lt=1, description="Phí môi giới mỗi chiều (0.15%)")
+    tax_rate: float = Field(default=0.0010, ge=0, lt=1, description="Thuế chuyển nhượng khi bán (0.10%)")
     lot_size: int = Field(default=100, description="Quy cách lô chẵn (100 cổ phiếu)")
     settlement_delay: int = Field(default=2, description="Chu kỳ thanh toán (T+2)")
     use_advanced_settings: bool = Field(default=False, description="Chỉ áp dụng cài đặt nâng cao khi cờ này là True")

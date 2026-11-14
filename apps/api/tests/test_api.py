@@ -138,7 +138,7 @@ def test_invalid_symbol_or_model():
     """Kiểm tra xử lý lỗi khi nhập mã hoặc model không hợp lệ."""
     # Mã không tồn tại
     res_stock = client.get("/api/stocks/history?symbol=NON_EXISTENT_XYZ")
-    assert res_stock.status_code == 404
+    assert res_stock.status_code == 400  # Malformed ticker, rejected before data lookup.
 
     # Model không hỗ trợ
     res_model = client.get("/api/predict/signal?symbol=VIC&model_type=random_forest_xyz")
@@ -182,7 +182,7 @@ def test_invalid_symbol_backtest():
         "initial_capital": 100_000_000.0,
     }
     res_bad_sym = client.post("/api/backtest/run", json=payload_bad_sym)
-    assert res_bad_sym.status_code == 404
+    assert res_bad_sym.status_code == 400  # Malformed ticker, rejected before data lookup.
 
 
 def test_backtest_run_endpoint_parameter_forwarding():
@@ -303,13 +303,11 @@ def test_predict_universal_symbol():
 
 
 def test_stocks_trigger_sync():
-    """Kiểm tra endpoint POST /api/stocks/sync."""
+    """Anonymous callers cannot mutate the shared market-data cache."""
     from unittest.mock import patch
     with patch("vn_stock.data_ingestion.sync_latest_market_data", return_value={"status": "completed"}):
         response = client.post("/api/stocks/sync")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] in ["success", "completed", "running"]
+        assert response.status_code == 401
 
 
 def test_predict_live_endpoints():

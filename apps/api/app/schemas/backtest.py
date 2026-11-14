@@ -4,25 +4,35 @@ import uuid
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.schemas.validation import validate_json_payload
 
 
 class BacktestHistoryCreateRequest(BaseModel):
     """Payload lưu trữ kết quả kiểm thử chiến lược vào tài khoản."""
 
-    symbol: str = Field(..., min_length=1, description="Mã cổ phiếu")
-    strategy_name: str = Field(..., min_length=1, description="Tên chiến lược")
-    strategy_type: str = Field(..., min_length=1, description="Loại chiến lược")
+    model_config = ConfigDict(allow_inf_nan=False, str_strip_whitespace=True)
+
+    symbol: str = Field(..., min_length=1, max_length=20, description="Mã cổ phiếu")
+    strategy_name: str = Field(..., min_length=1, max_length=100, description="Tên chiến lược")
+    strategy_type: str = Field(..., min_length=1, max_length=50, description="Loại chiến lược")
     start_date: date = Field(..., description="Ngày bắt đầu kiểm thử")
     end_date: date = Field(..., description="Ngày kết thúc kiểm thử")
     initial_capital: float = Field(..., gt=0, description="Vốn ban đầu (phải > 0)")
     total_return: float = Field(..., description="Tổng tỷ suất sinh lời")
     sharpe_ratio: float = Field(..., description="Chỉ số Sharpe")
-    max_drawdown: float = Field(..., description="Mức sụt giảm tối đa")
-    win_rate: float = Field(..., description="Tỷ lệ giao dịch thắng")
+    max_drawdown: float = Field(..., ge=-100, le=100, description="Mức sụt giảm tối đa (%); nhận dấu âm từ client cũ")
+    win_rate: float = Field(..., ge=0, le=100, description="Tỷ lệ giao dịch thắng (%)")
     equity_curve: list[dict[str, Any]] = Field(
-        default_factory=list, description="Chuỗi giá trị tài sản ròng"
+        default_factory=list, max_length=5000, description="Chuỗi giá trị tài sản ròng"
     )
+
+    @model_validator(mode="after")
+    def validate_dates(self):
+        if self.end_date < self.start_date:
+            raise ValueError("end_date must not precede start_date")
+        return self
 
     @field_validator("symbol")
     @classmethod
@@ -37,7 +47,7 @@ class BacktestHistoryCreateRequest(BaseModel):
     def validate_equity_curve(cls, v: Any) -> list[dict[str, Any]]:
         if not isinstance(v, list):
             raise TypeError("equity_curve must be a list")
-        return v
+        return validate_json_payload(v)
 
 
 class BacktestHistoryResponse(BaseModel):

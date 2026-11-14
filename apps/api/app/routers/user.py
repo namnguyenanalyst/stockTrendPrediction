@@ -9,13 +9,13 @@ Mọi truy cập tài nguyên của người dùng khác hoặc ID không tồn 
 """
 
 import uuid
-from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_active_user, get_db
+from app.core.persistence import commit_or_conflict
 from app.db.models.backtest import BacktestHistory
 from app.db.models.preset import StrategyPreset
 from app.db.models.user import User
@@ -36,6 +36,40 @@ from app.schemas.watchlist import (
 router = APIRouter()
 
 
+async def _owned_item(db, model, item_id, user_id):
+    try:
+        key = uuid.UUID(item_id)
+    except (ValueError, TypeError):
+        raise HTTPException(404, "Saved item not found") from None
+    result = await db.execute(select(model).where(model.id == key, model.user_id == user_id))
+    item = result.scalar_one_or_none()
+    if item is None:
+        raise HTTPException(404, "Saved item not found")
+    return item
+
+
+@router.put("/watchlists/{watchlist_id}", response_model=WatchlistResponse)
+async def update_watchlist(watchlist_id: str, req: WatchlistCreateRequest,
+                           current_user: User = Depends(get_current_active_user),
+                           db: AsyncSession = Depends(get_db)) -> WatchlistResponse:
+    item = await _owned_item(db, UserWatchlist, watchlist_id, current_user.id)
+    item.name, item.symbols = req.name, req.symbols
+    await commit_or_conflict(db)
+    await db.refresh(item)
+    return WatchlistResponse.model_validate(item)
+
+
+@router.put("/presets/{preset_id}", response_model=PresetResponse)
+async def update_preset(preset_id: str, req: PresetCreateRequest,
+                        current_user: User = Depends(get_current_active_user),
+                        db: AsyncSession = Depends(get_db)) -> PresetResponse:
+    item = await _owned_item(db, StrategyPreset, preset_id, current_user.id)
+    item.name, item.description, item.parameters = req.name, req.description, req.parameters
+    await commit_or_conflict(db)
+    await db.refresh(item)
+    return PresetResponse.model_validate(item)
+
+
 # =============================================================================
 # 1. Danh mục theo dõi (Watchlists)
 # =============================================================================
@@ -48,6 +82,8 @@ router = APIRouter()
     summary="Lấy danh sách các danh mục theo dõi của người dùng hiện tại",
 )
 async def list_watchlists(
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[WatchlistResponse]:
@@ -56,6 +92,7 @@ async def list_watchlists(
         select(UserWatchlist)
         .where(UserWatchlist.user_id == current_user.id)
         .order_by(UserWatchlist.created_at.desc())
+        .offset(offset).limit(limit)
     )
     items = result.scalars().all()
     return [WatchlistResponse.model_validate(w) for w in items]
@@ -80,7 +117,7 @@ async def create_watchlist(
         symbols=req.symbols,
     )
     db.add(item)
-    await db.commit()
+    await commit_or_conflict(db)
     await db.refresh(item)
     return WatchlistResponse.model_validate(item)
 
@@ -135,6 +172,8 @@ async def delete_watchlist(
     summary="Lấy danh sách các mẫu tham số chiến lược của người dùng",
 )
 async def list_presets(
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[PresetResponse]:
@@ -143,6 +182,7 @@ async def list_presets(
         select(StrategyPreset)
         .where(StrategyPreset.user_id == current_user.id)
         .order_by(StrategyPreset.created_at.desc())
+        .offset(offset).limit(limit)
     )
     items = result.scalars().all()
     return [PresetResponse.model_validate(p) for p in items]
@@ -168,7 +208,7 @@ async def create_preset(
         parameters=req.parameters,
     )
     db.add(item)
-    await db.commit()
+    await commit_or_conflict(db)
     await db.refresh(item)
     return PresetResponse.model_validate(item)
 
@@ -223,6 +263,8 @@ async def delete_preset(
     summary="Lấy danh sách nhật ký kiểm thử chiến lược của người dùng",
 )
 async def list_backtests(
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[BacktestHistoryResponse]:
@@ -231,6 +273,7 @@ async def list_backtests(
         select(BacktestHistory)
         .where(BacktestHistory.user_id == current_user.id)
         .order_by(BacktestHistory.executed_at.desc())
+        .offset(offset).limit(limit)
     )
     items = result.scalars().all()
     return [BacktestHistoryResponse.model_validate(b) for b in items]
@@ -248,37 +291,14 @@ async def save_backtest(
     db: AsyncSession = Depends(get_db),
 ) -> BacktestHistoryResponse:
     """Lưu trữ kết quả backtest bao gồm các chỉ số tài chính và đường cong Equity Curve."""
-    # Chuyển đổi start_date và end_date sang kiểu datetime.date nếu nhận dạng chuỗi
-    if isinstance(req.start_date, date):
-        start_d = req.start_date
-    else:
-        try:
-            start_d = datetime.strptime(str(req.start_date).strip(), "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="start_date must be a valid date in YYYY-MM-DD format",
-            )
-
-    if isinstance(req.end_date, date):
-        end_d = req.end_date
-    else:
-        try:
-            end_d = datetime.strptime(str(req.end_date).strip(), "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="end_date must be a valid date in YYYY-MM-DD format",
-            )
-
     item = BacktestHistory(
         id=uuid.uuid4(),
         user_id=current_user.id,
         symbol=req.symbol,
         strategy_name=req.strategy_name,
         strategy_type=req.strategy_type,
-        start_date=start_d,
-        end_date=end_d,
+        start_date=req.start_date,
+        end_date=req.end_date,
         initial_capital=req.initial_capital,
         total_return=req.total_return,
         sharpe_ratio=req.sharpe_ratio,
@@ -287,7 +307,7 @@ async def save_backtest(
         equity_curve=req.equity_curve,
     )
     db.add(item)
-    await db.commit()
+    await commit_or_conflict(db)
     await db.refresh(item)
     return BacktestHistoryResponse.model_validate(item)
 

@@ -1,21 +1,34 @@
 """Router Xác thực và Quản lý Phiên Người dùng (/api/v1/auth)."""
 
 import uuid
+from datetime import datetime, timezone
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
 from app.core.deps import get_current_active_user, get_db
+from app.core.persistence import commit_or_conflict
 from app.core.security import (
+    PASSWORD_HASH_PREFIX,
     create_access_token,
     create_refresh_token,
     decode_token,
     get_password_hash,
     verify_password,
 )
+from app.core.sessions import (
+    COOKIE_PATH,
+    add_refresh_session,
+    check_cookie_origin,
+    consume_refresh_session,
+    set_refresh_cookie,
+    token_digest,
+)
+from app.db.models.refresh_session import RefreshSession
 from app.db.models.user import RiskProfile, User, UserRole
 from app.schemas.auth import (
     RefreshRequest,
@@ -59,7 +72,7 @@ async def register(
     except ValueError:
         risk_enum = RiskProfile.BALANCED
 
-    hashed_pwd = get_password_hash(req.password)
+    hashed_pwd = await run_in_threadpool(get_password_hash, req.password)
     user_id = uuid.uuid4()
 
     new_user = User(
@@ -72,7 +85,7 @@ async def register(
         is_active=True,
     )
     db.add(new_user)
-    await db.commit()
+    await commit_or_conflict(db, "Email already registered")
     await db.refresh(new_user)
 
     return UserResponse.model_validate(new_user)
@@ -95,7 +108,7 @@ async def login(
     result = await db.execute(select(User).where(func.lower(User.email) == email_clean))
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(req.password, user.hashed_password):
+    if not user or not await run_in_threadpool(verify_password, req.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -114,16 +127,13 @@ async def login(
         extra_claims={"email": user.email, "role": role_str},
     )
     refresh_token = create_refresh_token(subject=str(user.id))
-
-    # Gán Refresh Token vào HTTP-only cookie bảo mật
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        path="/api/v1/auth",
-        samesite="lax",
-        max_age=86400 * settings.REFRESH_TOKEN_EXPIRE_DAYS,
-    )
+    if not user.hashed_password.startswith(PASSWORD_HASH_PREFIX):
+        user.hashed_password = await run_in_threadpool(get_password_hash, req.password)
+    await db.execute(delete(RefreshSession).where(
+        RefreshSession.user_id == user.id, RefreshSession.expires_at <= datetime.now(timezone.utc)))
+    add_refresh_session(db, refresh_token, user.id)
+    await db.commit()
+    set_refresh_cookie(response, refresh_token)
 
     return TokenResponse(
         access_token=access_token,
@@ -140,6 +150,7 @@ async def login(
 )
 async def refresh_token_endpoint(
     request: Request,
+    response: Response,
     req: RefreshRequest | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> TokenRefreshResponse:
@@ -148,6 +159,7 @@ async def refresh_token_endpoint(
     if req is not None and req.refresh_token:
         token = req.refresh_token
     elif request.cookies.get("refresh_token"):
+        check_cookie_origin(request)
         token = request.cookies.get("refresh_token")
 
     if not token:
@@ -165,10 +177,10 @@ async def refresh_token_endpoint(
             detail="Refresh token has expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except (jwt.PyJWTError, ValueError) as exc:
+    except (jwt.PyJWTError, ValueError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid or expired refresh token: {exc!s}",
+            detail="Invalid or expired refresh token",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -205,6 +217,13 @@ async def refresh_token_endpoint(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    await consume_refresh_session(db, token, user.id)
+    remaining = datetime.fromtimestamp(payload["exp"], timezone.utc) - datetime.now(timezone.utc)
+    rotated = create_refresh_token(user.id, expires_delta=remaining)
+    add_refresh_session(db, rotated, user.id)
+    await db.commit()
+    set_refresh_cookie(response, rotated)
+
     role_str = user.role.value if hasattr(user.role, "value") else str(user.role)
     new_access_token = create_access_token(
         subject=str(user.id),
@@ -215,6 +234,21 @@ async def refresh_token_endpoint(
         access_token=new_access_token,
         token_type="bearer",
     )
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, summary="Thu hồi phiên refresh hiện tại")
+async def logout(request: Request, req: RefreshRequest | None = None,
+                 db: AsyncSession = Depends(get_db)) -> Response:
+    token = req.refresh_token if req and req.refresh_token else request.cookies.get("refresh_token")
+    if not (req and req.refresh_token):
+        check_cookie_origin(request)
+    if token:
+        await db.execute(delete(RefreshSession).where(RefreshSession.token_hash == token_digest(token)))
+        await db.commit()
+    response = Response(status_code=204)
+    response.delete_cookie("refresh_token", path=COOKIE_PATH, httponly=True,
+                           secure=settings.ENVIRONMENT.lower() == "production", samesite="lax")
+    return response
 
 
 @router.get(
