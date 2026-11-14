@@ -34,6 +34,8 @@ def _is_live_server_available(url: str) -> bool:
 LIVE_AVAILABLE = False
 if not E2E_FORCE_MOCK and E2E_BASE_URL:
     LIVE_AVAILABLE = _is_live_server_available(E2E_BASE_URL)
+    if not LIVE_AVAILABLE:
+        raise pytest.UsageError("Explicit E2E_BASE_URL unavailable; refusing mock fallback.")
 elif not E2E_FORCE_MOCK and not E2E_BASE_URL:
     # Try local default port 8000
     if _is_live_server_available("http://localhost:8000"):

@@ -82,10 +82,14 @@ def main():
     # Determine execution target
     target_url = args.target.rstrip("/") if args.target else ""
     force_mock = args.force_mock or os.environ.get("E2E_FORCE_MOCK", "").lower() in ("1", "true")
+    if target_url and force_mock:
+        parser.error("Explicit live target cannot be combined with force-mock.")
 
     is_live = False
     if not force_mock and target_url:
         is_live = check_live_server(target_url)
+        if not is_live:
+            parser.error("Explicit live target is unavailable; refusing mock fallback.")
     elif not force_mock and not target_url:
         # Check default localhost:8000
         if check_live_server("http://localhost:8000"):
@@ -93,6 +97,7 @@ def main():
             is_live = True
 
     if is_live:
+        os.environ.pop("E2E_FORCE_MOCK", None)
         os.environ["E2E_BASE_URL"] = target_url
         mode_label = f"LIVE TARGET ({target_url})"
     else:

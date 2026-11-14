@@ -245,7 +245,7 @@ def create_reference_app() -> FastAPI:
         ]
         return {"symbol": symbol, "indicators": indicators, "count": len(indicators)}
 
-    @app.post("/api/predict/direction")
+    @app.post("/api/predict/signal")
     async def predict_direction(payload: Dict[str, Any]):
         symbol = payload.get("symbol")
         if not symbol:
@@ -255,12 +255,12 @@ def create_reference_app() -> FastAPI:
         return {
             "symbol": symbol,
             "target_horizon": "T+3",
-            "predicted_signal": 2,
+            "predicted_label": 2,
             "direction_label": "Tăng (Bullish)",
-            "predicted_probabilities": {
-                "down": 0.15,
-                "neutral": 0.25,
-                "up": 0.60,
+            "probabilities": {
+                "GIẢM": 0.15,
+                "ĐI NGANG": 0.25,
+                "TĂNG": 0.60,
             },
             "as_of_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         }
@@ -281,22 +281,20 @@ def create_reference_app() -> FastAPI:
         ]
         return {
             "symbol": req.symbol,
-            "strategy_type": req.strategy_type,
-            "start_date": req.start_date,
-            "end_date": req.end_date,
-            "initial_capital": req.initial_capital,
-            "final_equity": req.initial_capital * 1.155,
-            "total_return": 0.155,
-            "sharpe_ratio": 1.42,
-            "sortino_ratio": 1.85,
-            "max_drawdown": -0.062,
-            "win_rate": 0.65,
-            "total_trades": 12,
-            "fee_rate": 0.0015,
-            "tax_rate": 0.0010,
-            "settlement_cycle": "T+2.5",
-            "equity_curve": curve,
+            "strategy_name": "REFERENCE_ONLY",
+            "metrics": {"initial_capital": req.initial_capital, "final_equity": req.initial_capital * 1.155,
+                "total_return_pct": 15.5, "sharpe_ratio": 1.42, "sortino_ratio": 1.85,
+                "max_drawdown_pct": 6.2, "win_rate_pct": 65., "total_trades": 12},
+            "config": {"fee_rate": .0015, "tax_rate": .001, "settlement_delay": 2, "execution_price": "open"},
+            "equity_curve": [{"date": point["date"], "total_equity": point["equity"],
+                              "cash": point["cash"], "holdings_value": point["holdings"]} for point in curve],
         }
+
+    @app.post("/api/backtest/run-advanced")
+    async def advanced_boundary(req: BacktestRunRequest):
+        if req.start_date > req.end_date:
+            raise HTTPException(400, "start_date must be before end_date")
+        raise HTTPException(501, "Advanced simulation requires the real application")
 
     # -------------------------------------------------------------------------
     # Authentication Router: /api/v1/auth

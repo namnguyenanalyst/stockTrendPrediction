@@ -167,28 +167,24 @@ def test_full_investor_journey_e2e(client: E2EClient):
     # Step 6: Execute Backtest Simulation via quantitative engine
     bt_run = client.post("/api/backtest/run", json={
         "symbol": "HPG",
-        "strategy_type": "macd_crossover",
-        "start_date": "2023-01-01",
-        "end_date": "2023-12-31",
         "initial_capital": 200_000_000.0,
-        "parameters": preset_params,
     })
     assert bt_run.status_code == 200
     run_data = bt_run.json()
-    assert run_data["total_return"] is not None
+    assert run_data["metrics"]["total_return_pct"] is not None
 
     # Step 7: Persist simulation results into user backtest history
     save_payload = {
         "symbol": "HPG",
-        "strategy_name": "HPG Custom MACD",
-        "strategy_type": "macd_crossover",
-        "start_date": "2023-01-01",
-        "end_date": "2023-12-31",
-        "initial_capital": run_data["initial_capital"],
-        "total_return": run_data["total_return"],
-        "sharpe_ratio": run_data["sharpe_ratio"],
-        "max_drawdown": run_data["max_drawdown"],
-        "win_rate": run_data["win_rate"],
+        "strategy_name": "HPG AI Validation",
+        "strategy_type": "ai_validation",
+        "start_date": run_data["equity_curve"][0]["date"],
+        "end_date": run_data["equity_curve"][-1]["date"],
+        "initial_capital": run_data["metrics"]["initial_capital"],
+        "total_return": run_data["metrics"]["total_return_pct"],
+        "sharpe_ratio": run_data["metrics"]["sharpe_ratio"],
+        "max_drawdown": run_data["metrics"]["max_drawdown_pct"],
+        "win_rate": run_data["metrics"]["win_rate_pct"],
         "equity_curve": run_data["equity_curve"],
     }
     save_res = client.save_backtest(save_payload)
@@ -201,7 +197,7 @@ def test_full_investor_journey_e2e(client: E2EClient):
     history_items = history_res.json()
     saved_record = next(b for b in history_items if b["id"] == bid)
     assert saved_record["symbol"] == "HPG"
-    assert saved_record["total_return"] == run_data["total_return"]
+    assert saved_record["total_return"] == run_data["metrics"]["total_return_pct"]
     assert len(saved_record["equity_curve"]) == len(run_data["equity_curve"])
 
     # Step 9: Clean teardown (delete watchlist and preset)

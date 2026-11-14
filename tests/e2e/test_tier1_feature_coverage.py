@@ -565,31 +565,28 @@ def test_stocks_indicators_returns_ta_features(client: E2EClient):
 
 
 def test_predict_direction_returns_signal_and_probabilities(client: E2EClient):
-    """POST /api/predict/direction returns T+3 signal and class probabilities."""
-    res = client.post("/api/predict/direction", json={"symbol": "HPG"})
+    """POST /api/predict/signal returns T+3 signal and class probabilities."""
+    res = client.post("/api/predict/signal", json={"symbol": "HPG"})
     assert res.status_code == 200
     data = res.json()
     assert data["symbol"] == "HPG"
-    assert "predicted_signal" in data
-    assert "predicted_probabilities" in data
-    probs = data["predicted_probabilities"]
-    assert "down" in probs and "up" in probs
+    assert "predicted_label" in data
+    assert "probabilities" in data
+    probs = data["probabilities"]
+    assert "GIẢM" in probs and "TĂNG" in probs
 
 
 def test_backtest_run_simulation_returns_financial_metrics(client: E2EClient):
     """POST /api/backtest/run executes simulation with fee and settlement parameters."""
     payload = {
         "symbol": "HPG",
-        "strategy_type": "macd_crossover",
-        "start_date": "2023-01-01",
-        "end_date": "2023-12-31",
         "initial_capital": 100_000_000.0,
     }
     res = client.post("/api/backtest/run", json=payload)
     assert res.status_code == 200
     data = res.json()
-    assert data["total_return"] is not None
-    assert data["sharpe_ratio"] is not None
-    assert data["fee_rate"] == 0.0015
-    assert data["tax_rate"] == 0.0010
+    assert data["metrics"]["total_return_pct"] is not None
+    assert data["metrics"]["sharpe_ratio"] is not None
+    assert data["config"]["fee_rate"] == 0.0015
+    assert data["config"]["tax_rate"] == 0.0010
     assert len(data["equity_curve"]) >= 2

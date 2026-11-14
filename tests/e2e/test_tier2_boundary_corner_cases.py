@@ -226,9 +226,6 @@ def test_backtest_run_negative_initial_capital_returns_422(client: E2EClient):
     """Running backtest simulation with negative initial capital returns HTTP 422."""
     payload = {
         "symbol": "HPG",
-        "strategy_type": "macd_crossover",
-        "start_date": "2023-01-01",
-        "end_date": "2023-12-31",
         "initial_capital": -100_000.0,
     }
     res = client.post("/api/backtest/run", json=payload)
@@ -239,9 +236,6 @@ def test_backtest_run_zero_initial_capital_returns_422(client: E2EClient):
     """Running backtest simulation with zero initial capital returns HTTP 422."""
     payload = {
         "symbol": "HPG",
-        "strategy_type": "macd_crossover",
-        "start_date": "2023-01-01",
-        "end_date": "2023-12-31",
         "initial_capital": 0.0,
     }
     res = client.post("/api/backtest/run", json=payload)
@@ -252,12 +246,11 @@ def test_backtest_run_inverted_dates_returns_400(client: E2EClient):
     """Running backtest with start_date after end_date returns HTTP 400."""
     payload = {
         "symbol": "HPG",
-        "strategy_type": "macd_crossover",
         "start_date": "2023-12-31",
         "end_date": "2023-01-01",
         "initial_capital": 100_000_000.0,
     }
-    res = client.post("/api/backtest/run", json=payload)
+    res = client.post("/api/backtest/run-advanced", json=payload)
     assert res.status_code in (400, 422)
 
 
