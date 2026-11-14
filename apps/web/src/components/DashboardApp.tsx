@@ -35,7 +35,11 @@ interface DashboardAppProps {
 
 export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
   const { user } = useAuth();
-  const [activeTab, setActiveTabState] = useState<DashboardTab>(initialTab);
+  const [activeTab, setActiveTabState] = useState<DashboardTab>(() =>
+    initialTab === "admin-stats" && user && user.role !== "admin"
+      ? "market"
+      : initialTab
+  );
   const [selectedSymbol, setSelectedSymbol] = useState<string>("VIC");
   const [modelType, setModelType] = useState<"lightgbm" | "lstm">("lightgbm");
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
@@ -62,7 +66,9 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
   // Bảo vệ không cho non-admin ở lại tab admin-stats
   useEffect(() => {
     if (activeTab === "admin-stats" && user && user.role !== "admin") {
-      setActiveTabState("market");
+      queueMicrotask(() => {
+        setActiveTabState("market");
+      });
       if (typeof window !== "undefined") {
         window.history.replaceState(null, "", "/dashboard");
       }
@@ -100,63 +106,84 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
     return () => window.removeEventListener("popstate", onPopState);
   }, [user]);
 
-  // Thủ tục tải dữ liệu bất đồng bộ với Promise.allSettled
+  // Hook 1: Tải dự báo hàng loạt khi thay đổi mô hình AI (Decoupled Batch Prediction)
   useEffect(() => {
     let ignore = false;
 
-    async function initData() {
+    async function fetchBatchPrediction() {
+      try {
+        const data = await getBatchPrediction(modelType);
+        if (!ignore) setBatchPrediction(data);
+      } catch (err) {
+        console.warn("Lỗi tải dự báo hàng loạt:", err);
+      }
+    }
+
+    fetchBatchPrediction();
+
+    return () => {
+      ignore = true;
+    };
+  }, [modelType]);
+
+  // Hook 2: Tải dữ liệu chi tiết theo mã cổ phiếu được chọn (History, Indicators, Summary, Prediction Signal)
+  useEffect(() => {
+    let ignore = false;
+
+    async function fetchSymbolData() {
       setLoadingMarket(true);
       setLoadingPrediction(true);
-      setLoadingBacktest(true);
 
       try {
-        const [boardRes, histRes, indRes, sumRes, singlePred, batchPred] =
-          await Promise.allSettled([
-            getMarketBoard(),
-            getStockHistory(selectedSymbol),
-            getStockIndicators(selectedSymbol),
-            getStockSummary(selectedSymbol),
-            getPredictionSignal(selectedSymbol, modelType),
-            getBatchPrediction(modelType),
-          ]);
+        const [histRes, indRes, sumRes, singlePred] = await Promise.allSettled([
+          getStockHistory(selectedSymbol),
+          getStockIndicators(selectedSymbol),
+          getStockSummary(selectedSymbol),
+          getPredictionSignal(selectedSymbol, modelType),
+        ]);
 
         if (ignore) return;
 
-        if (boardRes.status === "fulfilled") {
-          setMarketBoard(boardRes.value);
-        }
-        if (histRes.status === "fulfilled") {
-          setBars(histRes.value.bars);
-        }
-        if (indRes.status === "fulfilled") {
-          setIndicators(indRes.value.indicators);
-        }
-        if (sumRes.status === "fulfilled") {
-          setSummary(sumRes.value);
-        }
-        if (singlePred.status === "fulfilled") {
-          setPrediction(singlePred.value);
-        }
-        if (batchPred.status === "fulfilled") {
-          setBatchPrediction(batchPred.value);
-        }
+        if (histRes.status === "fulfilled") setBars(histRes.value.bars);
+        if (indRes.status === "fulfilled") setIndicators(indRes.value.indicators);
+        if (sumRes.status === "fulfilled") setSummary(sumRes.value);
+        if (singlePred.status === "fulfilled") setPrediction(singlePred.value);
       } catch (err) {
-        console.warn("Lỗi đồng bộ Dashboard:", err);
+        console.warn("Lỗi tải dữ liệu chi tiết cổ phiếu:", err);
       } finally {
         if (!ignore) {
           setLoadingMarket(false);
           setLoadingPrediction(false);
-          setLoadingBacktest(false);
         }
       }
     }
 
-    initData();
+    fetchSymbolData();
 
     return () => {
       ignore = true;
     };
   }, [selectedSymbol, modelType]);
+
+  // Hook 3: Tải dữ liệu bảng giá thị trường ban đầu khi mount
+  useEffect(() => {
+    let ignore = false;
+
+    async function fetchMarketBoardInitial() {
+      try {
+        const board = await getMarketBoard();
+        if (!ignore) setMarketBoard(board);
+      } catch (err) {
+        console.warn("Lỗi tải bảng giá thị trường ban đầu:", err);
+      }
+    }
+
+    fetchMarketBoardInitial();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   // Tự động cập nhật bảng giá và các chỉ số thị trường định kỳ mỗi 10 giây
   useEffect(() => {

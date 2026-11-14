@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Clock,
   Cpu,
-  Eye,
   HelpCircle,
   History,
   Minus,
@@ -19,7 +18,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import { getPredictStatus, getStockHistory, syncLivePrediction } from "@/lib/api";
+import { getPredictStatus, getStockHistory } from "@/lib/api";
 import {
   BatchPredictionResponse,
   PredictionResponse,

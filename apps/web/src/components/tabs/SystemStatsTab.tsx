@@ -15,7 +15,6 @@ import {
   ShieldCheck,
   TrendingUp,
   Unlock,
-  UserCheck,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -117,12 +116,16 @@ export const SystemStatsTab: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchStats();
-    fetchActivities();
+    queueMicrotask(() => {
+      void fetchStats();
+      void fetchActivities();
+    });
   }, []);
 
   useEffect(() => {
-    fetchUsers();
+    queueMicrotask(() => {
+      void fetchUsers();
+    });
   }, [fetchUsers]);
 
   // Xử lý bật/tắt khóa tài khoản

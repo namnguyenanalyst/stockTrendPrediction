@@ -479,6 +479,10 @@ export interface AdvancedBacktestRequest {
   initial_capital: number;
   model_type: "lightgbm" | "lstm" | "none";
   slippage_rate?: number;
+  fee_rate?: number;
+  tax_rate?: number;
+  lot_size?: number;
+  settlement_delay?: number;
   buy_conditions?: BacktestConditionFilter;
   sell_conditions?: BacktestConditionFilter;
   use_advanced_settings?: boolean;

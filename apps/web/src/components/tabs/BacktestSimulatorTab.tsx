@@ -106,7 +106,6 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
   const { user, isAuthenticated } = useAuth();
   const [backtestHistories, setBacktestHistories] = useState<UserBacktestHistory[]>([]);
   const [loadingHistories, setLoadingHistories] = useState<boolean>(false);
-  const [isSavingHistory, setIsSavingHistory] = useState<boolean>(false);
 
   // Strategy View Mode within "Chiến lược của tôi": "manager" (Quản lý chiến thuật DNSE) vs "builder" (Phòng Lab Kiểm thử)
   // Mặc định luôn hiển thị giao diện Quản lý chiến thuật (manager) như Hình 2
@@ -661,64 +660,6 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
   const metrics = portfolioResult?.aggregate_metrics || backtestResult?.metrics;
   const equityCurve = portfolioResult?.portfolio_equity_curve || backtestResult?.equity_curve || [];
 
-  // Lưu kết quả kiểm thử vào sổ nhật ký (CSDL / tài khoản)
-  const handleSaveBacktestToHistory = async () => {
-    if (!metrics) {
-      setSavedToast("⚠️ Vui lòng chạy kiểm thử trước khi lưu vào sổ nhật ký!");
-      setTimeout(() => setSavedToast(null), 3500);
-      return;
-    }
-
-    setIsSavingHistory(true);
-    try {
-      const targetSymbol =
-        scopeType === "stock"
-          ? selectedSymbol
-          : scopeType === "index"
-          ? selectedIndex
-          : scopeType === "sector"
-          ? selectedSector
-          : "PORTFOLIO";
-
-      const payload = {
-        symbol: targetSymbol || "VNINDEX",
-        strategy_name: strategyName || `Chiến lược ${targetSymbol}`,
-        strategy_type:
-          modelType === "lstm"
-            ? "Mô hình PyTorch LSTM"
-            : "Mô hình LightGBM",
-        start_date: startDate,
-        end_date: endDate,
-        initial_capital: initialCapital,
-        total_return: metrics.total_return_pct,
-        sharpe_ratio: metrics.sharpe_ratio,
-        max_drawdown: metrics.max_drawdown_pct,
-        win_rate: metrics.win_rate_pct,
-        equity_curve: equityCurve,
-      };
-
-      if (isAuthenticated) {
-        const savedItem = await saveUserBacktest(payload);
-        setBacktestHistories((prev) => [savedItem, ...prev]);
-      } else {
-        const localItem: UserBacktestHistory = {
-          id: "local_" + Date.now(),
-          ...payload,
-          executed_at: new Date().toISOString(),
-        };
-        setBacktestHistories((prev) => [localItem, ...prev]);
-      }
-
-      setSavedToast("Đã lưu kết quả kiểm thử vào Sổ nhật ký!");
-      setTimeout(() => setSavedToast(null), 3500);
-    } catch (err) {
-      console.warn("Lỗi lưu nhật ký kiểm thử:", err);
-      setSavedToast("Không thể lưu kết quả vào Sổ nhật ký.");
-      setTimeout(() => setSavedToast(null), 3500);
-    } finally {
-      setIsSavingHistory(false);
-    }
-  };
   const trades: TradeLogItem[] = useMemo(() => {
     if (detailSymbol && portfolioResult?.individual_results?.[detailSymbol]) {
       return portfolioResult.individual_results[detailSymbol].trades || [];

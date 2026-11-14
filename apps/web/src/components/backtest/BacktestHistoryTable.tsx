@@ -5,7 +5,6 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Check,
-  CheckCircle2,
   Clock,
   Eye,
   History,
