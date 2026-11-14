@@ -185,6 +185,101 @@ def test_invalid_symbol_backtest():
     assert res_bad_sym.status_code == 404
 
 
+def test_backtest_run_endpoint_parameter_forwarding():
+    """Kiểm tra endpoint POST /api/backtest/run với payload tham số tùy chỉnh."""
+    from unittest.mock import MagicMock, patch
+    import pandas as pd
+
+    mock_res = MagicMock()
+    mock_res.symbol = "VIC"
+    mock_res.strategy_name = "AI_LIGHTGBM_OOS"
+    mock_res.config = {
+        "symbol": "VIC",
+        "initial_capital": 50_000_000.0,
+        "fee_rate": 0.0025,
+        "tax_rate": 0.0015,
+        "lot_size": 200,
+        "settlement_delay": 1,
+        "execution_price": "close",
+        "buy_prob_threshold": 0.45,
+        "sell_prob_threshold": 0.55,
+    }
+    mock_res.metrics = MagicMock(
+        initial_capital=50_000_000.0,
+        final_equity=53_000_000.0,
+        total_return_pct=6.0,
+        cagr_pct=12.0,
+        buy_and_hold_return_pct=3.0,
+        excess_return_pct=3.0,
+        annualized_volatility_pct=14.0,
+        sharpe_ratio=1.4,
+        sortino_ratio=1.7,
+        max_drawdown_pct=3.5,
+        calmar_ratio=2.5,
+        var_95_pct=1.8,
+        cvar_95_pct=2.5,
+        win_rate_pct=65.0,
+        profit_factor=2.0,
+        total_trades=5,
+        winning_trades=4,
+        losing_trades=1,
+        avg_trade_return_pct=1.2,
+        avg_holding_days=3.5,
+        total_fees_paid=150000.0,
+        total_taxes_paid=80000.0,
+        total_costs=230000.0,
+        cost_impact_pct=0.25,
+    )
+    mock_res.equity_df = pd.DataFrame([
+        {
+            "Date": "2024-01-01",
+            "Total_Equity": 50_000_000.0,
+            "Benchmark_Equity": 50_000_000.0,
+            "Drawdown_Pct": 0.0,
+            "Daily_Return": 0.0,
+        }
+    ])
+    mock_res.trades_df = pd.DataFrame()
+
+    payload = {
+        "symbol": "VIC",
+        "model_type": "lightgbm",
+        "initial_capital": 50_000_000.0,
+        "slippage_rate": 0.0010,
+        "fee_rate": 0.0025,
+        "tax_rate": 0.0015,
+        "lot_size": 200,
+        "settlement_delay": 1,
+        "execution_price": "close",
+        "buy_prob_threshold": 0.45,
+        "sell_prob_threshold": 0.55,
+        "take_profit_pct": 0.10,
+        "stop_loss_pct": 0.05,
+        "trailing_stop_pct": 0.03,
+    }
+
+    with patch("vn_stock.backtest.backtest_symbol_oos", return_value=mock_res) as mock_oos:
+        response = client.post("/api/backtest/run", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["symbol"] == "VIC"
+        assert data["strategy_name"] == "AI_LIGHTGBM_OOS"
+        assert data["config"]["fee_rate"] == 0.0025
+        assert data["config"]["tax_rate"] == 0.0015
+        assert data["config"]["lot_size"] == 200
+        assert data["config"]["settlement_delay"] == 1
+        assert data["config"]["execution_price"] == "close"
+        mock_oos.assert_called_once()
+        _, kwargs = mock_oos.call_args
+        assert kwargs["fee_rate"] == 0.0025
+        assert kwargs["tax_rate"] == 0.0015
+        assert kwargs["lot_size"] == 200
+        assert kwargs["settlement_delay"] == 1
+        assert kwargs["execution_price"] == "close"
+        assert kwargs["buy_prob_threshold"] == 0.45
+        assert kwargs["sell_prob_threshold"] == 0.55
+
+
 def test_stocks_sync_status():
     """Kiểm tra endpoint GET /api/stocks/sync-status."""
     response = client.get("/api/stocks/sync-status")

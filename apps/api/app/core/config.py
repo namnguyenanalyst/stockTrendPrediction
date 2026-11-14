@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     MODELS_DIR: Path = ML_APP_DIR / "models"
 
     # Danh mục mã cổ phiếu và chỉ số hỗ trợ
+    # CORE_SYMBOLS: Tập 5 cổ phiếu đại diện trọng số cao thuộc 5 ngành cốt lõi của VN30
+    # (VIC: Bất động sản, HPG: Thép/Vật liệu, FPT: Công nghệ, VNM: Tiêu dùng thiết yếu, MWG: Bán lẻ).
+    # Dùng cho benchmark đối sánh, kiểm thử hồi quy nhanh và batch prediction mức rút gọn (scope="CORE").
     CORE_SYMBOLS: list[str] = ["VIC", "HPG", "FPT", "VNM", "MWG"]
     VN30_SYMBOLS: list[str] = [
         "ACB",

@@ -73,6 +73,13 @@ def run_backtest_simulation(req: BacktestRequest) -> BacktestResponse:
             models_dir=settings.MODELS_DIR,
             initial_capital=req.initial_capital,
             slippage_rate=req.slippage_rate,
+            fee_rate=req.fee_rate,
+            tax_rate=req.tax_rate,
+            lot_size=req.lot_size,
+            settlement_delay=req.settlement_delay,
+            execution_price=req.execution_price,
+            buy_prob_threshold=req.buy_prob_threshold,
+            sell_prob_threshold=req.sell_prob_threshold,
             take_profit_pct=req.take_profit_pct,
             stop_loss_pct=req.stop_loss_pct,
             trailing_stop_pct=req.trailing_stop_pct,
@@ -338,6 +345,10 @@ def run_advanced_backtest(req: AdvancedBacktestRequest) -> PortfolioBacktestResp
         effective_capital = req.initial_capital if req.use_advanced_settings else 100_000_000.0
         effective_slippage = req.slippage_rate if req.use_advanced_settings else 0.0
         effective_model = req.model_type if req.use_advanced_settings else "none"
+        effective_fee = req.fee_rate if req.use_advanced_settings else 0.0015
+        effective_tax = req.tax_rate if req.use_advanced_settings else 0.0010
+        effective_lot = req.lot_size if req.use_advanced_settings else 100
+        effective_settlement = req.settlement_delay if req.use_advanced_settings else 2
 
         res = run_portfolio_backtest(
             symbols=target_symbols,
@@ -348,6 +359,10 @@ def run_advanced_backtest(req: AdvancedBacktestRequest) -> PortfolioBacktestResp
             buy_rules=buy_dict,
             sell_rules=sell_dict,
             slippage_rate=effective_slippage,
+            fee_rate=effective_fee,
+            tax_rate=effective_tax,
+            lot_size=effective_lot,
+            settlement_delay=effective_settlement,
             take_profit_pct=req.sell_conditions.take_profit_pct,
             stop_loss_pct=req.sell_conditions.stop_loss_pct,
             trailing_stop_pct=req.sell_conditions.trailing_stop_pct,
