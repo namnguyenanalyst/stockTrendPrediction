@@ -83,6 +83,10 @@ def create_lightgbm_model(custom_params: dict[str, Any] | None = None) -> lgb.LG
     """
     Khởi tạo mô hình LightGBM Classifier dạng bảng đa mã chuẩn thực nghiệm Notebook 2.0.
 
+    Tự động áp dụng cơ chế class_weight='balanced' từ DEFAULT_LGB_PARAMS để cân bằng
+    đạo hàm bậc 1 và 2 (Gradient / Hessian), chống bẫy sụp đổ về lớp đa số Đi ngang
+    và nâng cao độ nhạy phát hiện tín hiệu BÁN (Lớp 0) và MUA (Lớp 2).
+
     Args:
         custom_params: Bộ tham số tùy biến nếu muốn ghi đè DEFAULT_LGB_PARAMS.
 
@@ -93,30 +97,3 @@ def create_lightgbm_model(custom_params: dict[str, Any] | None = None) -> lgb.LG
     if custom_params:
         params.update(custom_params)
     return lgb.LGBMClassifier(**params)
-
-
-class PredictionModel(nn.Module):
-    """
-    Mô hình LSTM hồi quy đơn biến cũ (giữ lại nhằm tương thích ngược nếu có module cũ gọi).
-    Khuyến nghị sử dụng GlobalLSTMClassifier cho bài toán phân loại xu hướng 3 lớp có ngưỡng.
-    """
-
-    def __init__(
-        self,
-        input_size: int = 1,
-        hidden_size: int = 32,
-        num_layers: int = 2,
-        output_size: int = 1,
-    ):
-        super().__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size, device=x.device)
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size, device=x.device)
-        out, _ = self.lstm(x, (h0, c0))
-        out = self.fc(out[:, -1, :])
-        return out

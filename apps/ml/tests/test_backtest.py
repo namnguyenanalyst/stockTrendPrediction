@@ -743,6 +743,61 @@ def test_backtest_symbol_oos_and_all_symbols():
         assert "Sharpe" in df_summary.columns
 
 
+def test_backtest_symbol_oos_custom_parameters():
+    """Kiểm tra backtest_symbol_oos nhận và áp dụng đầy đủ các tham số tùy biến (fee, tax, lot, settlement, execution_price, thresholds)."""
+    from unittest.mock import patch
+    from vn_stock.features import FEATURE_COLS
+
+    dates = pd.date_range("2024-01-01", periods=20, freq="B")
+    records = []
+    for d in dates:
+        row = {
+            "Date": d,
+            "Symbol": "VIC",
+            "Open": 50.0,
+            "High": 52.0,
+            "Low": 48.0,
+            "Close": 51.0,
+            "Volume": 1000000,
+            "Symbol_Code": 0,
+        }
+        for f in FEATURE_COLS:
+            row[f] = 0.05
+        records.append(row)
+    mock_test_df = pd.DataFrame(records)
+
+    mock_splits = {
+        "val": mock_test_df,
+        "val_warmup": mock_test_df.tail(19),
+        "scaler": None,
+    }
+
+    with (
+        patch("vn_stock.data_ingestion.load_panel_dataset", return_value=pd.DataFrame()),
+        patch("vn_stock.features.compute_features_per_symbol", return_value=pd.DataFrame()),
+        patch("vn_stock.splitting_data.apply_study_window", return_value=pd.DataFrame()),
+        patch("vn_stock.splitting_data.create_multi_day_labels", return_value=pd.DataFrame()),
+        patch("vn_stock.splitting_data.prepare_production_training_data", return_value=mock_splits),
+    ):
+        res = backtest_symbol_oos(
+            symbol="VIC",
+            model_type="lightgbm",
+            fee_rate=0.0030,
+            tax_rate=0.0020,
+            lot_size=200,
+            settlement_delay=1,
+            execution_price="close",
+            buy_prob_threshold=0.50,
+            sell_prob_threshold=0.50,
+        )
+        assert res.symbol == "VIC"
+        assert res.config["fee_rate"] == 0.0030
+        assert res.config["tax_rate"] == 0.0020
+        assert res.config["lot_size"] == 200
+        assert res.config["settlement_delay"] == 1
+        assert res.config["execution_price"] == "close"
+
+
 # ===========================================================================
 # CÁC TEST CASE CHUYÊN SÂU CẤP ĐỘ UNIT (UNIT-LEVEL TEST SUITE FOR BACKTESTING)
 # ===========================================================================
@@ -1176,6 +1231,160 @@ def test_position_lot_and_trade_record_dataclass_contracts():
     assert tr.net_cash_flow == -25037.5
     assert tr.fee == 37.5
     assert tr.tax == 0.0
+
+
+def test_evaluate_strategy_signals_ai_and_technical_combination():
+    """
+    Kiểm định kết hợp tín hiệu AI (AI Signal) và bộ lọc kỹ thuật (Technical Rules):
+    1. buy_logic == 'AND': Chỉ sinh tín hiệu Mua (2) khi CẢ 2 cùng đồng thuận.
+    2. buy_logic == 'OR': Sinh tín hiệu Mua (2) khi MỘT TRONG HAI thỏa mãn.
+    3. sell_logic == 'OR': Ưu tiên cắt lỗ/bán ngay khi AI báo Giảm (0) hoặc luật kỹ thuật kích hoạt.
+    4. sell_logic == 'AND': Chỉ bán khi cả hai cùng đồng thuận.
+    """
+    dates = pd.date_range("2026-01-01", periods=10, freq="B")
+    prices = [50.0 + i * 0.5 for i in range(10)]
+    df = pd.DataFrame({
+        "Date": dates,
+        "Open": prices,
+        "High": [p + 1.0 for p in prices],
+        "Low": [p - 1.0 for p in prices],
+        "Close": prices,
+        "Volume": [1000000.0] * 10,
+    })
+    df_prepared = prepare_backtest_df(df)
+
+    # Đặt RSI giả lập:
+    # Bar 0: RSI 30 (thỏa mãn rsi_threshold <= 40)
+    # Bar 1: RSI 30 (thỏa mãn rsi_threshold <= 40)
+    # Bar 2: RSI 60 (không thỏa mãn)
+    # Bar 3: RSI 80 (thỏa mãn rsi_sell_threshold >= 75)
+    df_prepared["RSI"] = [30.0, 30.0, 60.0, 80.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0]
+
+    # Mảng tín hiệu AI:
+    # Bar 0: 2 (TĂNG)
+    # Bar 1: 1 (ĐI NGANG)
+    # Bar 2: 2 (TĂNG)
+    # Bar 3: 0 (GIẢM)
+    # Bar 4: 1 (ĐI NGANG)
+    ai_signals = np.array([2, 1, 2, 0, 1, 1, 1, 1, 1, 1])
+
+    # 1. Kiểm thử Mua với logic AND (Dual Confirmation)
+    buy_rules_and = {
+        "condition_logic": "AND",
+        "use_rsi": True,
+        "rsi_threshold": 40.0,
+    }
+    sig_and = evaluate_strategy_signals(df_prepared, buy_rules=buy_rules_and, ai_signals=ai_signals)
+    # Bar 0: Tech (RSI=30 <= 40) VÀ AI (2) -> Mua (2)
+    assert sig_and[0] == 2
+    # Bar 1: Tech (RSI=30 <= 40) nhưng AI=1 (Hold) -> Không Mua
+    assert sig_and[1] != 2
+    # Bar 2: Tech (RSI=60 > 40) nhưng AI=2 -> Không Mua
+    assert sig_and[2] != 2
+
+    # 2. Kiểm thử Mua với logic OR (Trigger Breakout)
+    buy_rules_or = {
+        "condition_logic": "OR",
+        "use_rsi": True,
+        "rsi_threshold": 40.0,
+    }
+    sig_or = evaluate_strategy_signals(df_prepared, buy_rules=buy_rules_or, ai_signals=ai_signals)
+    # Bar 0: Cả hai đều thỏa mãn -> Mua (2)
+    assert sig_or[0] == 2
+    # Bar 1: Tech thỏa mãn (RSI=30) dù AI=1 -> Mua (2)
+    assert sig_or[1] == 2
+    # Bar 2: AI thỏa mãn (AI=2) dù RSI=60 -> Mua (2)
+    assert sig_or[2] == 2
+
+    # 3. Kiểm thử Bán với logic OR (Risk Containment)
+    # Bar 4 có RSI=50 (chưa quá mua), nhưng AI báo 0 (GIẢM)
+    ai_signals_sell = np.array([1, 1, 1, 1, 0, 1, 1, 1, 1, 1])
+    sell_rules_or = {
+        "condition_logic": "OR",
+        "use_rsi": True,
+        "rsi_sell_threshold": 75.0,
+    }
+    sig_sell_or = evaluate_strategy_signals(df_prepared, sell_rules=sell_rules_or, ai_signals=ai_signals_sell)
+    # Bar 4: Tech chưa bán (RSI=50 < 75) nhưng AI=0 -> BÁN ngay (0)
+    assert sig_sell_or[4] == 0
+
+    # 4. Kiểm thử Bán với logic AND (Both Agree)
+    sell_rules_and = {
+        "condition_logic": "AND",
+        "use_rsi": True,
+        "rsi_sell_threshold": 75.0,
+    }
+    sig_sell_and = evaluate_strategy_signals(df_prepared, sell_rules=sell_rules_and, ai_signals=ai_signals_sell)
+    # Bar 4: Tech chưa bán nên dù AI=0 cũng KHÔNG bán
+    assert sig_sell_and[4] != 0
+
+
+def test_portfolio_backtest_with_lstm_model():
+    """Kiểm tra run_portfolio_backtest hỗ trợ mượt mà khi model_type='lstm'."""
+    from vn_stock.backtest import run_portfolio_backtest
+
+    res = run_portfolio_backtest(
+        symbols=["VIC"],
+        start_date="2024-01-01",
+        end_date="2024-04-01",
+        initial_capital=50_000_000.0,
+        model_type="lstm",
+    )
+    assert res is not None
+    assert "aggregate_metrics" in res
+    assert "symbols_breakdown" in res
+    assert "individual_results" in res
+    assert "VIC" in res["individual_results"]
+    assert len(res["symbols_breakdown"]) == 1
+    assert res["symbols_breakdown"][0]["symbol"] == "VIC"
+    assert len(res["portfolio_equity_curve"]) > 0
+
+
+def test_portfolio_backtest_with_lstm_multi_symbol():
+    """Kiểm tra run_portfolio_backtest với LSTM trên nhiều mã VN30 (VIC, HPG, FPT)."""
+    from vn_stock.backtest import run_portfolio_backtest
+
+    res = run_portfolio_backtest(
+        symbols=["VIC", "HPG", "FPT"],
+        start_date="2024-01-01",
+        end_date="2024-06-30",
+        initial_capital=150_000_000.0,
+        model_type="lstm",
+    )
+    assert res is not None
+    agg = res["aggregate_metrics"]
+    assert agg["initial_capital"] == 150_000_000.0
+    assert "total_return_pct" in agg
+    assert "total_trades" in agg
+    assert "sharpe_ratio" in agg
+    assert "max_drawdown_pct" in agg
+    assert len(res["symbols_breakdown"]) == 3
+    for sym_res in res["symbols_breakdown"]:
+        assert sym_res["symbol"] in ["VIC", "HPG", "FPT"]
+    assert len(res["portfolio_equity_curve"]) > 0
+
+
+def test_portfolio_backtest_lstm_with_combination_rules():
+    """Kiểm tra chiến lược kết hợp (Phương án B): Tín hiệu AI LSTM và Bộ lọc kỹ thuật RSI."""
+    from vn_stock.backtest import run_portfolio_backtest
+
+    res = run_portfolio_backtest(
+        symbols=["VIC", "HPG"],
+        start_date="2024-01-01",
+        end_date="2024-06-30",
+        initial_capital=100_000_000.0,
+        model_type="lstm",
+        buy_rules={"use_rsi": True, "rsi_min": 20.0, "rsi_max": 70.0, "condition_logic": "AND"},
+        sell_rules={"take_profit_pct": 0.15, "stop_loss_pct": 0.07},
+    )
+    assert res is not None
+    assert "aggregate_metrics" in res
+    agg = res["aggregate_metrics"]
+    assert agg["initial_capital"] == 100_000_000.0
+    assert "total_return_pct" in agg
+    assert len(res["portfolio_equity_curve"]) > 0
+
+
 
 
 

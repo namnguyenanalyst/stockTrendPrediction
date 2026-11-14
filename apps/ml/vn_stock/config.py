@@ -81,15 +81,6 @@ VN30_SYMBOLS = [
 ]
 SYMBOL_TO_CODE = {sym: idx for idx, sym in enumerate(VN30_SYMBOLS)}
 
-# Siêu tham số PyTorch LSTM (Kế thừa tương thích ngược)
-DEFAULT_INPUT_SIZE = 1
-DEFAULT_HIDDEN_SIZE = 32
-DEFAULT_NUM_LAYERS = 2
-DEFAULT_OUTPUT_SIZE = 1
-DEFAULT_LEARNING_RATE = 0.001
-DEFAULT_EPOCHS = 50
-DEFAULT_BATCH_SIZE = 32
-
 # Cấu hình Phân loại Xu hướng 3 Lớp có ngưỡng (3-class Trend Classification)
 DEFAULT_LABEL_THRESHOLD = (
     0.01  # Ngưỡng ±1.0% phân loại Tăng (>=+1%), Đi ngang ((-1%, +1%)), Giảm (<=-1%)
@@ -119,6 +110,7 @@ DEFAULT_LGB_PARAMS = {
     "num_leaves": 20,
     "subsample": 0.8,
     "colsample_bytree": 0.8,
+    "class_weight": "balanced",
     "random_state": RANDOM_SEED,
     "n_jobs": 1,
     "verbose": -1,
@@ -130,3 +122,13 @@ TRANSACTION_FEE_RATE = 0.0015  # 0.15% phí giao dịch
 TAX_RATE = 0.0010  # 0.10% thuế bán chứng khoán
 INITIAL_CAPITAL = 100_000_000  # 100 triệu VNĐ
 LOT_SIZE = 100  # Lô chẵn 100 cổ phiếu
+
+# Giả định tham số proxy và ước lượng chỉ tiêu tài chính / giao dịch khối ngoại trong Backtesting
+DEFAULT_FOREIGN_VAL_PROXY_RATIO = 0.08  # Tỷ lệ ước lượng GTGD khối ngoại (8% GTGD toàn sàn)
+DEFAULT_FOREIGN_VOL_PROXY_RATIO = 0.08  # Tỷ lệ ước lượng KLGD khối ngoại (8% KLGD toàn sàn)
+DEFAULT_PROP_VAL_PROXY_RATIO = 0.05     # Tỷ lệ ước lượng GTGD tự doanh (5% GTGD toàn sàn)
+DEFAULT_PROP_VOL_PROXY_RATIO = 0.05     # Tỷ lệ ước lượng KLGD tự doanh (5% KLGD toàn sàn)
+DEFAULT_GROWTH_REV_PREV = 10.0          # Tăng trưởng doanh thu quý trước mặc định (%)
+DEFAULT_GROWTH_NP_PREV = 12.0           # Tăng trưởng LNST quý trước mặc định (%)
+DEFAULT_GROWTH_REV_TTM = 8.5            # Tăng trưởng doanh thu 4 quý gần nhất TTM mặc định (%)
+DEFAULT_GROWTH_NP_TTM = 11.0            # Tăng trưởng LNST 4 quý gần nhất TTM mặc định (%)

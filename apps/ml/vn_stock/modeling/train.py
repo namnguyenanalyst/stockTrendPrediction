@@ -179,16 +179,23 @@ def train_production_model(
     # Bước 2: Tạo nhãn xu hướng đa phiên T+horizon
     labeled_df = create_multi_day_labels(study_df, horizon=horizon, threshold=threshold)
 
-    # Bước 3: Phân chia Train và Val Buffer không rò rỉ
+    # Bước 3: Phân chia Train và Val Buffer không rò rỉ (Purged Boundary)
     splits = prepare_production_training_data(
         labeled_df,
         val_buffer_days=val_buffer_days,
         seq_length=seq_length,
+        purge_horizon=horizon,
     )
     train_df = splits["train"]
     val_df = splits["val"]
     val_warmup = splits["val_warmup"]
     scaler = splits["scaler"]
+
+    logger.info(
+        "Đã cô lập ranh giới Train/Val: %d mẫu mang nhãn sentinel -1 (purged horizon = %d phiên) được loại bỏ khỏi tập Train.",
+        splits.get("purged_samples_count", 0),
+        splits.get("purge_horizon", 0),
+    )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

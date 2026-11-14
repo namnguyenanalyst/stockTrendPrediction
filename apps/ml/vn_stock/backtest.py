@@ -30,6 +30,27 @@ from vn_stock.config import (
     TRANSACTION_FEE_RATE,
 )
 
+try:
+    from vn_stock.config import (
+        DEFAULT_FOREIGN_VAL_PROXY_RATIO,
+        DEFAULT_FOREIGN_VOL_PROXY_RATIO,
+        DEFAULT_GROWTH_NP_PREV,
+        DEFAULT_GROWTH_NP_TTM,
+        DEFAULT_GROWTH_REV_PREV,
+        DEFAULT_GROWTH_REV_TTM,
+        DEFAULT_PROP_VAL_PROXY_RATIO,
+        DEFAULT_PROP_VOL_PROXY_RATIO,
+    )
+except ImportError:
+    DEFAULT_FOREIGN_VAL_PROXY_RATIO = 0.08
+    DEFAULT_FOREIGN_VOL_PROXY_RATIO = 0.08
+    DEFAULT_PROP_VAL_PROXY_RATIO = 0.05
+    DEFAULT_PROP_VOL_PROXY_RATIO = 0.05
+    DEFAULT_GROWTH_REV_PREV = 10.0
+    DEFAULT_GROWTH_NP_PREV = 12.0
+    DEFAULT_GROWTH_REV_TTM = 8.5
+    DEFAULT_GROWTH_NP_TTM = 11.0
+
 logger = logging.getLogger(__name__)
 
 
@@ -918,6 +939,13 @@ def backtest_symbol_oos(
     models_dir: Path = MODELS_DIR,
     initial_capital: float = INITIAL_CAPITAL,
     slippage_rate: float = 0.0005,
+    fee_rate: float = TRANSACTION_FEE_RATE,
+    tax_rate: float = TAX_RATE,
+    lot_size: int = LOT_SIZE,
+    settlement_delay: int = 2,
+    execution_price: str = "open",
+    buy_prob_threshold: float = 0.40,
+    sell_prob_threshold: float = 0.40,
     take_profit_pct: float | None = None,
     stop_loss_pct: float | None = None,
     trailing_stop_pct: float | None = None,
@@ -967,7 +995,6 @@ def backtest_symbol_oos(
             lgb_file = models_dir / "lightgbm_classifier.txt"
         booster = lgb.Booster(model_file=str(lgb_file))
         probs = booster.predict(sym_scaled[ALL_FEATURE_COLS])
-        signals = np.argmax(probs, axis=1)
     elif model_type.lower() == "lstm":
         import torch
 
@@ -1001,7 +1028,6 @@ def backtest_symbol_oos(
         with torch.no_grad():
             x_t = torch.from_numpy(np.ascontiguousarray(xs_sym))
             probs = lstm_model.predict_proba(x_t).numpy()
-            signals = np.argmax(probs, axis=1)
     else:
         raise ValueError(
             f"model_type '{model_type}' không hợp lệ (hỗ trợ 'lightgbm' hoặc 'lstm')."
@@ -1009,10 +1035,17 @@ def backtest_symbol_oos(
 
     return run_backtest(
         df=sym_df,
-        signals=signals,
+        probabilities=probs,
+        buy_prob_threshold=buy_prob_threshold,
+        sell_prob_threshold=sell_prob_threshold,
         symbol=clean_sym,
         initial_capital=initial_capital,
+        fee_rate=fee_rate,
+        tax_rate=tax_rate,
         slippage_rate=slippage_rate,
+        lot_size=lot_size,
+        settlement_delay=settlement_delay,
+        execution_price=execution_price,
         strategy_name=f"AI_{model_type.upper()}_OOS",
         take_profit_pct=take_profit_pct,
         stop_loss_pct=stop_loss_pct,
@@ -1140,6 +1173,86 @@ def prepare_backtest_df(df: pd.DataFrame) -> pd.DataFrame:
     return df_clean
 
 
+def _get_foreign_buy_val(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
+    if "Foreign_Net_Val" in df.columns:
+        return float(df["Foreign_Net_Val"].iloc[idx])
+    if "Foreign_Buy_Val" in df.columns and "Foreign_Sell_Val" in df.columns:
+        return float(df["Foreign_Buy_Val"].iloc[idx] - df["Foreign_Sell_Val"].iloc[idx])
+    if meta and "foreign_net_val" in meta:
+        return float(meta["foreign_net_val"])
+    return float(df["Close"].iloc[idx] * df["Volume"].iloc[idx] * DEFAULT_FOREIGN_VAL_PROXY_RATIO / 1e6)
+
+
+def _get_foreign_buy_vol(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
+    if "Foreign_Net_Vol" in df.columns:
+        return float(df["Foreign_Net_Vol"].iloc[idx])
+    if "Foreign_Buy_Vol" in df.columns and "Foreign_Sell_Vol" in df.columns:
+        return float(df["Foreign_Buy_Vol"].iloc[idx] - df["Foreign_Sell_Vol"].iloc[idx])
+    if meta and "foreign_net_vol" in meta:
+        return float(meta["foreign_net_vol"])
+    return float(df["Volume"].iloc[idx] * DEFAULT_FOREIGN_VOL_PROXY_RATIO / 1e6)
+
+
+def _get_prop_buy_val(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
+    if "Prop_Net_Val" in df.columns:
+        return float(df["Prop_Net_Val"].iloc[idx])
+    if "Prop_Buy_Val" in df.columns and "Prop_Sell_Val" in df.columns:
+        return float(df["Prop_Buy_Val"].iloc[idx] - df["Prop_Sell_Val"].iloc[idx])
+    if meta and "prop_net_val" in meta:
+        return float(meta["prop_net_val"])
+    return float(df["Close"].iloc[idx] * df["Volume"].iloc[idx] * DEFAULT_PROP_VAL_PROXY_RATIO / 1e6)
+
+
+def _get_prop_buy_vol(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
+    if "Prop_Net_Vol" in df.columns:
+        return float(df["Prop_Net_Vol"].iloc[idx])
+    if "Prop_Buy_Vol" in df.columns and "Prop_Sell_Vol" in df.columns:
+        return float(df["Prop_Buy_Vol"].iloc[idx] - df["Prop_Sell_Vol"].iloc[idx])
+    if meta and "prop_net_vol" in meta:
+        return float(meta["prop_net_vol"])
+    return float(df["Volume"].iloc[idx] * DEFAULT_PROP_VOL_PROXY_RATIO / 1e6)
+
+
+def _get_foreign_sell_val(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
+    if "Foreign_Sell_Val" in df.columns and "Foreign_Buy_Val" in df.columns:
+        return float(df["Foreign_Sell_Val"].iloc[idx] - df["Foreign_Buy_Val"].iloc[idx])
+    if "Foreign_Net_Val" in df.columns:
+        return -float(df["Foreign_Net_Val"].iloc[idx])
+    if meta and "foreign_net_sell_val" in meta:
+        return float(meta["foreign_net_sell_val"])
+    return float(df["Close"].iloc[idx] * df["Volume"].iloc[idx] * DEFAULT_FOREIGN_VAL_PROXY_RATIO / 1e6)
+
+
+def _get_prop_sell_vol(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
+    if "Prop_Sell_Vol" in df.columns and "Prop_Buy_Vol" in df.columns:
+        return float(df["Prop_Sell_Vol"].iloc[idx] - df["Prop_Buy_Vol"].iloc[idx])
+    if "Prop_Net_Vol" in df.columns:
+        return -float(df["Prop_Net_Vol"].iloc[idx])
+    if meta and "prop_net_sell_vol" in meta:
+        return float(meta["prop_net_sell_vol"])
+    return float(df["Volume"].iloc[idx] * DEFAULT_PROP_VOL_PROXY_RATIO / 1e6)
+
+
+def _get_foreign_sell_vol(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
+    if "Foreign_Sell_Vol" in df.columns and "Foreign_Buy_Vol" in df.columns:
+        return float(df["Foreign_Sell_Vol"].iloc[idx] - df["Foreign_Buy_Vol"].iloc[idx])
+    if "Foreign_Net_Vol" in df.columns:
+        return -float(df["Foreign_Net_Vol"].iloc[idx])
+    if meta and "foreign_net_sell_vol" in meta:
+        return float(meta["foreign_net_sell_vol"])
+    return float(df["Volume"].iloc[idx] * DEFAULT_FOREIGN_VOL_PROXY_RATIO / 1e6)
+
+
+def _get_prop_sell_val(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
+    if "Prop_Sell_Val" in df.columns and "Prop_Buy_Val" in df.columns:
+        return float(df["Prop_Sell_Val"].iloc[idx] - df["Prop_Buy_Val"].iloc[idx])
+    if "Prop_Net_Val" in df.columns:
+        return -float(df["Prop_Net_Val"].iloc[idx])
+    if meta and "prop_net_sell_val" in meta:
+        return float(meta["prop_net_sell_val"])
+    return float(df["Close"].iloc[idx] * df["Volume"].iloc[idx] * DEFAULT_PROP_VAL_PROXY_RATIO / 1e6)
+
+
 def evaluate_strategy_signals(
     df: pd.DataFrame,
     buy_rules: dict[str, Any] | None = None,
@@ -1178,8 +1291,11 @@ def evaluate_strategy_signals(
         "growth_eps",
         "foreign_net_val",
         "foreign_net_buy",
+        "foreign_net_buy_val",
         "prop_net_vol",
+        "prop_net_buy_vol",
         "foreign_net_vol",
+        "foreign_net_buy_vol",
         "use_roe",
         "growth_np_prev",
         "growth_rev_prev",
@@ -1193,6 +1309,7 @@ def evaluate_strategy_signals(
         "use_eps",
         "prop_net_val",
         "prop_net_buy",
+        "prop_net_buy_val",
         "use_price_cross",
         "use_bb",
     ]
@@ -1517,60 +1634,102 @@ def evaluate_strategy_signals(
             if buy_rules.get("growth_rev_prev"):
                 min_grp = float(buy_rules.get("min_growth_rev_prev") if buy_rules.get("min_growth_rev_prev") is not None else -200.0)
                 max_grp = float(buy_rules.get("max_growth_rev_prev") if buy_rules.get("max_growth_rev_prev") is not None else 500.0)
-                active_buy_flags.append(bool(min_grp <= 10.0 <= max_grp))
+                grp_est = float(symbol_meta.get("growth_rev_prev", symbol_meta.get("rev_growth_prev", DEFAULT_GROWTH_REV_PREV))) if symbol_meta else DEFAULT_GROWTH_REV_PREV
+                active_buy_flags.append(bool(min_grp <= grp_est <= max_grp))
 
             if buy_rules.get("growth_np_prev"):
                 min_npp = float(buy_rules.get("min_growth_np_prev") if buy_rules.get("min_growth_np_prev") is not None else -500.0)
                 max_npp = float(buy_rules.get("max_growth_np_prev") if buy_rules.get("max_growth_np_prev") is not None else 1000.0)
-                active_buy_flags.append(bool(min_npp <= 12.0 <= max_npp))
+                npp_est = float(symbol_meta.get("growth_np_prev", symbol_meta.get("np_growth_prev", DEFAULT_GROWTH_NP_PREV))) if symbol_meta else DEFAULT_GROWTH_NP_PREV
+                active_buy_flags.append(bool(min_npp <= npp_est <= max_npp))
 
             if buy_rules.get("growth_rev_ttm"):
                 min_grt = float(buy_rules.get("min_growth_rev_ttm") if buy_rules.get("min_growth_rev_ttm") is not None else -200.0)
                 max_grt = float(buy_rules.get("max_growth_rev_ttm") if buy_rules.get("max_growth_rev_ttm") is not None else 500.0)
-                active_buy_flags.append(bool(min_grt <= 8.5 <= max_grt))
+                grt_est = float(symbol_meta.get("growth_rev_ttm", symbol_meta.get("rev_growth_ttm", DEFAULT_GROWTH_REV_TTM))) if symbol_meta else DEFAULT_GROWTH_REV_TTM
+                active_buy_flags.append(bool(min_grt <= grt_est <= max_grt))
 
             if buy_rules.get("growth_np_ttm"):
                 min_npt = float(buy_rules.get("min_growth_np_ttm") if buy_rules.get("min_growth_np_ttm") is not None else -500.0)
                 max_npt = float(buy_rules.get("max_growth_np_ttm") if buy_rules.get("max_growth_np_ttm") is not None else 1000.0)
-                active_buy_flags.append(bool(min_npt <= 11.0 <= max_npt))
+                npt_est = float(symbol_meta.get("growth_np_ttm", symbol_meta.get("np_growth_ttm", DEFAULT_GROWTH_NP_TTM))) if symbol_meta else DEFAULT_GROWTH_NP_TTM
+                active_buy_flags.append(bool(min_npt <= npt_est <= max_npt))
 
             # Khối ngoại & Tự doanh
-            if buy_rules.get("foreign_net_val") or buy_rules.get("foreign_net_buy"):
-                min_fv = float(buy_rules.get("min_foreign_val") if buy_rules.get("min_foreign_val") is not None else 0.0)
-                max_fv = float(buy_rules.get("max_foreign_val") if buy_rules.get("max_foreign_val") is not None else 20000.0)
-                f_val_est = float(df["Close"].iloc[i] * df["Volume"].iloc[i] * 0.08 / 1e6)
+            if buy_rules.get("foreign_net_val") or buy_rules.get("foreign_net_buy") or buy_rules.get("foreign_net_buy_val"):
+                min_fv = float(
+                    buy_rules.get("min_foreign_buy_val")
+                    if buy_rules.get("min_foreign_buy_val") is not None
+                    else (buy_rules.get("min_foreign_val") if buy_rules.get("min_foreign_val") is not None else 0.0)
+                )
+                max_fv = float(
+                    buy_rules.get("max_foreign_buy_val")
+                    if buy_rules.get("max_foreign_buy_val") is not None
+                    else (buy_rules.get("max_foreign_val") if buy_rules.get("max_foreign_val") is not None else 20000.0)
+                )
+                f_val_est = _get_foreign_buy_val(df, i, symbol_meta)
                 active_buy_flags.append(bool(min_fv <= f_val_est <= max_fv))
 
-            if buy_rules.get("foreign_net_vol"):
-                min_fvol = float(buy_rules.get("min_foreign_vol") if buy_rules.get("min_foreign_vol") is not None else 0.0)
-                max_fvol = float(buy_rules.get("max_foreign_vol") if buy_rules.get("max_foreign_vol") is not None else 500.0)
-                f_vol_est = float(df["Volume"].iloc[i] * 0.08 / 1e6)
+            if buy_rules.get("foreign_net_vol") or buy_rules.get("foreign_net_buy_vol"):
+                min_fvol = float(
+                    buy_rules.get("min_foreign_buy_vol")
+                    if buy_rules.get("min_foreign_buy_vol") is not None
+                    else (buy_rules.get("min_foreign_vol") if buy_rules.get("min_foreign_vol") is not None else 0.0)
+                )
+                max_fvol = float(
+                    buy_rules.get("max_foreign_buy_vol")
+                    if buy_rules.get("max_foreign_buy_vol") is not None
+                    else (buy_rules.get("max_foreign_val") if buy_rules.get("max_foreign_val") is not None else 500.0)
+                )
+                f_vol_est = _get_foreign_buy_vol(df, i, symbol_meta)
                 active_buy_flags.append(bool(min_fvol <= f_vol_est <= max_fvol))
 
-            if buy_rules.get("prop_net_val") or buy_rules.get("prop_net_buy"):
-                min_pv = float(buy_rules.get("min_prop_val") if buy_rules.get("min_prop_val") is not None else 0.0)
-                max_pv = float(buy_rules.get("max_prop_val") if buy_rules.get("max_prop_val") is not None else 60000.0)
-                p_val_est = float(df["Close"].iloc[i] * df["Volume"].iloc[i] * 0.05 / 1e6)
+            if buy_rules.get("prop_net_val") or buy_rules.get("prop_net_buy") or buy_rules.get("prop_net_buy_val"):
+                min_pv = float(
+                    buy_rules.get("min_prop_buy_val")
+                    if buy_rules.get("min_prop_buy_val") is not None
+                    else (buy_rules.get("min_prop_val") if buy_rules.get("min_prop_val") is not None else 0.0)
+                )
+                max_pv = float(
+                    buy_rules.get("max_prop_buy_val")
+                    if buy_rules.get("max_prop_buy_val") is not None
+                    else (buy_rules.get("max_prop_val") if buy_rules.get("max_prop_val") is not None else 60000.0)
+                )
+                p_val_est = _get_prop_buy_val(df, i, symbol_meta)
                 active_buy_flags.append(bool(min_pv <= p_val_est <= max_pv))
 
-            if buy_rules.get("prop_net_vol"):
-                min_pvol = float(buy_rules.get("min_prop_vol") if buy_rules.get("min_prop_vol") is not None else 0.0)
-                max_pvol = float(buy_rules.get("max_prop_vol") if buy_rules.get("max_prop_vol") is not None else 100.0)
-                p_vol_est = float(df["Volume"].iloc[i] * 0.05 / 1e6)
+            if buy_rules.get("prop_net_vol") or buy_rules.get("prop_net_buy_vol"):
+                min_pvol = float(
+                    buy_rules.get("min_prop_buy_vol")
+                    if buy_rules.get("min_prop_buy_vol") is not None
+                    else (buy_rules.get("min_prop_vol") if buy_rules.get("min_prop_vol") is not None else 0.0)
+                )
+                max_pvol = float(
+                    buy_rules.get("max_prop_buy_vol")
+                    if buy_rules.get("max_prop_buy_vol") is not None
+                    else (buy_rules.get("max_prop_vol") if buy_rules.get("max_prop_vol") is not None else 100.0)
+                )
+                p_vol_est = _get_prop_buy_vol(df, i, symbol_meta)
                 active_buy_flags.append(bool(min_pvol <= p_vol_est <= max_pvol))
 
             if active_buy_flags:
                 if buy_logic == "OR":
-                    buy_cond = any(active_buy_flags)
+                    tech_buy = any(active_buy_flags)
                 else:
-                    buy_cond = all(active_buy_flags)
+                    tech_buy = all(active_buy_flags)
             else:
-                buy_cond = False
+                tech_buy = False
+
+            if ai_signals is not None and len(ai_signals) == n_bars:
+                ai_buy = bool(ai_signals[i] == 2)
+                buy_cond = (tech_buy or ai_buy) if buy_logic == "OR" else (tech_buy and ai_buy)
+            else:
+                buy_cond = tech_buy
         elif ai_signals is not None and len(ai_signals) == n_bars:
-            buy_cond = ai_signals[i] == 2
+            buy_cond = bool(ai_signals[i] == 2)
         else:
             # Quy tắc xu hướng mặc định: Golden Cross hoặc RSI quá bán hồi phục
-            buy_cond = (df["SMA20"].iloc[i] > df["SMA50"].iloc[i]) and (df["RSI"].iloc[i] > 40.0)
+            buy_cond = bool((df["SMA20"].iloc[i] > df["SMA50"].iloc[i]) and (df["RSI"].iloc[i] > 40.0))
 
         # 2. Đánh giá điều kiện BÁN
         sell_cond = False
@@ -1681,7 +1840,7 @@ def evaluate_strategy_signals(
                 min_fv = float(sell_rules.get("min_foreign_sell_val") if sell_rules.get("min_foreign_sell_val") is not None else 0.0)
                 max_fv = float(sell_rules.get("max_foreign_sell_val") if sell_rules.get("max_foreign_sell_val") is not None else 9817.0)
                 if not (min_fv <= 0.0 and max_fv >= 9817.0):
-                    f_val_est = float(df["Close"].iloc[i] * df["Volume"].iloc[i] * 0.08 / 1e6)
+                    f_val_est = _get_foreign_sell_val(df, i, symbol_meta)
                     active_sell_flags.append(bool(min_fv <= f_val_est <= max_fv))
 
             # 5. KLGD tự doanh bán ròng (triệu cp)
@@ -1689,7 +1848,7 @@ def evaluate_strategy_signals(
                 min_pvol = float(sell_rules.get("min_prop_sell_vol") if sell_rules.get("min_prop_sell_vol") is not None else 0.0)
                 max_pvol = float(sell_rules.get("max_prop_sell_vol") if sell_rules.get("max_prop_sell_vol") is not None else 50.0)
                 if not (min_pvol <= 0.0 and max_pvol >= 50.0):
-                    p_vol_est = float(df["Volume"].iloc[i] * 0.05 / 1e6)
+                    p_vol_est = _get_prop_sell_vol(df, i, symbol_meta)
                     active_sell_flags.append(bool(min_pvol <= p_vol_est <= max_pvol))
 
             # 6. ADX (14)
@@ -1740,7 +1899,7 @@ def evaluate_strategy_signals(
                 min_fvol = float(sell_rules.get("min_foreign_sell_vol") if sell_rules.get("min_foreign_sell_vol") is not None else 0.0)
                 max_fvol = float(sell_rules.get("max_foreign_sell_vol") if sell_rules.get("max_foreign_sell_vol") is not None else 300.0)
                 if not (min_fvol <= 0.0 and max_fvol >= 300.0):
-                    f_vol_est = float(df["Volume"].iloc[i] * 0.08 / 1e6)
+                    f_vol_est = _get_foreign_sell_vol(df, i, symbol_meta)
                     active_sell_flags.append(bool(min_fvol <= f_vol_est <= max_fvol))
 
             # 9. RS
@@ -1789,7 +1948,7 @@ def evaluate_strategy_signals(
                 min_pv = float(sell_rules.get("min_prop_sell_val") if sell_rules.get("min_prop_sell_val") is not None else 0.0)
                 max_pv = float(sell_rules.get("max_prop_sell_val") if sell_rules.get("max_prop_sell_val") is not None else 48633.0)
                 if not (min_pv <= 0.0 and max_pv >= 48633.0):
-                    p_val_est = float(df["Close"].iloc[i] * df["Volume"].iloc[i] * 0.05 / 1e6)
+                    p_val_est = _get_prop_sell_val(df, i, symbol_meta)
                     active_sell_flags.append(bool(min_pv <= p_val_est <= max_pv))
 
             # 12. Bollinger Bands
@@ -1798,15 +1957,21 @@ def evaluate_strategy_signals(
 
             if active_sell_flags:
                 if sell_logic == "AND":
-                    sell_cond = all(active_sell_flags)
+                    tech_sell = all(active_sell_flags)
                 else:
-                    sell_cond = any(active_sell_flags)
+                    tech_sell = any(active_sell_flags)
             else:
-                sell_cond = False
+                tech_sell = False
+
+            if ai_signals is not None and len(ai_signals) == n_bars:
+                ai_sell = bool(ai_signals[i] == 0)
+                sell_cond = (tech_sell and ai_sell) if sell_logic == "AND" else (tech_sell or ai_sell)
+            else:
+                sell_cond = tech_sell
         elif ai_signals is not None and len(ai_signals) == n_bars:
-            sell_cond = ai_signals[i] == 0
+            sell_cond = bool(ai_signals[i] == 0)
         elif not has_custom_buy:
-            sell_cond = (df["SMA20"].iloc[i] < df["SMA50"].iloc[i]) or (df["RSI"].iloc[i] > 70.0)
+            sell_cond = bool((df["SMA20"].iloc[i] < df["SMA50"].iloc[i]) or (df["RSI"].iloc[i] > 70.0))
         else:
             sell_cond = False
 
@@ -1856,26 +2021,26 @@ def run_portfolio_backtest(
     n_symbols = len(clean_symbols)
     sub_capital = float(initial_capital) / n_symbols
 
-    # Tải mô hình AI nếu có sẵn
+    # Tải mô hình AI nếu có sẵn (hỗ trợ cả LightGBM và PyTorch LSTM)
     booster = None
+    lstm_model = None
     scaler = None
-    if model_type.lower() == "lightgbm":
-        lgb_file = MODELS_DIR / "production_lgb_t3.txt"
-        if not lgb_file.exists():
-            lgb_file = MODELS_DIR / "lightgbm_classifier.txt"
-        if lgb_file.exists():
-            try:
-                import lightgbm as lgb
+    m_clean = model_type.lower()
+    if m_clean in ("lightgbm", "lgb", "lstm"):
+        try:
+            from vn_stock.modeling.predict import load_prediction_artifacts
 
-                booster = lgb.Booster(model_file=str(lgb_file))
-                scaler_file = MODELS_DIR / "production_scaler_t3.pkl"
-                if not scaler_file.exists():
-                    scaler_file = MODELS_DIR / "scaler_window3.pkl"
-                if scaler_file.exists():
-                    with open(scaler_file, "rb") as sf:
-                        scaler = pickle.load(sf)
-            except Exception as e:
-                logger.warning("Không thể nạp LightGBM: %s", e)
+            loaded_model, scaler = load_prediction_artifacts(
+                model_type="lightgbm" if m_clean in ("lightgbm", "lgb") else "lstm",
+                models_dir=MODELS_DIR,
+                horizon=3,
+            )
+            if m_clean in ("lightgbm", "lgb"):
+                booster = loaded_model
+            else:
+                lstm_model = loaded_model
+        except Exception as e:
+            logger.warning("Không thể nạp mô hình AI %s: %s", model_type, e)
 
     individual_results: dict[str, Any] = {}
     breakdown_list: list[dict[str, Any]] = []
@@ -1910,7 +2075,7 @@ def run_portfolio_backtest(
             df_prepared = prepare_backtest_df(filtered_df)
 
             ai_signals = None
-            if booster is not None and scaler is not None:
+            if (booster is not None or lstm_model is not None) and scaler is not None:
                 try:
                     from vn_stock.data_ingestion import fetch_daily_index
                     from vn_stock.features import compute_features_per_symbol
@@ -1932,8 +2097,41 @@ def run_portfolio_backtest(
                         from vn_stock.config import SYMBOL_TO_CODE
 
                         feat_scaled["Symbol_Code"] = SYMBOL_TO_CODE.get(sym, 0)
-                        probs = booster.predict(feat_scaled[ALL_FEATURE_COLS])
-                        ai_signals = np.argmax(probs, axis=1)
+                        feat_scaled["Symbol"] = sym
+
+                        if booster is not None:
+                            probs = booster.predict(feat_scaled[ALL_FEATURE_COLS])
+                            ai_signals = np.argmax(probs, axis=1)
+                        elif lstm_model is not None:
+                            import torch
+                            from vn_stock.features import create_multivariate_sequences
+
+                            pre_mask = computed_feats["Date"] < filtered_df["Date"].iloc[0]
+                            warm_feats = computed_feats[pre_mask].sort_values("Date").tail(19).copy()
+                            if len(warm_feats) < 19:
+                                base_row = warm_feats.iloc[[0]] if len(warm_feats) > 0 else aligned_feats.iloc[[0]]
+                                pad_rows = pd.concat([base_row] * (19 - len(warm_feats)), ignore_index=True)
+                                warm_feats = pd.concat([pad_rows, warm_feats], ignore_index=True)
+
+                            warm_scaled = warm_feats.copy()
+                            warm_scaled[FEATURE_COLS] = warm_scaled[FEATURE_COLS].bfill().ffill().fillna(0.0)
+                            warm_scaled[FEATURE_COLS] = scaler.transform(warm_scaled[FEATURE_COLS])
+                            warm_scaled["Symbol_Code"] = SYMBOL_TO_CODE.get(sym, 0)
+                            warm_scaled["Symbol"] = sym
+
+                            xs, _ = create_multivariate_sequences(
+                                feat_scaled,
+                                warmup_df=warm_scaled,
+                                feature_cols=ALL_FEATURE_COLS,
+                                seq_length=20,
+                            )
+                            if len(xs) == len(df_prepared):
+                                lstm_model.eval()
+                                with torch.no_grad():
+                                    device = next(lstm_model.parameters()).device
+                                    xt = torch.from_numpy(xs).to(device)
+                                    probs = lstm_model.predict_proba(xt).cpu().numpy()
+                                    ai_signals = np.argmax(probs, axis=1)
                 except Exception as pred_err:
                     logger.debug("Bỏ qua dự báo AI cho %s: %s", sym, pred_err)
 

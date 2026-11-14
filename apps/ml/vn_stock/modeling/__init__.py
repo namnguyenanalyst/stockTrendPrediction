@@ -2,7 +2,6 @@
 
 __all__ = [
     "GlobalLSTMClassifier",
-    "PredictionModel",
     "create_lightgbm_model",
     "evaluate_predictions",
     "predict_next_day",
@@ -13,7 +12,7 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    if name in ("GlobalLSTMClassifier", "PredictionModel", "create_lightgbm_model"):
+    if name in ("GlobalLSTMClassifier", "create_lightgbm_model"):
         from vn_stock.modeling import model
 
         return getattr(model, name)

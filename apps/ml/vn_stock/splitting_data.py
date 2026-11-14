@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from vn_stock.config import DEFAULT_SEQ_LENGTH, STUDY_START_DATE
+from vn_stock.config import DEFAULT_HORIZON_DAYS, DEFAULT_SEQ_LENGTH, STUDY_START_DATE
 from vn_stock.features import FEATURE_COLS
 
 logger = logging.getLogger(__name__)
@@ -268,6 +268,7 @@ def prepare_production_training_data(
     val_buffer_days: int = 40,
     feature_cols: list[str] = FEATURE_COLS,
     seq_length: int = DEFAULT_SEQ_LENGTH,
+    purge_horizon: int = DEFAULT_HORIZON_DAYS,
     date_col: str = "Date",
     symbol_col: str = "Symbol",
 ) -> dict[str, Any]:
@@ -277,15 +278,21 @@ def prepare_production_training_data(
     - Dành val_buffer_days phiên gần nhất (mặc định 40 phiên ~ 2 tháng) làm Validation Buffer
       để phục vụ Early Stopping chống quá khớp (overfitting).
     - Toàn bộ dữ liệu trước đó (hơn 95% lịch sử) làm Train.
+    - Áp dụng kỹ thuật Purged Horizon (López de Prado): Cô lập triệt để ranh giới Train/Val
+      bằng cách gán nhãn sentinel -1 cho purge_horizon phiên cuối cùng của Train. Nhờ đó,
+      nhãn Train không nhìn trước giá tương lai trong Validation, nhưng chuỗi đặc trưng X vẫn
+      được bảo toàn liên tục cho val_warmup của PyTorch LSTM.
     - StandardScaler chỉ fit trên tập Train, sau đó transform cho cả Train và Val.
     - Trích xuất đuôi warm-up (seq_length - 1 phiên) từ Train cho Val để bảo toàn 100% mẫu cho PyTorch LSTM.
     """
     unique_dates = np.sort(df[date_col].unique())
     n_dates = len(unique_dates)
 
-    if n_dates <= val_buffer_days:
+    min_required_dates = val_buffer_days + max(0, purge_horizon)
+    if n_dates <= min_required_dates:
         raise ValueError(
-            f"Tổng số ngày ({n_dates}) không đủ để tạo validation buffer {val_buffer_days} ngày."
+            f"Tổng số ngày ({n_dates}) không đủ để tạo validation buffer ({val_buffer_days} ngày) "
+            f"và purge boundary ({purge_horizon} ngày). Yêu cầu tối thiểu > {min_required_dates} ngày."
         )
 
     t_end_idx = n_dates - val_buffer_days
@@ -294,6 +301,14 @@ def prepare_production_training_data(
 
     train_df = df[df[date_col].isin(train_dates)].copy()
     val_df = df[df[date_col].isin(val_dates)].copy()
+
+    # Cô lập ranh giới (Purged Boundary): Gán nhãn sentinel -1 cho purge_horizon phiên cuối của Train
+    purged_dates = np.array([])
+    if purge_horizon > 0:
+        purge_start_idx = max(0, len(train_dates) - purge_horizon)
+        purged_dates = train_dates[purge_start_idx:]
+        if "Label" in train_df.columns and len(purged_dates) > 0:
+            train_df.loc[train_df[date_col].isin(purged_dates), "Label"] = -1
 
     train_s, val_s, _, scaler = scale_window(
         train_df=train_df,
@@ -309,6 +324,8 @@ def prepare_production_training_data(
         date_col=date_col,
     )
 
+    purged_count = int((train_s["Label"] == -1).sum()) if "Label" in train_s.columns else 0
+
     return {
         "train": train_s,
         "val": val_s,
@@ -316,6 +333,9 @@ def prepare_production_training_data(
         "scaler": scaler,
         "train_end_date": pd.Timestamp(train_dates[-1]),
         "val_end_date": pd.Timestamp(val_dates[-1]),
+        "purged_dates": [pd.Timestamp(d) for d in purged_dates],
+        "purge_horizon": purge_horizon,
+        "purged_samples_count": purged_count,
         "total_training_days": n_dates,
         "val_buffer_days": val_buffer_days,
     }

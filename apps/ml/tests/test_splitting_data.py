@@ -252,6 +252,9 @@ def test_prepare_production_training_data(dummy_panel_data):
     assert "val" in res
     assert "val_warmup" in res
     assert "scaler" in res
+    assert "purged_dates" in res
+    assert "purge_horizon" in res
+    assert "purged_samples_count" in res
 
     # 200 ngày - 40 ngày buffer = 160 ngày train, 40 ngày val
     unique_train_dates = res["train"]["Date"].nunique()
@@ -261,6 +264,53 @@ def test_prepare_production_training_data(dummy_panel_data):
 
     # Kiểm tra val_warmup có đủ seq_length - 1 = 9 phiên cho mỗi mã
     assert len(res["val_warmup"]) == 3 * 9
+
+    # Kiểm tra metadata purged horizon
+    assert res["purge_horizon"] == 3
+    assert len(res["purged_dates"]) == 3
+    assert res["purged_samples_count"] == 3 * 3  # 3 mã x 3 phiên = 9 mẫu
+
+
+def test_prepare_production_training_data_purged_boundary(dummy_panel_data):
+    """
+    Kiểm định kỹ thuật Purged Horizon (López de Prado):
+    - 3 phiên cuối cùng của Train phải được đánh dấu nhãn sentinel -1 để triệt tiêu lookahead leakage.
+    - Các phiên trước đó của Train và toàn bộ tập Val không chứa nhãn -1.
+    - Hàm drop_ignored_labels loại bỏ triệt để 100% mẫu sentinel trước khi huấn luyện.
+    """
+    horizon = 3
+    res = prepare_production_training_data(
+        dummy_panel_data,
+        val_buffer_days=40,
+        seq_length=10,
+        purge_horizon=horizon,
+    )
+
+    train_df = res["train"]
+    val_df = res["val"]
+    purged_dates = res["purged_dates"]
+
+    # 1. Khẳng định đúng 3 ngày ranh giới cuối của tập Train bị gán nhãn -1
+    all_train_dates = np.sort(train_df["Date"].unique())
+    expected_purged_dates = [pd.Timestamp(d) for d in all_train_dates[-horizon:]]
+    assert purged_dates == expected_purged_dates
+
+    purged_mask = train_df["Date"].isin(purged_dates)
+    assert (train_df.loc[purged_mask, "Label"] == -1).all()
+
+    # 2. Khẳng định các ngày trước vùng purge của Train đều có nhãn hợp lệ (>= 0)
+    non_purged_train = train_df.loc[~purged_mask]
+    assert (non_purged_train["Label"] >= 0).all()
+    assert not (non_purged_train["Label"] == -1).any()
+
+    # 3. Khẳng định tập Validation không bị ảnh hưởng bởi sentinel -1
+    assert (val_df["Label"] >= 0).all()
+    assert not (val_df["Label"] == -1).any()
+
+    # 4. Kiểm tra drop_ignored_labels lọc bỏ chính xác số lượng mẫu ranh giới
+    X_clean, y_clean = drop_ignored_labels(train_df[FEATURE_COLS], train_df["Label"].values)
+    assert len(y_clean) == len(train_df) - (3 * horizon)
+    assert not (y_clean == -1).any()
 
 
 def test_prepare_production_training_data_insufficient_dates():

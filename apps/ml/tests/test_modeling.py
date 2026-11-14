@@ -13,7 +13,6 @@ from vn_stock.config import NUM_CLASSES
 from vn_stock.features import ALL_FEATURE_COLS, FEATURE_COLS
 from vn_stock.modeling.model import (
     GlobalLSTMClassifier,
-    PredictionModel,
     create_lightgbm_model,
 )
 from vn_stock.modeling.predict import (
@@ -77,23 +76,53 @@ def test_global_lstm_classifier_architecture():
     np.testing.assert_allclose(row_sums, 1.0, atol=1e-5)
 
 
-def test_prediction_model_interface():
-    """Kiểm thử mô hình hồi quy đơn biến cũ PredictionModel (tương thích ngược)."""
-    model = PredictionModel(input_size=len(ALL_FEATURE_COLS), output_size=1)
-    x = torch.randn(4, 10, len(ALL_FEATURE_COLS))
-    out = model(x)
-    assert out.shape == (4, 1)
-
-
 def test_create_lightgbm_model_defaults_and_custom():
     """Kiểm thử khởi tạo mô hình LightGBM với siêu tham số mặc định và tùy chỉnh."""
     model_def = create_lightgbm_model()
     assert model_def.n_estimators == 300
     assert model_def.learning_rate == 0.03
+    assert model_def.class_weight == "balanced"
 
     model_custom = create_lightgbm_model({"n_estimators": 100, "max_depth": 3})
     assert model_custom.n_estimators == 100
     assert model_custom.max_depth == 3
+
+
+def test_lightgbm_class_weight_balanced_multiclass():
+    """
+    Kiểm định cơ chế cân bằng trọng số lớp (class_weight='balanced') cho LightGBM:
+    - Trên tập dữ liệu mất cân bằng nghiêm trọng (60% Đi ngang, 24% Giảm, 16% Tăng).
+    - Mô hình phải dự đoán ra cả 3 lớp (len(unique_preds) == 3), không bị triệt tiêu lớp thiểu số (đặc biệt là lớp Giảm).
+    - Macro F1 phải đạt ngưỡng tối thiểu >= 0.30.
+    """
+    np.random.seed(42)
+    n_samples = 600
+    X = pd.DataFrame(
+        np.random.randn(n_samples, len(ALL_FEATURE_COLS)),
+        columns=ALL_FEATURE_COLS,
+    )
+    # Phân phối mất cân bằng thực tế
+    y = np.random.choice([0, 1, 2], size=n_samples, p=[0.24, 0.60, 0.16])
+
+    split_idx = 450
+    X_tr, y_tr = X.iloc[:split_idx], y[:split_idx]
+    X_va, y_va = X.iloc[split_idx:], y[split_idx:]
+
+    model = create_lightgbm_model({"n_estimators": 50, "random_state": 42})
+    assert model.class_weight == "balanced"
+
+    model.fit(X_tr, y_tr)
+    preds = model.predict(X_va)
+    unique_preds = np.unique(preds)
+
+    # Đảm bảo không bị sụp đổ về lớp đa số: Phải dự đoán được cả 3 lớp
+    assert len(unique_preds) == 3
+    assert 0 in unique_preds  # Lớp GIẢM
+    assert 1 in unique_preds  # Lớp ĐI NGANG
+    assert 2 in unique_preds  # Lớp TĂNG
+
+    metrics = evaluate_predictions(y_va, preds)
+    assert metrics["macro_f1"] >= 0.30
 
 
 def test_evaluate_predictions_metrics_integrity():
