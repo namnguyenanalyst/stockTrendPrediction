@@ -41,8 +41,12 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 let inMemoryToken: string | null = null;
+let authGeneration = 0;
+const pendingRefreshes = new Map<string, Promise<RefreshTokenResponse>>();
+const pendingLogins = new Set<Promise<LoginResponse>>();
 
 export function setAuthToken(token: string | null): void {
+  authGeneration += 1;
   inMemoryToken = token;
 }
 
@@ -244,14 +248,18 @@ export async function loginUser(
   password: string
 ): Promise<LoginResponse> {
   const data: LoginRequest = { email, password };
-  const res = await fetchJson<LoginResponse>("/api/v1/auth/login", {
+  const operation = fetchJson<LoginResponse>("/api/v1/auth/login", {
     method: "POST",
     body: JSON.stringify(data),
   });
-  if (res.access_token) {
-    setAuthToken(res.access_token);
+  pendingLogins.add(operation);
+  try {
+    const res = await operation;
+    if (res.access_token) setAuthToken(res.access_token);
+    return res;
+  } finally {
+    pendingLogins.delete(operation);
   }
-  return res;
 }
 
 export async function registerUser(
@@ -272,16 +280,21 @@ export async function registerUser(
   });
 }
 
-export async function refreshToken(token?: string): Promise<RefreshTokenResponse> {
+export function refreshToken(token?: string): Promise<RefreshTokenResponse> {
+  const key = token || "cookie";
+  const pending = pendingRefreshes.get(key);
+  if (pending) return pending;
+  const generation = authGeneration;
   const body = token ? JSON.stringify({ refresh_token: token }) : JSON.stringify({});
-  const res = await fetchJson<RefreshTokenResponse>("/api/v1/auth/refresh", {
+  const operation = fetchJson<RefreshTokenResponse>("/api/v1/auth/refresh", {
     method: "POST",
     body,
-  });
-  if (res.access_token) {
-    setAuthToken(res.access_token);
-  }
-  return res;
+  }).then((res) => {
+    if (res.access_token && generation === authGeneration) setAuthToken(res.access_token);
+    return res;
+  }).finally(() => { pendingRefreshes.delete(key); });
+  pendingRefreshes.set(key, operation);
+  return operation;
 }
 
 export async function getCurrentUser(): Promise<User> {
@@ -290,6 +303,12 @@ export async function getCurrentUser(): Promise<User> {
 
 export async function logoutUser(): Promise<void> {
   setAuthToken(null);
+  try {
+    await Promise.allSettled([...pendingRefreshes.values(), ...pendingLogins]);
+    await fetchJson<void>("/api/v1/auth/logout", { method: "POST" });
+  } finally {
+    setAuthToken(null);
+  }
 }
 
 // =============================================================================
@@ -317,7 +336,14 @@ export async function deleteUserWatchlist(id: string): Promise<void> {
 }
 
 export async function getUserPresets(): Promise<UserStrategyPreset[]> {
-  return fetchJson<UserStrategyPreset[]>("/api/v1/user/presets");
+  const result = await fetchJson<UserStrategyPreset[]>("/api/v1/user/presets");
+  let pageSize = result.length;
+  while (pageSize === 100) {
+    const page = await fetchJson<UserStrategyPreset[]>(`/api/v1/user/presets?limit=100&offset=${result.length}`);
+    result.push(...page);
+    pageSize = page.length;
+  }
+  return result;
 }
 
 export async function createUserPreset(
@@ -397,3 +423,7 @@ export async function getPredictStatus(): Promise<PredictStatusResponse> {
 }
 
 
+
+export async function updateUserPreset(id: string, name: string, description: string | null | undefined, parameters: Record<string, unknown>): Promise<UserStrategyPreset> {
+  return fetchJson<UserStrategyPreset>(`/api/v1/user/presets/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify({ name, description, parameters }) });
+}

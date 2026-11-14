@@ -618,6 +618,3 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
     </div>
   );
 };
-
-// Xuất alias IndexChartModal để đảm bảo tương thích ngược 100% với các import cũ
-export const IndexChartModal = FinancialDetailModal;

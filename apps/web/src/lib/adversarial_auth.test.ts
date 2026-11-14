@@ -466,15 +466,15 @@ describe("Adversarial Stress Test: Route Protection & Auth State", () => {
 
       // Start login
       const loginPromise = loginUser("c@quant.vn", "passC");
+      vi.mocked(fetch).mockResolvedValue({ ok: true, status: 204 } as Response);
       // Immediate logout before login resolves
       await logoutUser();
 
       // Await login completion
       await loginPromise;
 
-      // Because login resolves, inMemoryToken was set by loginUser line 266:
-      // In apps/web/src/lib/api.ts: loginUser sets setAuthToken(res.access_token)
-      expect(getAuthToken()).toBe("token-concurrent-login");
+      // Logout waits for the login cookie, revokes it and clears the access token.
+      expect(getAuthToken()).toBeNull();
 
       // Calling logoutUser after login completes must clean up cleanly
       await logoutUser();

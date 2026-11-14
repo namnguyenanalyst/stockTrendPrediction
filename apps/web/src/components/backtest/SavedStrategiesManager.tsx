@@ -13,6 +13,7 @@ import {
   Activity,
 } from "lucide-react";
 import { SavedStrategyItem } from "@/lib/types";
+import { DeleteStrategyDialog } from "./DeleteStrategyDialog";
 import { filterStrategies } from "@/lib/strategyStorage";
 
 interface SavedStrategiesManagerProps {
@@ -21,7 +22,7 @@ interface SavedStrategiesManagerProps {
   onRunStrategy: (strategy: SavedStrategyItem) => void;
   onEditStrategy: (strategy: SavedStrategyItem) => void;
   onToggleStatus: (strategyId: string) => void;
-  onDeleteStrategy: (strategyId: string) => void;
+  onDeleteStrategy: (strategyId: string) => Promise<boolean>;
 }
 
 export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
@@ -34,6 +35,7 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
 }) => {
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "draft">("all");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+  const [deleteTarget, setDeleteTarget] = useState<SavedStrategyItem | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   // Đếm số lượng theo trạng thái
@@ -47,7 +49,7 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
   return (
     <div className="space-y-4 animate-fade-in">
       {/* 1. THANH ĐIỀU HƯỚNG BỘ LỌC CHUẨN DNSE: TẤT CẢ / TRIỂN KHAI / CHƯA TRIỂN KHAI */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/80 p-3 sm:flex-row sm:items-center sm:justify-between backdrop-blur-md">
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/80 p-3 xl:flex-row xl:items-center xl:justify-between backdrop-blur-md">
         {/* Bộ ba nút Pills: Tất cả, Triển khai, Chưa triển khai */}
         <div className="flex items-center gap-2">
           {/* Tất cả */}
@@ -207,7 +209,7 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
         </div>
       ) : viewMode === "grid" ? (
         /* DẠNG GRID (THẺ CHIẾN LƯỢC TRỰC QUAN) */
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
           {filteredStrategies.map((strat) => {
             const isActive = strat.status === "active";
             const metrics = strat.last_metrics;
@@ -419,7 +421,7 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => onDeleteStrategy(strat.id)}
+                      onClick={() => setDeleteTarget(strat)}
                       className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"
                       title="Xóa chiến lược"
                     >
@@ -544,7 +546,7 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
                           </button>
                           <button
                             type="button"
-                            onClick={() => onDeleteStrategy(strat.id)}
+                            onClick={() => setDeleteTarget(strat)}
                             className="rounded-lg p-1 text-slate-500 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"
                             title="Xóa"
                           >
@@ -560,6 +562,8 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
           </div>
         </div>
       )}
+      {deleteTarget && <DeleteStrategyDialog name={deleteTarget.name}
+        onDelete={() => onDeleteStrategy(deleteTarget.id)} onClose={() => setDeleteTarget(null)} />}
     </div>
   );
 };

@@ -193,9 +193,14 @@ describe("Frontend Auth Suite (src/lib/auth.test.ts)", () => {
     it("logoutUser should clear inMemoryToken", async () => {
       setAuthToken("some-token");
       expect(getAuthToken()).toBe("some-token");
+      vi.mocked(fetch).mockResolvedValueOnce({ ok: true, status: 204 } as Response);
 
       await logoutUser();
       expect(getAuthToken()).toBeNull();
+      expect(fetch).toHaveBeenCalledWith(
+        "http://localhost:8000/api/v1/auth/logout",
+        expect.objectContaining({ method: "POST", credentials: "include" })
+      );
     });
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   X,
   BookmarkCheck,
@@ -9,6 +9,7 @@ import {
   Copy,
 } from "lucide-react";
 import { SavedStrategyItem } from "@/lib/types";
+import { createExclusiveAction } from "@/lib/exclusiveAction";
 import { generateCopyStrategyName } from "@/lib/strategyStorage";
 
 interface SaveStrategyModalProps {
@@ -20,7 +21,7 @@ interface SaveStrategyModalProps {
     name: string;
     status: "active" | "draft";
     overwriteExistingId?: string;
-  }) => void;
+  }) => Promise<boolean>;
 }
 
 export const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
@@ -30,6 +31,9 @@ export const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
   savedStrategies,
   onSave,
 }) => {
+  const saveOnce = useRef(createExclusiveAction());
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [name, setName] = useState<string>(currentStrategyName);
   const [status, setStatus] = useState<"active" | "draft">("draft");
 
@@ -49,38 +53,28 @@ export const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
     (s) => s.name.trim().toLowerCase() === name.trim().toLowerCase()
   );
 
-  const handleSaveNew = () => {
-    if (!name.trim()) return;
-    onSave({
-      name: name.trim(),
-      status,
+  const submit = async (data: { name: string; status: "active" | "draft"; overwriteExistingId?: string }) => {
+    const accepted = await saveOnce.current(async () => {
+      setSaving(true);
+      setSaveError(null);
+      try {
+        const success = await onSave(data);
+        if (!success) setSaveError("Chưa lưu được. Kiểm tra kết nối rồi thử lại; bản cũ vẫn được giữ.");
+        return success;
+      } catch {
+        setSaveError("Không thể lưu lúc này. Vui lòng thử lại.");
+        return false;
+      } finally { setSaving(false); }
     });
-    onClose();
+    if (accepted) onClose();
   };
-
-  const handleOverwrite = () => {
-    if (!existingStrategy) return;
-    onSave({
-      name: name.trim(),
-      status,
-      overwriteExistingId: existingStrategy.id,
-    });
-    onClose();
-  };
-
-  const handleSaveAsCopy = () => {
-    if (!name.trim()) return;
-    const copyName = generateCopyStrategyName(name, savedStrategies);
-    onSave({
-      name: copyName,
-      status,
-    });
-    onClose();
-  };
+  const handleSaveNew = () => { if (name.trim()) void submit({ name: name.trim(), status }); };
+  const handleOverwrite = () => { if (existingStrategy) void submit({ name: name.trim(), status, overwriteExistingId: existingStrategy.id }); };
+  const handleSaveAsCopy = () => { if (name.trim()) void submit({ name: generateCopyStrategyName(name, savedStrategies), status }); };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl shadow-emerald-500/10">
+      <div role="dialog" aria-modal="true" aria-label="Lưu chiến lược giao dịch" aria-busy={saving} className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl shadow-emerald-500/10">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
           <div className="flex items-center gap-2.5">
@@ -96,7 +90,7 @@ export const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            aria-label="Đóng hộp thoại lưu chiến lược" disabled={saving} onClick={onClose}
             className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
           >
             <X className="h-5 w-5" />
@@ -110,7 +104,7 @@ export const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
             <label className="block text-xs font-semibold text-slate-300 mb-1.5">
               Tên chiến lược <span className="text-rose-400">*</span>
             </label>
-            <input
+            <input id="strategy-save-name" disabled={saving}
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -154,7 +148,7 @@ export const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-bold text-emerald-400">Chưa triển khai</span>
-                  <input
+                  <input disabled={saving}
                     type="radio"
                     name="strategy_status"
                     checked={status === "draft"}
@@ -177,7 +171,7 @@ export const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-bold text-emerald-400">Triển khai</span>
-                  <input
+                  <input disabled={saving}
                     type="radio"
                     name="strategy_status"
                     checked={status === "active"}
@@ -193,11 +187,12 @@ export const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
           </div>
         </div>
 
+        {saveError && <p role="alert" className="mt-3 text-sm text-amber-300">{saveError}</p>}
         {/* Footer Actions */}
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end border-t border-slate-800 pt-4">
           <button
             type="button"
-            onClick={onClose}
+            disabled={saving} onClick={onClose}
             className="rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-colors"
           >
             Hủy bỏ
@@ -207,7 +202,7 @@ export const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
             <>
               <button
                 type="button"
-                onClick={handleSaveAsCopy}
+                disabled={saving} onClick={handleSaveAsCopy}
                 className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-200 hover:border-slate-600 hover:bg-slate-700 transition-all cursor-pointer"
               >
                 <Copy className="h-4 w-4 text-slate-400" />
@@ -215,7 +210,7 @@ export const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
               </button>
               <button
                 type="button"
-                onClick={handleOverwrite}
+                disabled={saving} onClick={handleOverwrite}
                 className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2.5 text-xs font-bold text-slate-950 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 transition-all cursor-pointer"
               >
                 <CheckCircle className="h-4 w-4 fill-current" />
@@ -226,11 +221,11 @@ export const SaveStrategyModal: React.FC<SaveStrategyModalProps> = ({
             <button
               type="button"
               onClick={handleSaveNew}
-              disabled={!name.trim()}
+              disabled={saving || !name.trim()}
               className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-5 py-2.5 text-xs font-bold text-slate-950 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 disabled:opacity-50 transition-all cursor-pointer"
             >
               <BookmarkCheck className="h-4 w-4" />
-              <span>Lưu chiến lược</span>
+              <span>{saving ? "Đang lưu…" : "Lưu chiến lược"}</span>
             </button>
           )}
         </div>

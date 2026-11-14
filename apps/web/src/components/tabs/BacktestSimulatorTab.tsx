@@ -44,6 +44,7 @@ import {
 } from "@/lib/types";
 import {
   createUserPreset,
+  updateUserPreset,
   deleteUserBacktest,
   deleteUserPreset,
   getMarketSyncStatus,
@@ -111,7 +112,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
   // Mặc định luôn hiển thị giao diện Quản lý chiến thuật (manager) như Hình 2
   const [strategyViewMode, setStrategyViewMode] = useState<"manager" | "builder">("manager");
   const [savedStrategies, setSavedStrategies] = useState<SavedStrategyItem[]>(() => {
-    return loadSavedStrategies();
+    return isAuthenticated ? [] : loadSavedStrategies();
   });
   const [isSaveModalOpen, setIsSaveModalOpen] = useState<boolean>(false);
   const [activeStrategyId, setActiveStrategyId] = useState<string | null>(null);
@@ -235,6 +236,8 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
 
     async function loadUserData() {
       if (!isAuthenticated) return;
+      setSavedStrategies([]);
+      setBacktestHistories([]);
       setLoadingHistories(true);
       try {
         const [presetsRes, historiesRes] = await Promise.allSettled([
@@ -242,6 +245,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
           getUserBacktests(),
         ]);
         if (ignore) return;
+        if (presetsRes.status === "rejected") setSavedToast("Chưa tải được chiến lược từ tài khoản. Hãy thử lại.");
         if (presetsRes.status === "fulfilled") {
           if (presetsRes.value && presetsRes.value.length > 0) {
             const dbPresets: SavedStrategyItem[] = presetsRes.value.map((p) => {
@@ -275,9 +279,9 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
                   use_volume_spike: false,
                 },
                 sell_conditions: (params.sell_conditions as BacktestConditionFilter) || {
-                  take_profit_pct: 15,
-                  stop_loss_pct: 7,
-                  trailing_stop_pct: 5,
+                  take_profit_pct: 0.15,
+                  stop_loss_pct: 0.07,
+                  trailing_stop_pct: 0.05,
                   max_holding_days: 30,
                 },
                 last_metrics: params.metrics as SavedStrategyItem["last_metrics"],
@@ -496,7 +500,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
   };
 
   // Lưu chiến lược vào danh sách và localStorage (Có xử lý trùng lặp và cập nhật)
-  const handleSaveStrategyData = ({
+  const handleSaveStrategyData = async ({
     name,
     status,
     overwriteExistingId,
@@ -543,17 +547,11 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
       }
     );
 
-    setSavedStrategies(updatedList);
-    setActiveStrategyId(activeId);
-    setStrategyName(name);
+    let resolvedId = activeId;
 
     if (isAuthenticated) {
-      (async () => {
-        try {
-          if (overwriteExistingId) {
-            await deleteUserPreset(overwriteExistingId).catch(() => {});
-          }
-          await createUserPreset(name, `Chiến lược ${name}`, {
+      try {
+          const saved = await (overwriteExistingId ? updateUserPreset.bind(null, overwriteExistingId) : createUserPreset)(name, `Chiến lược ${name}`, {
             scope_type: scopeType,
             symbol: selectedSymbol,
             index_name: selectedIndex,
@@ -570,11 +568,18 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
             metrics: currentMetrics,
             status,
           });
-        } catch (err) {
-          console.warn("Lỗi lưu preset lên CSDL:", err);
-        }
-      })();
+        resolvedId = saved.id;
+      } catch {
+        persistSavedStrategies(savedStrategies);
+        setSavedToast("Chưa lưu được lên tài khoản. Hãy thử lại; bản cũ được giữ nguyên.");
+        return false;
+      }
     }
+    const committed = updatedList.map(item => item.id === activeId ? { ...item, id: resolvedId } : item);
+    persistSavedStrategies(committed);
+    setSavedStrategies(committed);
+    setActiveStrategyId(resolvedId);
+    setStrategyName(name);
 
     setSavedToast(
       action === "created"
@@ -582,6 +587,7 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
         : `Đã cập nhật chiến lược "${name}" thành công!`
     );
     setTimeout(() => setSavedToast(null), 4000);
+    return true;
   };
 
   // Nạp cấu hình từ một chiến lược đã lưu vào phòng Lab
@@ -621,11 +627,20 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
   };
 
   // Đổi trạng thái Triển khai <-> Chưa triển khai (Bật/Tắt theo dõi)
-  const handleToggleStatus = (strategyId: string) => {
+  const handleToggleStatus = async (strategyId: string) => {
     const targetStrat = savedStrategies.find((s) => s.id === strategyId);
     if (!targetStrat) return;
 
     const { updatedList, nextStatus } = toggleStrategyStatus(savedStrategies, strategyId);
+    if (isAuthenticated) {
+      try {
+        await updateUserPreset(strategyId, targetStrat.name, null, { ...targetStrat, metrics: targetStrat.last_metrics, status: nextStatus });
+      } catch {
+        persistSavedStrategies(savedStrategies);
+        setSavedToast("Chưa cập nhật được trạng thái trên tài khoản. Hãy thử lại.");
+        return;
+      }
+    }
     setSavedStrategies(updatedList);
 
     setSavedToast(
@@ -637,23 +652,21 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
   };
 
   // Xóa chiến lược khỏi danh sách
-  const handleDeleteStrategy = (strategyId: string) => {
-    const strat = savedStrategies.find((s) => s.id === strategyId);
-    if (!strat) return;
-
-    if (window.confirm(`Bạn có chắc chắn muốn xóa chiến lược "${strat.name}" khỏi danh sách?`)) {
-      const { updatedList, deleted } = deleteStrategy(savedStrategies, strategyId);
-      if (deleted) {
-        setSavedStrategies(updatedList);
-        if (isAuthenticated) {
-          deleteUserPreset(strategyId).catch((err) =>
-            console.warn("Lỗi xóa mẫu chiến lược trên CSDL:", err)
-          );
-        }
-        setSavedToast(`Đã xóa chiến lược "${strat.name}"`);
-        setTimeout(() => setSavedToast(null), 3000);
-      }
+  const handleDeleteStrategy = async (strategyId: string): Promise<boolean> => {
+    const strat = savedStrategies.find(item => item.id === strategyId);
+    if (!strat) return false;
+    if (isAuthenticated) {
+      try { await deleteUserPreset(strategyId); }
+      catch { setSavedToast("Chưa xóa được trên tài khoản. Bản lưu vẫn được giữ."); return false; }
     }
+    const { updatedList, deleted } = deleteStrategy(savedStrategies, strategyId);
+    if (deleted) {
+      setSavedStrategies(updatedList);
+      if (activeStrategyId === strategyId) setActiveStrategyId(null);
+      setSavedToast(`Đã xóa chiến lược "${strat.name}"`);
+      setTimeout(() => setSavedToast(null), 3000);
+    }
+    return deleted;
   };
 
   // Lấy các metrics hiển thị
@@ -811,8 +824,8 @@ export const BacktestSimulatorTab: React.FC<BacktestSimulatorTabProps> = ({
         {/* Floating Toast Notification (Tránh layout shift) */}
         {savedToast && (
           <div className="absolute top-full right-3 mt-2 z-30 flex items-center gap-2 rounded-lg bg-slate-900 border border-emerald-500/40 px-3.5 py-2 text-xs font-medium text-slate-100 shadow-xl backdrop-blur-md animate-fade-in">
-            <CheckCircle className="h-4 w-4 shrink-0 text-emerald-400" />
-            <span>{savedToast}</span>
+            {savedToast.startsWith("Chưa") ? <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400" /> : <CheckCircle className="h-4 w-4 shrink-0 text-emerald-400" />}
+            <span role="status" aria-live="polite">{savedToast}</span>
             {strategyViewMode === "builder" && (
               <button
                 type="button"

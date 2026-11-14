@@ -489,6 +489,7 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-slate-400" role="note">Nguồn nến: SSI, theo phiên chốt. Một số chỉ số tổng quan, dòng tiền và dữ liệu cơ bản đang dùng giá trị ước lượng hoặc dự phòng; chưa phải dữ liệu thị trường đã xác minh đầy đủ.</p>
       {/* ========================================================================= */}
       {/* 1. BĂNG CHUYỂN CHỈ SỐ THỊ TRƯỜNG TÁCH BIỆT (INDEX RIBBON COMPONENT)       */}
       {/* ========================================================================= */}

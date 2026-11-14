@@ -1,4 +1,5 @@
 "use client";
+import { matchesPrediction } from "@/lib/predictionPresentation";
 
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -48,36 +49,20 @@ export interface PredictionHistoryItem {
 
 const MODEL_SPECIFICATIONS = {
   lightgbm: {
-    title: "LightGBM — Chuyên gia Bắt nhịp Ngắn hạn",
-    badge: "Phù hợp khi thị trường Đi ngang (Sideway) & Lướt sóng T+3",
-    overview:
-      "Như một chuyên gia phân tích kỹ thuật soi kính lúp vào phiên hôm nay: đo lường xem nến hôm nay đóng cửa ở đâu, RSI có đang quá mua/quá bán không, dòng tiền ngắn hạn vào hay ra để phản xạ tức thì.",
-    purpose:
-      "Dự đoán xem trong 1–3 phiên tiếp theo (chu kỳ T+3), cổ phiếu sẽ BẬT TĂNG, CHỈNH GIẢM hay tiếp tục GIẰNG CO theo các mốc hỗ trợ và kháng cự kỹ thuật.",
-    whenToUse:
-      "LÚC NÊN CHỌN: Thị trường hoặc cổ phiếu đang ĐI NGANG (lình xình không rõ sóng), giá biến động trong biên độ hẹp và bạn muốn lướt sóng nhanh bắt nhịp hồi T+3.",
-    signsTitle: "Dấu hiệu trên bảng điện để bạn chọn mô hình này:",
-    signs: [
-      "Giá cổ phiếu dập dìu trong vùng giá quen thuộc, chưa vượt được đỉnh cũ hay thủng đáy cũ.",
-      "Chỉ báo RSI rơi vào vùng Quá bán (< 30 - canh bắt nhịp nảy hồi) hoặc Quá mua (> 70 - canh chốt lời).",
-      "Thị trường phân hóa mạnh, dòng tiền đánh nhanh rút gọn, không tạo thành sóng ngành kéo dài.",
-    ],
+    title: "LightGBM — Đặc trưng dạng bảng", badge: "Phân loại xu hướng T+3",
+    overview: "Dùng các đặc trưng kỹ thuật tại phiên chốt. Các chỉ báo đã tổng hợp lịch sử giá và khối lượng.",
+    purpose: "Phân loại mức thay đổi giá sau ba phiên thành tăng, đi ngang hoặc giảm.",
+    whenToUse: "So sánh với LSTM trên cùng giai đoạn và cùng tập mã. Chưa có kiểm định xác nhận ưu thế riêng ở thị trường đi ngang.",
+    signsTitle: "Cách đọc kết quả:",
+    signs: ["Xác suất lớp không phải độ chính xác đã kiểm chứng.", "Đầu ra phân loại không trực tiếp dự báo giá mục tiêu.", "Xem ngày dữ liệu và giới hạn thực nghiệm trước khi sử dụng."],
   },
   lstm: {
-    title: "LSTM Network — Chuyên gia Bám sóng Quán tính",
-    badge: "Phù hợp khi cổ phiếu Vào Sóng Lớn (Trend)",
-    overview:
-      "Khác với LightGBM chỉ nhìn 1 phiên, mô hình này có 'trí nhớ' chuỗi thời gian: nó xem trọn vẹn cả cuộn phim 20 ngày giao dịch liên tục (~1 tháng) để giải mã xem quán tính của con sóng và lực gom hàng của dòng tiền lớn đang mạnh hay yếu.",
-    purpose:
-      "Đo lường sức đẩy quán tính của chuỗi ngày qua để dự phóng xem đà tăng/giảm này còn đủ lực kéo tiếp trong 3 phiên tới hay sắp cạn kiệt.",
-    whenToUse:
-      "LÚC NÊN CHỌN: Cổ phiếu hoặc thị trường đang VÀO SÓNG TĂNG/GIẢM MẠNH (Uptrend/Downtrend), có dòng tiền lớn dẫn dắt và bạn muốn đầu tư bám theo xu hướng lớn (Trend Following).",
-    signsTitle: "Dấu hiệu trên bảng điện để bạn chọn mô hình này:",
-    signs: [
-      "Cổ phiếu có 3–5 phiên tăng liên tục hoặc vừa có phiên nổ khối lượng bứt phá đỉnh cũ (Breakout).",
-      "Khối lượng giao dịch (Volume) tăng đột biến gấp 1.5 - 2 lần bình thường (dòng tiền tổ chức tham gia).",
-      "Thị trường xuất hiện sóng ngành dẫn dắt rõ rệt (cả họ cổ phiếu cùng tăng mạnh), giá bám sát đà dốc đi lên.",
-    ],
+    title: "Global LSTM — Chuỗi 20 phiên", badge: "Phân loại xu hướng T+3",
+    overview: "Dùng chuỗi đặc trưng đa biến của 20 phiên để phân loại xu hướng sau ba phiên.",
+    purpose: "Đối chứng mô hình chuỗi với LightGBM trên dữ liệu và quy trình đánh giá tương ứng.",
+    whenToUse: "So sánh bằng kết quả theo thời gian. Chưa có kiểm định xác nhận mô hình tốt hơn khi thị trường có xu hướng.",
+    signsTitle: "Cách đọc kết quả:",
+    signs: ["Chuỗi đầu vào gồm 20 phiên, không phải dự báo 20 phiên tới.", "Xác suất chưa được hiệu chỉnh thành tỷ lệ đúng.", "Đường giá là minh họa theo quy tắc, không phải giá được LSTM dự báo."],
   },
 };
 
@@ -147,6 +132,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   useEffect(() => {
     if (!bars || bars.length === 0) {
       let ignore = false;
+      setFallbackBars([]);
       getStockHistory(selectedSymbol)
         .then((res) => {
           if (!ignore && res && res.bars) setFallbackBars(res.bars);
@@ -205,9 +191,9 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   }, [activeTooltipModel]);
 
   // Hiển thị localPrediction nếu vừa đồng bộ Live, ngược lại hiển thị prediction từ props
-  const activePred = localPrediction && localPrediction.symbol === selectedSymbol
+  const activePred = matchesPrediction(localPrediction, selectedSymbol, modelType)
     ? localPrediction
-    : prediction;
+    : matchesPrediction(prediction, selectedSymbol, modelType) ? prediction : null;
 
   // Tự động ghi vết dự báo vào lịch sử khi người dùng chọn cổ phiếu hoặc đổi mô hình
   useEffect(() => {
@@ -297,7 +283,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   return (
     <div className="space-y-4">
       {/* 1. Header & Bộ điều phối Mô hình Học máy & Live Feed */}
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-800 bg-slate-900 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-lg border border-slate-800 bg-slate-900 p-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-400">
             <Brain className="h-5 w-5" />
@@ -305,7 +291,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-slate-100 sm:text-lg">
-                Trung tâm Tín hiệu AI & Mô hình Định lượng
+                Dự báo xu hướng T+3
               </h2>
             </div>
             <p className="text-xs text-slate-400">
@@ -318,12 +304,12 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 className="inline-flex flex-wrap items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/40 px-3 py-1 text-[11px] font-medium text-emerald-300 shadow-sm backdrop-blur-sm"
               >
                 <span className="relative flex h-2 w-2 shrink-0">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
                 </span>
                 <Bot className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
                 <span>
-                  Học máy tự trị | Phiên căn cứ:{" "}
+                  Thông tin mô hình | Phiên chốt:{" "}
                   <strong className="text-emerald-200">
                     {predictStatus?.last_atc_session_date || "..."}
                   </strong>
@@ -337,7 +323,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
         </div>
 
         {/* Bộ điều khiển Chuyển đổi Mô hình */}
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
 
 
           {/* Bộ chọn Mô hình kèm Cơ chế Hover 3 Giây Thả Đặc Tả */}
@@ -425,10 +411,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               </div>
             </div>
 
-            {loading ? (
+            {loading || !activePred ? (
               <div className="my-8 flex flex-col items-center justify-center gap-2">
-                <div className="h-7 w-7 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-                <span className="text-xs text-slate-400">Mô hình AI đang suy luận...</span>
+                {loading && <div className="h-7 w-7 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />}
+                <span className="text-xs text-slate-400">{loading ? "Mô hình đang suy luận..." : "Chưa có dự báo hợp lệ cho mã và mô hình này. Hãy thử tải lại."}</span>
               </div>
             ) : (
               <div className="my-4">
@@ -491,8 +477,8 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                     </span>
                   </div>
                   <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-                    <span className="text-slate-400">Độ tin cậy mô hình:</span>
-                    <span className="font-mono font-semibold text-blue-400">{confidencePct}%</span>
+                    <span className="text-slate-400">Xác suất lớp cao nhất:</span>
+                    <span className="font-mono font-semibold text-blue-400">{activePred ? `${confidencePct}%` : "—"}</span>
                   </div>
                 </div>
               </div>
@@ -534,7 +520,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                     <TrendingUp className="h-3.5 w-3.5" /> Kịch bản TĂNG GIÁ
                   </span>
                   <span className="font-mono font-bold text-emerald-400">
-                    {(probUp * 100).toFixed(1)}%
+                    {activePred ? `${(probUp * 100).toFixed(1)}%` : "—"}
                   </span>
                 </div>
                 <div className="h-2 w-full rounded bg-slate-800 overflow-hidden">
@@ -552,7 +538,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                     <Minus className="h-3.5 w-3.5" /> Kịch bản TÍCH LŨY / ĐI NGANG
                   </span>
                   <span className="font-mono font-bold text-amber-400">
-                    {(probHold * 100).toFixed(1)}%
+                    {activePred ? `${(probHold * 100).toFixed(1)}%` : "—"}
                   </span>
                 </div>
                 <div className="h-2 w-full rounded bg-slate-800 overflow-hidden">
@@ -570,7 +556,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                     <TrendingDown className="h-3.5 w-3.5" /> Kịch bản GIẢM GIÁ
                   </span>
                   <span className="font-mono font-bold text-rose-400">
-                    {(probDown * 100).toFixed(1)}%
+                    {activePred ? `${(probDown * 100).toFixed(1)}%` : "—"}
                   </span>
                 </div>
                 <div className="h-2 w-full rounded bg-slate-800 overflow-hidden">
@@ -585,11 +571,12 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
 
           <div className="mt-6 border-t border-slate-800/80 pt-3 flex items-center justify-between text-xs text-slate-400">
             <span>Mô hình đang chạy: <strong className="text-slate-200">{modelType.toUpperCase()}</strong></span>
-            <span className="text-[11px] text-slate-500">Đã kiểm định OOS Thực chiến</span>
+            <span className="text-[11px] text-slate-500">Kết quả nghiên cứu; chưa xác nhận hiệu quả đầu tư</span>
           </div>
         </div>
       </div>
 
+      <p className="text-xs text-slate-400" role="note">Mô hình phân loại xu hướng T+3. Xác suất lớp chưa được hiệu chỉnh và không phải tỷ lệ dự báo đúng. Kết quả kiểm thử tài chính còn phụ thuộc dữ liệu quyền cổ đông.</p>
       {/* 2.5. Biểu đồ Nến Kỹ thuật & Quỹ đạo Dự phóng Xu hướng T+1 -> T+3 chuẩn FireAnt */}
       <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
         <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -660,7 +647,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 <th className="px-3 py-2.5 text-center font-semibold">Tín hiệu Khuyến nghị</th>
                 <th className="px-3 py-2.5 text-right font-semibold">Xác suất Tăng</th>
                 <th className="px-3 py-2.5 text-right font-semibold">Xác suất Giảm</th>
-                <th className="px-3 py-2.5 text-right font-semibold">Độ tin cậy</th>
+                <th className="px-3 py-2.5 text-right font-semibold">Xác suất lớp</th>
                 <th className="px-3 py-2.5 text-center font-semibold">Hành động</th>
               </tr>
             </thead>

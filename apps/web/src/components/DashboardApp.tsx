@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Terminal } from "lucide-react";
 import { DashboardTab, Sidebar } from "@/components/Sidebar";
 import { TopHeader } from "@/components/TopHeader";
@@ -131,6 +131,10 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
     let ignore = false;
 
     async function fetchSymbolData() {
+      setBars([]);
+      setIndicators([]);
+      setSummary(null);
+      setPrediction(null);
       setLoadingMarket(true);
       setLoadingPrediction(true);
 

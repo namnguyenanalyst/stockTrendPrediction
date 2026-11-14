@@ -1,4 +1,5 @@
 "use client";
+import { matchesPrediction, formatPriceVnd } from "@/lib/predictionPresentation";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -123,7 +124,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
 
   // Tính toán các điểm giá cho Quỹ đạo dự phóng 3 phiên (T+1 -> T+3)
   const trajectoryPoints: TrajectoryStepPoint[] = useMemo(() => {
-    if (!lastBar) return [];
+    if (!lastBar || !matchesPrediction(prediction, symbol, modelType) || !prediction?.trajectory?.length || (prediction.data_as_of_date || prediction.date) !== lastBar.date) return [];
 
     const basePrice = lastBar.close;
     const baseDate = lastBar.date;
@@ -150,7 +151,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
       const step: DayForecast | undefined = trajectory[i];
       const dayName = step?.day_name || `T+${i + 1}`;
       const trend = step?.predicted_trend || (prediction?.class_name as "TĂNG" | "ĐI NGANG" | "GIẢM") || "ĐI NGANG";
-      const confidence = step?.confidence || 0.55;
+      const confidence = step?.confidence ?? 0;
       const signal = step?.signal || "NẮM GIỮ (HOLD)";
 
       // Xác định ngày tương lai hợp lệ (phải lớn hơn ngày trước đó)
@@ -189,7 +190,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
     }
 
     return points;
-  }, [lastBar, prediction]);
+  }, [lastBar, prediction, symbol, modelType]);
 
   // Khởi tạo Lightweight Chart
   useEffect(() => {
@@ -540,7 +541,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
             title="Bật/Tắt đường đi xu hướng dự báo AI của các phiên tiếp theo"
           >
             <span className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></span>
-            <span>FA - Quỹ đạo AI (T+1 → T+3)</span>
+            <span>Kịch bản minh họa (T+1 → T+3)</span>
           </button>
 
           {/* Toggle SMA 20 */}
@@ -577,14 +578,14 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
         {/* Nhãn Mục tiêu Dự phóng T+3 nổi bật */}
         {targetT3 && showTrajectory && (
           <div className="flex items-center gap-2">
-            <span className="text-slate-400">Mục tiêu T+3 ({modelType.toUpperCase()}):</span>
+            <span className="text-slate-400">Giá minh họa T+3 ({modelType.toUpperCase()}):</span>
             <span
               className={`font-mono font-bold px-2 py-0.5 rounded border text-xs shadow-sm ${targetT3.changePct >= 0
                   ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-400"
                   : "bg-rose-500/10 border-rose-500/40 text-rose-400"
                 }`}
             >
-              {targetT3.price.toLocaleString()} VNĐ ({targetT3.changePct >= 0 ? "+" : ""}
+              {formatPriceVnd(targetT3.price)} ({targetT3.changePct >= 0 ? "+" : ""}
               {targetT3.changePct}%)
             </span>
           </div>
@@ -602,7 +603,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
             <span>Chi tiết Tọa độ Quỹ đạo Đường đi Xu hướng ({modelType.toUpperCase()})</span>
           </div>
           <span className="text-[11px] text-slate-400">
-            Đường cong xanh lơ thể hiện xung lực quán tính và kỳ vọng giá của AI theo chu kỳ T+2.5
+            Trục giá: nghìn VNĐ. Đường giá do quy tắc minh họa tạo ra, không phải dự báo giá hoặc khoảng tin cậy. Ngày tương lai chưa đối chiếu lịch nghỉ lễ.
           </span>
         </div>
 
@@ -613,9 +614,9 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
 
             const roleLabels = [
               "Dữ liệu căn cứ",
-              "Phiên mở vị thế (Open)",
-              "Phiên lưu ký (Khóa T+2)",
-              "Phiên khả dụng bán (T+3)",
+              "Mốc minh họa T+1",
+              "Mốc minh họa T+2",
+              "Mốc minh họa T+3",
             ];
 
             return (
@@ -638,7 +639,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
 
                   <div className="flex items-baseline justify-between mb-1">
                     <span className="font-mono text-base font-black text-slate-100">
-                      {point.price.toLocaleString()}
+                      {formatPriceVnd(point.price)}
                     </span>
                     {idx > 0 ? (
                       <span
@@ -675,7 +676,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
                   <span className="font-semibold">{idx === 0 ? "Chốt phiên" : point.signal}</span>
                   {idx > 0 && (
                     <span className="font-semibold text-sky-400 font-mono text-[10px]">
-                      {(point.confidence * 100).toFixed(1)}% tin cậy
+                      {(point.confidence * 100).toFixed(1)}% xác suất lớp
                     </span>
                   )}
                 </div>
