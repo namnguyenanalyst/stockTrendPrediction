@@ -74,11 +74,12 @@ def test_t2_settlement_restriction():
     - Ngày 1: Phát tín hiệu Bán (sig=0) -> Ngày 2: Đòi khớp Bán.
       Tuy nhiên, hàng mua tại ngày 1 phải đến ngày 1 + 2 = ngày 3 mới về!
       Do đó, tại ngày 2 lệnh Bán BẮT BUỘC BỊ TỪ CHỐI, không được khớp.
-    - Ngày 2: Phát tín hiệu Bán (sig=0) -> Ngày 3: Hàng đã về (settled_idx=3 <= 3), lệnh Bán ĐƯỢC PHÉP KHỚP.
+    - Ngày 3: Cổ phiếu về buổi chiều; không được bán tại Open ngày 3.
+    - Tín hiệu bán tiếp ngày 3 chỉ được khớp tại Open ngày 4.
     """
     df = _create_sample_market_df(n_bars=6, start_price=50.0)
-    # Tín hiệu: [Mua, Bán (quá sớm), Bán (hợp lệ), Giữ, Giữ, Giữ]
-    signals = np.array([2, 0, 0, 1, 1, 1])
+    # Continue the sell signal through settlement; no pending-order carry is assumed.
+    signals = np.array([2, 0, 0, 0, 1, 1])
 
     metrics, eq_df, trades_df = simulate_vietnam_trading(
         df=df,
@@ -98,9 +99,9 @@ def test_t2_settlement_restriction():
 
     # Lệnh Mua khớp tại bar 1
     assert buy_trades.iloc[0]["exec_date"] == df.iloc[1]["Date"].strftime("%Y-%m-%d")
-    # Lệnh Bán chỉ được khớp tại bar 3 (không phải bar 2 vì T+2!)
-    assert sell_trades.iloc[0]["exec_date"] == df.iloc[3]["Date"].strftime("%Y-%m-%d")
-    assert sell_trades.iloc[0]["holding_days"] == 2.0
+    # Open-only execution waits until the morning after the T+2 settlement session.
+    assert sell_trades.iloc[0]["exec_date"] == df.iloc[4]["Date"].strftime("%Y-%m-%d")
+    assert sell_trades.iloc[0]["holding_days"] == 3.0
 
 
 def test_transaction_fee_and_tax_deductions():
@@ -108,8 +109,8 @@ def test_transaction_fee_and_tax_deductions():
     Kiểm tra tính chính xác của công thức trừ phí mua 0.15%, phí bán 0.15% và thuế bán 0.10%.
     """
     df = _create_sample_market_df(n_bars=6, start_price=100.0)
-    # Ngày 0: Mua, Ngày 1: Giữ, Ngày 2: Bán (khớp ngày 3, thỏa mãn T+2)
-    signals = np.array([2, 1, 0, 1, 1, 1])
+    # Buy at Open 1, sell at Open 4 after afternoon settlement on bar 3.
+    signals = np.array([2, 1, 1, 0, 1, 1])
 
     metrics, eq_df, trades_df = simulate_vietnam_trading(
         df=df,
@@ -698,6 +699,8 @@ def test_run_portfolio_backtest_sample():
 def test_backtest_symbol_oos_and_all_symbols():
     """Kiểm tra backtest_symbol_oos và backtest_all_symbols với mock test window."""
     from unittest.mock import patch
+    from types import SimpleNamespace
+    from sklearn.preprocessing import StandardScaler
     from vn_stock.features import FEATURE_COLS
 
     dates = pd.date_range("2024-01-01", periods=20, freq="B")
@@ -728,7 +731,10 @@ def test_backtest_symbol_oos_and_all_symbols():
         patch("vn_stock.data_ingestion.load_panel_dataset", return_value=pd.DataFrame()),
         patch("vn_stock.features.compute_features_per_symbol", return_value=pd.DataFrame()),
         patch("vn_stock.splitting_data.apply_study_window", return_value=pd.DataFrame()),
-        patch("vn_stock.splitting_data.create_multi_day_labels", return_value=pd.DataFrame()),
+        patch("vn_stock.splitting_data.create_multi_day_labels", return_value=mock_test_df),
+        patch("vn_stock.modeling.predict.load_prediction_snapshot", return_value=(
+            SimpleNamespace(predict=lambda rows: np.tile([0.1, 0.8, 0.1], (len(rows), 1))),
+            StandardScaler().fit(mock_test_df[FEATURE_COLS]), {})),
         patch("vn_stock.splitting_data.prepare_production_training_data", return_value=mock_splits),
     ):
         res_vic = backtest_symbol_oos(symbol="VIC", model_type="lightgbm")
@@ -746,6 +752,8 @@ def test_backtest_symbol_oos_and_all_symbols():
 def test_backtest_symbol_oos_custom_parameters():
     """Kiểm tra backtest_symbol_oos nhận và áp dụng đầy đủ các tham số tùy biến (fee, tax, lot, settlement, execution_price, thresholds)."""
     from unittest.mock import patch
+    from types import SimpleNamespace
+    from sklearn.preprocessing import StandardScaler
     from vn_stock.features import FEATURE_COLS
 
     dates = pd.date_range("2024-01-01", periods=20, freq="B")
@@ -776,7 +784,10 @@ def test_backtest_symbol_oos_custom_parameters():
         patch("vn_stock.data_ingestion.load_panel_dataset", return_value=pd.DataFrame()),
         patch("vn_stock.features.compute_features_per_symbol", return_value=pd.DataFrame()),
         patch("vn_stock.splitting_data.apply_study_window", return_value=pd.DataFrame()),
-        patch("vn_stock.splitting_data.create_multi_day_labels", return_value=pd.DataFrame()),
+        patch("vn_stock.splitting_data.create_multi_day_labels", return_value=mock_test_df),
+        patch("vn_stock.modeling.predict.load_prediction_snapshot", return_value=(
+            SimpleNamespace(predict=lambda rows: np.tile([0.1, 0.8, 0.1], (len(rows), 1))),
+            StandardScaler().fit(mock_test_df[FEATURE_COLS]), {})),
         patch("vn_stock.splitting_data.prepare_production_training_data", return_value=mock_splits),
     ):
         res = backtest_symbol_oos(
@@ -806,7 +817,7 @@ def test_backtest_symbol_oos_custom_parameters():
 def test_slippage_rate_impact():
     """Kiểm tra tác động của trượt giá (Slippage): mua đắt hơn, bán rẻ hơn và giảm lợi nhuận ròng."""
     df = _create_sample_market_df(n_bars=6, start_price=100.0)
-    signals = np.array([2, 1, 0, 1, 1, 1])
+    signals = np.array([2, 1, 1, 0, 1, 1])
 
     # 1. Chạy không trượt giá (slippage = 0.0)
     m_no_slip, _, tr_no_slip = simulate_vietnam_trading(

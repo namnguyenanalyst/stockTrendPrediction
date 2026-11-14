@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Bộ nhớ đệm mô hình thread-safe trong RAM kèm mtime polling và fallback khi file hỏng
 _cache_lock = threading.Lock()
-_model_cache: dict[tuple, tuple[Any, Any, dict[str, int]]] = {}
+_model_cache: dict[tuple, tuple[Any, Any, dict[str, int], dict]] = {}
 
 
 def clear_model_cache() -> None:
@@ -48,7 +48,12 @@ from vn_stock.data_ingestion import (
     load_local_data,
     load_panel_dataset,
 )
-from vn_stock.features import ALL_FEATURE_COLS, FEATURE_COLS, compute_features_per_symbol
+from vn_stock.features import (
+    ALL_FEATURE_COLS,
+    FEATURE_COLS,
+    compute_features_per_symbol,
+    transform_model_features,
+)
 from vn_stock.market_session import (
     get_future_trading_days,
     get_target_market_date,
@@ -69,7 +74,7 @@ def _resolve_artifact_paths(
         )
 
     scaler_path = models_dir / f"production_scaler_t{horizon}.pkl"
-    if not scaler_path.exists():
+    if not scaler_path.exists() and horizon == 3:
         scaler_path = models_dir / "scaler_window3.pkl"
     if not scaler_path.exists():
         raise FileNotFoundError(
@@ -78,7 +83,7 @@ def _resolve_artifact_paths(
 
     if m_type == "lstm":
         model_path = models_dir / f"production_lstm_t{horizon}.pth"
-        if not model_path.exists():
+        if not model_path.exists() and horizon == 3:
             model_path = models_dir / "global_lstm_classifier.pth"
         if not model_path.exists():
             raise FileNotFoundError(
@@ -90,7 +95,8 @@ def _resolve_artifact_paths(
     prod_pkl = models_dir / f"production_lgb_t{horizon}.pkl"
     def_txt = models_dir / "lightgbm_classifier.txt"
     def_pkl = models_dir / "lightgbm_classifier.pkl"
-    for candidate in [prod_txt, prod_pkl, def_txt, def_pkl]:
+    candidates = [prod_txt, prod_pkl] + ([def_txt, def_pkl] if horizon == 3 else [])
+    for candidate in candidates:
         if candidate.exists():
             return scaler_path, candidate
     raise FileNotFoundError(
@@ -138,60 +144,63 @@ def _load_raw_artifacts(
     raise ValueError(f"Loại mô hình không hợp lệ: '{model_type}'")
 
 
-def load_prediction_artifacts(
+def load_prediction_snapshot(
     model_type: str = "lstm",
     models_dir: Path = MODELS_DIR,
     horizon: int = 3,
     hidden_size: int = DEFAULT_LSTM_HIDDEN_SIZE,
     num_layers: int = DEFAULT_LSTM_NUM_LAYERS,
-) -> tuple[Any, Any]:
-    """
-    Nạp mô hình đã huấn luyện (LSTM hoặc LightGBM) và Scaler chuẩn hóa từ thư mục models/
-    kết hợp ModelCache in-memory thread-safe, mtime polling và fallback an toàn khi file hỏng.
-    """
+) -> tuple[Any, Any, dict]:
+    """Load model/scaler/metadata from the same committed generation."""
+    import json
+
+    from vn_stock.modeling.artifacts import resolve_bundle
+
     models_dir = Path(models_dir)
-    scaler_path, model_path = _resolve_artifact_paths(model_type, models_dir, horizon)
+    model_type = model_type.lower()
+    if model_type.lower() not in ("lightgbm", "lgb", "lstm"):
+        raise ValueError(f"Loại mô hình không hợp lệ: {model_type}")
     cache_key = (model_type.lower(), horizon, str(models_dir.resolve()), hidden_size, num_layers)
-
-    current_mtimes = {
-        str(scaler_path): scaler_path.stat().st_mtime_ns,
-        str(model_path): model_path.stat().st_mtime_ns,
-    }
-
-    # 1. Fast path: Kiểm tra cache in-memory không khóa nếu mtime không đổi (<1ms)
-    cached = _model_cache.get(cache_key)
-    if cached is not None:
-        cached_model, cached_scaler, cached_mtimes = cached
-        if cached_mtimes == current_mtimes:
-            return cached_model, cached_scaler
-
-    # 2. Slow path: Khóa thread để nạp mới hoặc reload khi mtime thay đổi
     with _cache_lock:
         cached = _model_cache.get(cache_key)
-        if cached is not None:
-            cached_model, cached_scaler, cached_mtimes = cached
-            if cached_mtimes == current_mtimes:
-                return cached_model, cached_scaler
-
         try:
-            new_model, new_scaler = _load_raw_artifacts(
-                model_type=model_type,
-                scaler_path=scaler_path,
-                model_path=model_path,
-                hidden_size=hidden_size,
-                num_layers=num_layers,
+            pointer = models_dir / f"production_bundle_t{horizon}.json"
+            if pointer.exists():
+                files = resolve_bundle(models_dir, horizon)
+                scaler_path = files[f"production_scaler_t{horizon}.pkl"]
+                name = f"production_lstm_t{horizon}.pth" if model_type == "lstm" else f"production_lgb_t{horizon}.txt"
+                model_path = files.get(name) or files[f"production_lgb_t{horizon}.pkl"]
+                info_path = files[f"production_training_info_t{horizon}.json"]
+            else:
+                scaler_path, model_path = _resolve_artifact_paths(model_type, models_dir, horizon)
+                info_path = models_dir / f"production_training_info_t{horizon}.json"
+            paths = [scaler_path, model_path] + ([info_path] if info_path.exists() else [])
+            mtimes = {str(p): p.stat().st_mtime_ns for p in paths}
+            if cached is not None and cached[2] == mtimes:
+                return cached[0], cached[1], cached[3]
+            info = json.loads(info_path.read_text()) if info_path.exists() else {}
+            model, scaler = _load_raw_artifacts(
+                model_type=model_type, scaler_path=scaler_path, model_path=model_path,
+                hidden_size=info.get("hidden_size", hidden_size),
+                num_layers=info.get("num_layers", num_layers),
             )
-            _model_cache[cache_key] = (new_model, new_scaler, current_mtimes)
-            logger.info("Đã nạp artifact mới vào ModelCache: %s", cache_key)
-            return new_model, new_scaler
-        except Exception as exc:
-            if cached is not None:
-                logger.error(
-                    "Nạp artifact mới từ đĩa thất bại do file hỏng (%s). Kích hoạt fallback giữ model cũ trong RAM.",
-                    exc,
-                )
-                return cached[0], cached[1]
-            raise
+            _model_cache[cache_key] = (model, scaler, mtimes, info)
+            return model, scaler, info
+        except Exception:
+            if cached is None:
+                raise
+            logger.exception("Artifact reload failed; retaining the complete cached generation.")
+            return cached[0], cached[1], cached[3]
+
+
+def load_prediction_artifacts(
+    model_type: str = "lstm", models_dir: Path = MODELS_DIR, horizon: int = 3,
+    hidden_size: int = DEFAULT_LSTM_HIDDEN_SIZE, num_layers: int = DEFAULT_LSTM_NUM_LAYERS,
+) -> tuple[Any, Any]:
+    model, scaler, _ = load_prediction_snapshot(
+        model_type, models_dir, horizon, hidden_size, num_layers,
+    )
+    return model, scaler
 
 
 def prepare_inference_features(
@@ -302,23 +311,16 @@ def prepare_inference_features(
     if "Symbol" not in df_raw.columns:
         df_raw["Symbol"] = clean_sym
 
+    df_raw = df_raw[pd.to_datetime(df_raw["Date"]) <= target_dt].copy()
+
     # Tính toán bộ đặc trưng
     df_feat = compute_features_per_symbol(df_raw, drop_na=True)
     if len(df_feat) < seq_length:
-        df_feat = compute_features_per_symbol(df_raw, drop_na=False).bfill().dropna(subset=FEATURE_COLS)
-        if len(df_feat) < seq_length:
-            raise ValueError(
-                f"Mã {clean_sym} chỉ có {len(df_feat)} phiên hợp lệ, không đủ tối thiểu seq_length={seq_length}."
-            )
-
-    # Bảo vệ làm sạch tuyệt đối các giá trị inf/nan trước khi đưa vào mô hình suy luận
-    df_feat[FEATURE_COLS] = (
-        df_feat[FEATURE_COLS]
-        .replace([np.inf, -np.inf], np.nan)
-        .ffill()
-        .bfill()
-        .fillna(0.0)
-    )
+        raise ValueError(
+            f"Mã {clean_sym} chỉ có {len(df_feat)} phiên hợp lệ, không đủ tối thiểu seq_length={seq_length}."
+        )
+    if not np.isfinite(df_feat[FEATURE_COLS].to_numpy()).all():
+        raise ValueError(f"Mã {clean_sym} có đặc trưng không hữu hạn.")
 
     latest_row = df_feat.iloc[-1]
     latest_close = float(latest_row["Close"])
@@ -369,20 +371,21 @@ def predict_trend(
         - summary_guidance: Khuyến nghị thực chiến cho nhà đầu tư
     """
     clean_sym = symbol.upper()
-    model, scaler = load_prediction_artifacts(
+    model, scaler, training_info = load_prediction_snapshot(
         model_type=model_type,
         models_dir=models_dir,
         horizon=horizon_days,
         hidden_size=hidden_size,
         num_layers=num_layers,
     )
+    if training_info.get("seq_length", seq_length) != seq_length:
+        raise ValueError("Requested sequence length differs from the trained artifact.")
     df_feat, latest_close, latest_date = prepare_inference_features(
         clean_sym, seq_length=seq_length
     )
 
     # Chuẩn hóa 13 đặc trưng số học bằng scaler (Symbol_Code giữ nguyên)
-    scaled_df = df_feat.copy()
-    scaled_df[FEATURE_COLS] = scaler.transform(df_feat[FEATURE_COLS])
+    scaled_df = transform_model_features(df_feat, scaler)
 
     if model_type.lower() == "lstm":
         import torch
@@ -479,19 +482,6 @@ def predict_trend(
         guidance = "Cảnh báo GIẢM: Rủi ro điều chỉnh trong chu kỳ nắm giữ T+3. Không mở vị thế mua mới; ưu tiên bảo toàn vốn."
     else:
         guidance = "Thị trường ĐI NGANG: Xu hướng tích lũy trong chu kỳ T+3. Khuyến nghị giữ tiền mặt và quan sát điểm bứt phá."
-
-    training_info_file = models_dir / f"production_training_info_t{horizon_days}.json"
-    if not training_info_file.exists():
-        training_info_file = models_dir / "production_training_info.json"
-    training_info = None
-    if training_info_file.exists():
-        try:
-            import json
-
-            with open(training_info_file, "r", encoding="utf-8") as f:
-                training_info = json.load(f)
-        except Exception:
-            pass
 
     session_info = get_target_market_session_info()
 

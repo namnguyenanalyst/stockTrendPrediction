@@ -30,6 +30,23 @@ FEATURE_COLS = [
 ALL_FEATURE_COLS = FEATURE_COLS + ["Symbol_Code"]
 
 
+def transform_model_features(df: pd.DataFrame, scaler) -> pd.DataFrame:
+    """Apply the fitted training schema without imputing from future observations."""
+    missing = set(ALL_FEATURE_COLS) - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing model features: {sorted(missing)}")
+    fitted_names = getattr(scaler, "feature_names_in_", FEATURE_COLS)
+    if list(fitted_names) != FEATURE_COLS:
+        raise ValueError("Scaler feature order does not match FEATURE_COLS.")
+    if not np.isfinite(df[ALL_FEATURE_COLS].to_numpy(dtype=float)).all():
+        raise ValueError("Model features must be finite; no future/backward filling is allowed.")
+    result = df.copy()
+    result[FEATURE_COLS] = scaler.transform(df[FEATURE_COLS])
+    if not np.isfinite(result[FEATURE_COLS].to_numpy()).all():
+        raise ValueError("Scaler produced nonfinite model features.")
+    return result
+
+
 def _compute_for_single_stock(group: pd.DataFrame) -> pd.DataFrame:
     """Tính toán 12 đặc trưng tương đối cho một mã cổ phiếu độc lập (tránh data leakage)."""
     g = group.sort_values("Date").copy()

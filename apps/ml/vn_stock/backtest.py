@@ -16,7 +16,6 @@ import argparse
 from dataclasses import dataclass, field
 import logging
 from pathlib import Path
-import pickle
 from typing import Any
 
 import numpy as np
@@ -63,7 +62,7 @@ class PositionLot:
     cost_basis: float  # Tổng giá trị mua + phí mua phân bổ
     buy_idx: int  # Chỉ số phiên giao dịch thực thi lệnh mua
     buy_date: str  # Ngày khớp lệnh mua
-    settled_idx: int  # Chỉ số phiên giao dịch sớm nhất được phép bán (buy_idx + settlement_delay)
+    settled_idx: int  # Afternoon settlement session; open execution must wait one further session.
     highest_price: float = 0.0  # Giá đỉnh cao nhất kể từ lúc mua (phục vụ Trailing Stop)
 
 
@@ -180,9 +179,9 @@ def calculate_financial_metrics(
 
     # 1. CAGR (Annualized Return)
     if final_equity > 0 and n_days > 1 and initial_capital > 0:
-        cagr_pct = ((final_equity / initial_capital) ** (252.0 / n_days) - 1.0) * 100.0
+        cagr_pct = ((final_equity / initial_capital) ** (252.0 / (n_days - 1)) - 1.0) * 100.0
     else:
-        cagr_pct = -100.0
+        cagr_pct = -100.0 if final_equity <= 0 else 0.0
 
     # 2. Lợi suất hàng ngày & Lãi suất phi rủi ro theo ngày
     daily_returns = equity_series.pct_change().dropna()
@@ -201,8 +200,7 @@ def calculate_financial_metrics(
         sharpe_ratio = 0.0
 
     # 5. Tỷ số Sortino năm hóa (Downside Deviation so với rf_daily)
-    downside_returns = excess_returns[excess_returns < 0]
-    downside_std = np.sqrt(np.mean(downside_returns**2)) if len(downside_returns) > 0 else 0.0
+    downside_std = np.sqrt(np.mean(np.minimum(excess_returns, 0.0)**2)) if len(excess_returns) else 0.0
     if downside_std > 1e-9:
         sortino_ratio = float(excess_returns.mean() / downside_std * np.sqrt(252.0))
     else:
@@ -291,6 +289,16 @@ def calculate_financial_metrics(
     )
 
 
+def trading_prices_vnd(df: pd.DataFrame, price_unit: str) -> pd.DataFrame:
+    """Convert ingestion prices explicitly; the cash engine always operates in VND."""
+    if price_unit not in ("VND", "kVND"):
+        raise ValueError("price_unit must be VND or kVND.")
+    result = df.copy()
+    if price_unit == "kVND":
+        result[["Open", "High", "Low", "Close"]] *= 1000.0
+    return result
+
+
 def simulate_vietnam_trading(
     df: pd.DataFrame,
     signals: np.ndarray,
@@ -315,7 +323,7 @@ def simulate_vietnam_trading(
     1. Không nhìn trước tương lai: Tín hiệu sinh ra tại cuối phiên t, lệnh thực thi vào phiên t+1.
     2. Khớp lệnh tại Open_{t+1} (hoặc Close_{t+1}) có cộng/trừ tỷ lệ trượt giá (slippage).
     3. Kiểm soát thanh toán T+2: Theo dõi từng lô mua (PositionLot), chỉ cho phép bán khi
-       phiên hiện tại >= phiên_mua + settlement_delay (mặc định 2 phiên).
+       Close phiên_mua + settlement_delay, hoặc Open phiên tiếp theo (T+2 về buổi chiều).
     4. Tích hợp Quản trị rủi ro chủ động (DNSE Risk Rules):
        - Stop Loss (Cắt lỗ cố định): Bán ngay khi chạm ngưỡng lỗ quy định.
        - Take Profit (Chốt lời mục tiêu): Chốt lãi khi đạt lợi nhuận kỳ vọng.
@@ -324,7 +332,13 @@ def simulate_vietnam_trading(
     5. Khấu trừ chi phí thực tế: Phí mua (0.15%), Phí bán (0.15%), Thuế bán (0.10%).
     6. Khớp lệnh theo lô chẵn 100 cổ phiếu và bảo toàn số dư tiền mặt lẻ.
     """
-    df_sorted = df.sort_values("Date").reset_index(drop=True)
+    if df.empty or not pd.to_datetime(df["Date"]).is_monotonic_increasing:
+        raise ValueError("Market rows must be nonempty and sorted (tăng dần) by Date.")
+    if pd.to_datetime(df["Date"]).duplicated().any():
+        raise ValueError("Market dates must be unique.")
+    if execution_price not in ("open", "close") or settlement_delay < 0:
+        raise ValueError("Invalid execution_price or settlement_delay.")
+    df_sorted = df.reset_index(drop=True)
     n_bars = len(df_sorted)
     if n_bars != len(signals):
         raise ValueError(
@@ -368,8 +382,10 @@ def simulate_vietnam_trading(
                 lot.highest_price = base_exec_price
 
         # Kiểm tra điều kiện bán đối với các lô đã về tài khoản (T+2)
-        settled_lots = [lot for lot in inventory if lot.settled_idx <= exec_idx]
-        unsettled_lots = [lot for lot in inventory if lot.settled_idx > exec_idx]
+        # T+2 settles in the afternoon; an open-only engine must wait another bar.
+        available_idx = exec_idx - int(execution_price == "open" and settlement_delay > 0)
+        settled_lots = [lot for lot in inventory if lot.settled_idx <= available_idx]
+        unsettled_lots = [lot for lot in inventory if lot.settled_idx > available_idx]
 
         should_sell = False
         sell_reason = "SIGNAL_SELL"
@@ -509,11 +525,12 @@ def simulate_vietnam_trading(
         )
 
     # Đóng vị thế vào ngày cuối cùng nếu close_at_end=True
-    if close_at_end and len(inventory) > 0:
+    final_settled = [lot for lot in inventory if lot.settled_idx <= n_bars - 1]
+    if close_at_end and final_settled:
         final_idx = n_bars - 1
         final_date = dates[final_idx]
-        final_close = closes[final_idx]
-        sell_shares = sum(lot.shares for lot in inventory)
+        final_close = closes[final_idx] * (1.0 - slippage_rate)
+        sell_shares = sum(lot.shares for lot in final_settled)
 
         gross = sell_shares * final_close
         fee = gross * fee_rate
@@ -521,13 +538,13 @@ def simulate_vietnam_trading(
         net_proceeds = gross - fee - tax
         cash += net_proceeds
 
-        total_cost_basis = sum(lot.cost_basis for lot in inventory)
+        total_cost_basis = sum(lot.cost_basis for lot in final_settled)
         realized_pnl = net_proceeds - total_cost_basis
         realized_ret_pct = (
             (realized_pnl / total_cost_basis * 100.0) if total_cost_basis > 0 else 0.0
         )
         avg_holding = (
-            sum((final_idx - lot.buy_idx) * lot.shares for lot in inventory) / sell_shares
+            sum((final_idx - lot.buy_idx) * lot.shares for lot in final_settled) / sell_shares
         )
 
         trades.append(
@@ -551,13 +568,13 @@ def simulate_vietnam_trading(
             )
         )
         trade_id_counter += 1
-        inventory.clear()
+        inventory = [lot for lot in inventory if lot.settled_idx > final_idx]
 
         # Cập nhật giá trị phiên cuối
         equity_records[-1]["Cash"] = cash
-        equity_records[-1]["Shares"] = 0
-        equity_records[-1]["Position_Value"] = 0.0
-        equity_records[-1]["Total_Equity"] = cash
+        equity_records[-1]["Shares"] = sum(lot.shares for lot in inventory)
+        equity_records[-1]["Position_Value"] = equity_records[-1]["Shares"] * closes[final_idx]
+        equity_records[-1]["Total_Equity"] = cash + equity_records[-1]["Position_Value"]
 
     eq_df = pd.DataFrame(equity_records)
     eq_df["Open"] = opens
@@ -576,8 +593,8 @@ def simulate_vietnam_trading(
     bh_series = [initial_capital]
 
     for j in range(1, n_bars):
-        if j == n_bars - 1 and close_at_end:
-            final_p = closes[j]
+        if j == n_bars - 1 and close_at_end and j >= 1 + settlement_delay:
+            final_p = closes[j] * (1.0 - slippage_rate)
             net_bh = bh_shares_max * final_p * (1.0 - fee_rate - tax_rate)
             bh_series.append(bh_cash + net_bh)
         else:
@@ -737,11 +754,11 @@ def run_random_baseline(
     class_probs: tuple[float, float, float] = (0.25, 0.50, 0.25),
     **kwargs: Any,
 ) -> BacktestResult:
-    """Mô phỏng chiến lược phát tín hiệu ngẫu nhiên theo phân phối lớp thực nghiệm."""
-    np.random.seed(seed)
+    """Mô phỏng tín hiệu ngẫu nhiên độc lập theo xác suất lớp được chỉ định."""
+    rng = np.random.default_rng(seed)
     n_bars = len(df)
     classes = [0, 1, 2]
-    signals = np.random.choice(classes, size=n_bars, p=list(class_probs))
+    signals = rng.choice(classes, size=n_bars, p=list(class_probs))
 
     return run_backtest(
         df=df,
@@ -751,6 +768,14 @@ def run_random_baseline(
         strategy_name=f"Random_Baseline_Seed{seed}",
         **kwargs,
     )
+
+
+def monte_carlo_tail_probability(samples, observed) -> float:
+    """Plus-one right-tail estimate, conditional on the specified simulation null."""
+    values = np.asarray(samples, dtype=float)
+    if not len(values) or not np.isfinite(values).all() or not np.isfinite(observed):
+        raise ValueError("Monte Carlo statistics must be finite and nonempty.")
+    return float((1 + np.count_nonzero(values >= observed)) / (len(values) + 1))
 
 
 def run_monte_carlo_random_test(
@@ -763,21 +788,25 @@ def run_monte_carlo_random_test(
     **kwargs: Any,
 ) -> dict[str, Any]:
     """
-    Thực hiện kiểm định Monte Carlo mô phỏng n_simulations đường chạy tín hiệu ngẫu nhiên:
-    - Tính khoảng tin cậy 90% (5th - 95th percentile) cho Sharpe Ratio, ROI, MDD.
-    - Đánh giá giá trị p-value thực nghiệm để kiểm chứng độ tin cậy khoa học của AI.
+    Mô phỏng n_simulations đường tín hiệu độc lập theo phân phối lớp chỉ định.
+    Phân vị 5% và 95% mô tả phân phối đối chứng, không phải khoảng tin cậy
+    của hiệu năng AI. Xác suất đuôi chỉ có ý nghĩa dưới giả thuyết đối chứng này.
     """
-    np.random.seed(seed)
+    probabilities = np.asarray(class_probs, dtype=float)
+    if (not isinstance(n_simulations, (int, np.integer)) or n_simulations < 1
+            or probabilities.shape != (3,) or not np.isfinite(probabilities).all()
+            or (probabilities < 0).any() or not np.isclose(probabilities.sum(), 1)):
+        raise ValueError("Positive simulation count and three valid class probabilities required.")
+    rng = np.random.default_rng(seed)
     n_bars = len(df)
     classes = [0, 1, 2]
 
     mc_returns = []
     mc_sharpes = []
     mc_mdds = []
-    mc_win_rates = []
 
     for _ in range(n_simulations):
-        rand_signals = np.random.choice(classes, size=n_bars, p=list(class_probs))
+        rand_signals = rng.choice(classes, size=n_bars, p=probabilities)
         res = run_backtest(
             df=df,
             signals=rand_signals,
@@ -788,7 +817,6 @@ def run_monte_carlo_random_test(
         mc_returns.append(res.metrics.total_return_pct)
         mc_sharpes.append(res.metrics.sharpe_ratio)
         mc_mdds.append(res.metrics.max_drawdown_pct)
-        mc_win_rates.append(res.metrics.win_rate_pct)
 
     arr_ret = np.array(mc_returns)
     arr_shp = np.array(mc_sharpes)
@@ -797,6 +825,12 @@ def run_monte_carlo_random_test(
     out = {
         "symbol": symbol,
         "n_simulations": n_simulations,
+        "seed": seed,
+        "null_model": "iid_class_signals",
+        "class_probabilities": probabilities.tolist(),
+        "p_value_method": "plus_one_right_tail_conditional_on_iid_null",
+        "simulations": [{"roi": roi, "sharpe": sharpe, "mdd": mdd}
+                        for roi, sharpe, mdd in zip(mc_returns, mc_sharpes, mc_mdds)],
         "roi_stats": {
             "mean": round(float(arr_ret.mean()), 2),
             "std": round(float(arr_ret.std()), 2),
@@ -821,8 +855,8 @@ def run_monte_carlo_random_test(
     if ai_result is not None:
         ai_ret = ai_result.metrics.total_return_pct
         ai_shp = ai_result.metrics.sharpe_ratio
-        p_val_ret = float(np.mean(arr_ret >= ai_ret))
-        p_val_shp = float(np.mean(arr_shp >= ai_shp))
+        p_val_ret = monte_carlo_tail_probability(arr_ret, ai_ret)
+        p_val_shp = monte_carlo_tail_probability(arr_shp, ai_shp)
         out["ai_comparison"] = {
             "ai_roi": ai_ret,
             "ai_sharpe": ai_shp,
@@ -950,22 +984,25 @@ def backtest_symbol_oos(
     stop_loss_pct: float | None = None,
     trailing_stop_pct: float | None = None,
     val_buffer_days: int = 40,
+    price_unit: str = "kVND",
 ) -> BacktestResult:
     """
-    Thực hiện Backtest tự động trên tập kiểm thử Out-of-Sample thực chiến (Validation Buffer)
+    Legacy entry point: simulate on the model-selection Validation Buffer (not independent OOS)
     sử dụng mô hình AI và Scaler đã lưu trong models/.
     """
+    from vn_stock.config import (
+        DEFAULT_HORIZON_DAYS,
+        DEFAULT_SEQ_LENGTH,
+        DEFAULT_TREND_THRESHOLD_3D,
+    )
     from vn_stock.data_ingestion import load_panel_dataset
     from vn_stock.features import (
         ALL_FEATURE_COLS,
-        FEATURE_COLS,
         compute_features_per_symbol,
     )
-    from vn_stock.config import DEFAULT_HORIZON_DAYS, DEFAULT_TREND_THRESHOLD_3D
     from vn_stock.splitting_data import (
         apply_study_window,
         create_multi_day_labels,
-        prepare_production_training_data,
     )
 
     clean_sym = symbol.upper()
@@ -976,65 +1013,42 @@ def backtest_symbol_oos(
     df_labeled = create_multi_day_labels(
         df_study, horizon=DEFAULT_HORIZON_DAYS, threshold=DEFAULT_TREND_THRESHOLD_3D
     )
-    splits = prepare_production_training_data(df_labeled, val_buffer_days=val_buffer_days)
-    val_scaled = splits["val"].copy()
-
-    sym_df = (
-        val_scaled[val_scaled["Symbol"] == clean_sym].copy().sort_values("Date").reset_index(drop=True)
-    )
+    validation_dates = np.sort(df_labeled["Date"].unique())[-val_buffer_days:]
+    sym_df = df_labeled[(df_labeled["Symbol"] == clean_sym)
+                        & df_labeled["Date"].isin(validation_dates)].sort_values("Date").reset_index(drop=True)
     if sym_df.empty:
         raise ValueError(f"Không tìm thấy dữ liệu cho mã {clean_sym} trong tập kiểm thử.")
 
-    sym_scaled = sym_df.copy()
+    from vn_stock.features import create_multivariate_sequences, transform_model_features
+    from vn_stock.modeling.predict import load_prediction_snapshot
 
-    if model_type.lower() == "lightgbm":
-        import lightgbm as lgb
-
-        lgb_file = models_dir / "production_lgb_t3.txt"
-        if not lgb_file.exists():
-            lgb_file = models_dir / "lightgbm_classifier.txt"
-        booster = lgb.Booster(model_file=str(lgb_file))
-        probs = booster.predict(sym_scaled[ALL_FEATURE_COLS])
+    model, scaler, info = load_prediction_snapshot(model_type, models_dir)
+    # Split construction identifies dates only; inference must use the persisted scaler.
+    raw_symbol = sym_df.copy()
+    sym_scaled = transform_model_features(raw_symbol, scaler)
+    sym_df = raw_symbol.reset_index(drop=True)
+    if model_type.lower() in ("lightgbm", "lgb"):
+        probs = (model.predict_proba(sym_scaled[ALL_FEATURE_COLS])
+                 if hasattr(model, "predict_proba") else model.predict(sym_scaled[ALL_FEATURE_COLS]))
     elif model_type.lower() == "lstm":
         import torch
-
-        from vn_stock.features import create_multivariate_sequences
-        from vn_stock.modeling.model import GlobalLSTMClassifier
-
-        warmup_val = splits["val_warmup"]
-        xs_te, _ = create_multivariate_sequences(
-            val_scaled, warmup_df=warmup_val, feature_cols=ALL_FEATURE_COLS
+        sequence_length = info.get("seq_length", DEFAULT_SEQ_LENGTH)
+        warm = df_feat[(df_feat["Symbol"] == clean_sym)
+                       & (df_feat["Date"] < sym_df["Date"].min())].tail(sequence_length - 1)
+        warm = transform_model_features(warm, scaler)
+        xs, _ = create_multivariate_sequences(
+            sym_scaled, warm, ALL_FEATURE_COLS, sequence_length,
         )
-
-        sym_mask = val_scaled["Symbol"] == clean_sym
-        xs_sym = xs_te[sym_mask.values]
-
-        device = torch.device("cpu")
-        lstm_model = GlobalLSTMClassifier(
-            input_size=len(ALL_FEATURE_COLS),
-            hidden_size=64,
-            num_layers=2,
-            num_classes=3,
-            dropout=0.2,
-        ).to(device)
-        lstm_path = models_dir / "production_lstm_t3.pth"
-        if not lstm_path.exists():
-            lstm_path = models_dir / "global_lstm_classifier.pth"
-        lstm_model.load_state_dict(
-            torch.load(lstm_path, map_location=device)
-        )
-        lstm_model.eval()
-
+        if len(xs) != len(sym_df):
+            raise ValueError("Insufficient warm-up for validation backtest.")
         with torch.no_grad():
-            x_t = torch.from_numpy(np.ascontiguousarray(xs_sym))
-            probs = lstm_model.predict_proba(x_t).numpy()
+            inputs = torch.from_numpy(np.ascontiguousarray(xs)).to(next(model.parameters()).device)
+            probs = model.predict_proba(inputs).cpu().numpy()
     else:
-        raise ValueError(
-            f"model_type '{model_type}' không hợp lệ (hỗ trợ 'lightgbm' hoặc 'lstm')."
-        )
+        raise ValueError(f"Unsupported model type: {model_type}")
 
     return run_backtest(
-        df=sym_df,
+        df=trading_prices_vnd(sym_df, price_unit),
         probabilities=probs,
         buy_prob_threshold=buy_prob_threshold,
         sell_prob_threshold=sell_prob_threshold,
@@ -1046,7 +1060,7 @@ def backtest_symbol_oos(
         lot_size=lot_size,
         settlement_delay=settlement_delay,
         execution_price=execution_price,
-        strategy_name=f"AI_{model_type.upper()}_OOS",
+        strategy_name=f"AI_{model_type.upper()}_VALIDATION",
         take_profit_pct=take_profit_pct,
         stop_loss_pct=stop_loss_pct,
         trailing_stop_pct=trailing_stop_pct,
@@ -1168,7 +1182,7 @@ def prepare_backtest_df(df: pd.DataFrame) -> pd.DataFrame:
 
     # Relative Strength RS (0 - 99.93)
     rs_60 = close.pct_change(60).fillna(0.0)
-    df_clean["RS"] = ((rs_60.rank(pct=True)) * 99.93).clip(0.0, 99.93)
+    df_clean["RS"] = ((rs_60.expanding().rank(pct=True)) * 99.93).clip(0.0, 99.93)
 
     return df_clean
 
@@ -2002,15 +2016,16 @@ def run_portfolio_backtest(
     stop_loss_pct: float | None = None,
     trailing_stop_pct: float | None = None,
     symbol_metadata: dict[str, dict[str, str]] | None = None,
+    price_unit: str = "kVND",
 ) -> dict[str, Any]:
     """
     Thực thi mô phỏng Backtesting cho danh mục đa mã (Rổ chỉ số, Ngành, hoặc Danh mục tự chọn)
     trong dải ngày xác định (tối đa 1 năm theo chuẩn DNSE), chia đều vốn (Equal-Weight).
     """
     from vn_stock.data_ingestion import fetch_stock_data, load_local_data
-    from vn_stock.features import ALL_FEATURE_COLS, FEATURE_COLS
+    from vn_stock.features import ALL_FEATURE_COLS
 
-    clean_symbols = [s.strip().upper() for s in symbols if s.strip()]
+    clean_symbols = list(dict.fromkeys(s.strip().upper() for s in symbols if s.strip()))
     if not clean_symbols:
         clean_symbols = ["VIC"]
 
@@ -2040,7 +2055,7 @@ def run_portfolio_backtest(
             else:
                 lstm_model = loaded_model
         except Exception as e:
-            logger.warning("Không thể nạp mô hình AI %s: %s", model_type, e)
+            raise ValueError(f"Requested AI model is unavailable: {model_type}") from e
 
     individual_results: dict[str, Any] = {}
     breakdown_list: list[dict[str, Any]] = []
@@ -2072,7 +2087,9 @@ def run_portfolio_backtest(
             if len(filtered_df) < 5:
                 continue
 
-            df_prepared = prepare_backtest_df(filtered_df)
+            historical_df = df_sym[df_sym["Date"] <= end_dt].sort_values("Date").reset_index(drop=True)
+            prepared_history = prepare_backtest_df(historical_df)
+            df_prepared = prepared_history[prepared_history["Date"] >= start_dt].reset_index(drop=True)
 
             ai_signals = None
             if (booster is not None or lstm_model is not None) and scaler is not None:
@@ -2092,32 +2109,29 @@ def run_portfolio_backtest(
 
                     if len(aligned_feats) == len(df_prepared):
                         feat_scaled = aligned_feats.copy()
-                        feat_scaled[FEATURE_COLS] = feat_scaled[FEATURE_COLS].bfill().ffill().fillna(0.0)
-                        feat_scaled[FEATURE_COLS] = scaler.transform(feat_scaled[FEATURE_COLS])
                         from vn_stock.config import SYMBOL_TO_CODE
 
                         feat_scaled["Symbol_Code"] = SYMBOL_TO_CODE.get(sym, 0)
                         feat_scaled["Symbol"] = sym
+                        from vn_stock.features import transform_model_features
+                        feat_scaled = transform_model_features(feat_scaled, scaler)
 
                         if booster is not None:
                             probs = booster.predict(feat_scaled[ALL_FEATURE_COLS])
                             ai_signals = np.argmax(probs, axis=1)
                         elif lstm_model is not None:
                             import torch
+
                             from vn_stock.features import create_multivariate_sequences
 
                             pre_mask = computed_feats["Date"] < filtered_df["Date"].iloc[0]
                             warm_feats = computed_feats[pre_mask].sort_values("Date").tail(19).copy()
                             if len(warm_feats) < 19:
-                                base_row = warm_feats.iloc[[0]] if len(warm_feats) > 0 else aligned_feats.iloc[[0]]
-                                pad_rows = pd.concat([base_row] * (19 - len(warm_feats)), ignore_index=True)
-                                warm_feats = pd.concat([pad_rows, warm_feats], ignore_index=True)
-
+                                raise ValueError(f"Insufficient causal LSTM warm-up for {sym}.")
                             warm_scaled = warm_feats.copy()
-                            warm_scaled[FEATURE_COLS] = warm_scaled[FEATURE_COLS].bfill().ffill().fillna(0.0)
-                            warm_scaled[FEATURE_COLS] = scaler.transform(warm_scaled[FEATURE_COLS])
                             warm_scaled["Symbol_Code"] = SYMBOL_TO_CODE.get(sym, 0)
                             warm_scaled["Symbol"] = sym
+                            warm_scaled = transform_model_features(warm_scaled, scaler)
 
                             xs, _ = create_multivariate_sequences(
                                 feat_scaled,
@@ -2133,7 +2147,7 @@ def run_portfolio_backtest(
                                     probs = lstm_model.predict_proba(xt).cpu().numpy()
                                     ai_signals = np.argmax(probs, axis=1)
                 except Exception as pred_err:
-                    logger.debug("Bỏ qua dự báo AI cho %s: %s", sym, pred_err)
+                    raise ValueError(f"AI preprocessing failed for {sym}: {pred_err}") from pred_err
 
             meta = (symbol_metadata or {}).get(sym, {})
             name = meta.get("name", f"Công ty Cổ phần {sym}")
@@ -2148,7 +2162,7 @@ def run_portfolio_backtest(
             )
 
             metrics, eq_df, trades_df = simulate_vietnam_trading(
-                df=df_prepared,
+                df=trading_prices_vnd(df_prepared, price_unit),
                 signals=signals,
                 symbol=sym,
                 initial_capital=sub_capital,
@@ -2226,7 +2240,11 @@ def run_portfolio_backtest(
         merged_eq = pd.merge(merged_eq, other_eq, on="Date", how="outer")
 
     merged_eq = merged_eq.sort_values("Date").reset_index(drop=True)
-    merged_eq = merged_eq.ffill().bfill()
+    merged_eq = merged_eq.ffill().fillna(sub_capital)
+    # A missing symbol remains in cash, rather than losing its allocated capital.
+    for missing_sym in set(clean_symbols) - set(individual_results):
+        merged_eq[f"Equity_{missing_sym}"] = sub_capital
+        merged_eq[f"BH_{missing_sym}"] = sub_capital
 
     eq_cols = [c for c in merged_eq.columns if c.startswith("Equity_")]
     bh_cols = [c for c in merged_eq.columns if c.startswith("BH_")]
@@ -2255,102 +2273,25 @@ def run_portfolio_backtest(
             }
         )
 
-    # Tính các chỉ số danh mục tổng thể
-    tot_init = float(initial_capital)
-    tot_final = float(merged_eq["Total_Equity"].iloc[-1])
-    tot_roi = ((tot_final - tot_init) / tot_init * 100.0) if tot_init > 0 else 0.0
-
-    bh_init = float(merged_eq["Benchmark_Equity"].iloc[0])
-    bh_final = float(merged_eq["Benchmark_Equity"].iloc[-1])
-    bh_roi = ((bh_final - bh_init) / bh_init * 100.0) if bh_init > 0 else 0.0
-
-    excess_roi = tot_roi - bh_roi
-    max_mdd = float(merged_eq["Drawdown_Pct"].min())
-
-    total_trades = sum(b["trades"] for b in breakdown_list)
-    total_costs = sum(b["costs"] for b in breakdown_list)
-    avg_win_rate = (
-        float(np.mean([b["win_rate_pct"] for b in breakdown_list])) if breakdown_list else 0.0
+    # Use the same unrounded equity returns and actual trade cash flows as single-symbol runs.
+    all_trades = [TradeRecord(**trade) for result in individual_results.values()
+                  for trade in result["trades"]]
+    benchmark_return = (merged_eq["Benchmark_Equity"].iloc[-1] / initial_capital - 1) * 100
+    metrics = calculate_financial_metrics(
+        merged_eq["Total_Equity"], initial_capital, all_trades,
+        buy_and_hold_return_pct=float(benchmark_return),
     )
-
-    daily_rets = merged_eq["Daily_Return"].values / 100.0
-    mean_ret = float(np.mean(daily_rets))
-    std_ret = float(np.std(daily_rets))
-    rf_daily = 0.04 / 252.0
-
-    if std_ret > 1e-6 and total_trades > 0:
-        sharpe = float((mean_ret - rf_daily) / std_ret * np.sqrt(252.0))
-    else:
-        sharpe = 0.0
-
-    downside = daily_rets[daily_rets < rf_daily]
-    down_std = float(np.std(downside)) if len(downside) > 0 else std_ret
-    if down_std > 1e-6 and total_trades > 0:
-        sortino = float((mean_ret - rf_daily) / down_std * np.sqrt(252.0))
-    else:
-        sortino = 0.0
-
-    all_realized_returns: list[float] = []
-    for ind in individual_results.values():
-        for t in ind.get("trades", []):
-            ret = t.get("realized_return_pct")
-            if ret is not None and not np.isnan(ret):
-                all_realized_returns.append(float(ret))
-
-    if all_realized_returns:
-        max_gain = float(np.max(all_realized_returns))
-        max_loss = float(np.min(all_realized_returns))
-        win_returns = [r for r in all_realized_returns if r > 0]
-        loss_returns = [r for r in all_realized_returns if r < 0]
-        avg_win = float(np.mean(win_returns)) if win_returns else 0.0
-        avg_loss = abs(float(np.mean(loss_returns))) if loss_returns else 0.0
-        rr_ratio = round(avg_win / avg_loss, 2) if avg_loss > 1e-4 else (round(avg_win, 2) if avg_win > 0 else 0.0)
-    else:
-        max_gain = 0.0
-        max_loss = 0.0
-        rr_ratio = 0.0
-
-    aggregate_metrics = {
-        "initial_capital": tot_init,
-        "final_equity": tot_final,
-        "total_return_pct": round(tot_roi, 2),
-        "cagr_pct": round(tot_roi, 2),
-        "buy_and_hold_return_pct": round(bh_roi, 2),
-        "excess_return_pct": round(excess_roi, 2),
-        "annualized_volatility_pct": round(float(std_ret * np.sqrt(252.0) * 100.0), 2),
-        "sharpe_ratio": round(sharpe, 4),
-        "sortino_ratio": round(sortino, 4),
-        "max_drawdown_pct": round(abs(max_mdd), 2),
-        "calmar_ratio": round(tot_roi / abs(max_mdd), 4) if abs(max_mdd) > 1e-6 else 0.0,
-        "var_95_pct": round(float(np.percentile(daily_rets, 5) * 100.0), 2),
-        "cvar_95_pct": (
-            round(float(np.mean(daily_rets[daily_rets <= np.percentile(daily_rets, 5)]) * 100.0), 2)
-            if len(daily_rets) > 0
-            else 0.0
-        ),
-        "win_rate_pct": round(avg_win_rate, 2),
-        "profit_factor": (
-            round(float(np.mean([b["profit_factor"] for b in breakdown_list])), 4)
-            if breakdown_list
-            else 1.0
-        ),
-        "total_trades": total_trades,
-        "winning_trades": int(round(total_trades * avg_win_rate / 100.0)),
-        "losing_trades": int(total_trades - round(total_trades * avg_win_rate / 100.0)),
-        "avg_trade_return_pct": (
-            round(float(np.mean([b["roi_pct"] / max(b["trades"], 1) for b in breakdown_list])), 2)
-            if breakdown_list
-            else 0.0
-        ),
-        "avg_holding_days": 5.0,
-        "total_fees_paid": round(total_costs * 0.6, 0),
-        "total_taxes_paid": round(total_costs * 0.4, 0),
-        "total_costs": round(total_costs, 0),
-        "cost_impact_pct": round(total_costs / tot_init * 100.0, 2),
-        "max_gain_pct": round(max_gain, 2),
-        "max_loss_pct": round(max_loss, 2),
-        "reward_risk_ratio": rr_ratio,
-    }
+    aggregate_metrics = metrics.__dict__.copy()
+    aggregate_metrics.pop("equity_curve")
+    aggregate_metrics["max_gain_pct"] = metrics.best_trade_return_pct
+    aggregate_metrics["max_loss_pct"] = metrics.worst_trade_return_pct
+    wins = [t.realized_return_pct for t in all_trades
+            if t.order_type == "SELL" and t.realized_pnl > 0]
+    losses = [t.realized_return_pct for t in all_trades
+              if t.order_type == "SELL" and t.realized_pnl < 0]
+    aggregate_metrics["reward_risk_ratio"] = (
+        round(float(np.mean(wins) / abs(np.mean(losses))), 2) if wins and losses else 0.0
+    )
 
     return {
         "aggregate_metrics": aggregate_metrics,

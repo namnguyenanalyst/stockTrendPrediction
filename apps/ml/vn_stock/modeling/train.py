@@ -12,13 +12,14 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 import argparse
 import copy
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 import logging
 from pathlib import Path
 import pickle
 from typing import Any
 
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
 from sklearn.metrics import (
@@ -28,16 +29,12 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
-from sklearn.utils.class_weight import compute_class_weight
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader, TensorDataset
-import lightgbm as lgb
 
 from vn_stock.config import (
     DEFAULT_EARLY_STOPPING_ROUNDS,
-    DEFAULT_HORIZON_DAYS,
-    DEFAULT_LABEL_THRESHOLD,
     DEFAULT_LSTM_BATCH_SIZE,
     DEFAULT_LSTM_DROPOUT,
     DEFAULT_LSTM_EPOCHS,
@@ -46,12 +43,11 @@ from vn_stock.config import (
     DEFAULT_LSTM_NUM_LAYERS,
     DEFAULT_LSTM_WEIGHT_DECAY,
     DEFAULT_SEQ_LENGTH,
-    DEFAULT_TREND_THRESHOLD_3D,
     MODELS_DIR,
     NUM_CLASSES,
     RANDOM_SEED,
 )
-from vn_stock.data_ingestion import build_panel_dataset, load_panel_dataset
+from vn_stock.data_ingestion import build_panel_dataset
 from vn_stock.features import (
     ALL_FEATURE_COLS,
     compute_features_per_symbol,
@@ -60,7 +56,6 @@ from vn_stock.features import (
 from vn_stock.modeling.model import GlobalLSTMClassifier, create_lightgbm_model
 from vn_stock.splitting_data import (
     apply_study_window,
-    create_labels_per_symbol,
     create_multi_day_labels,
     drop_ignored_labels,
     prepare_production_training_data,
@@ -72,7 +67,7 @@ logger = logging.getLogger(__name__)
 def _atomic_save_artifact(target_path: Path, write_fn: Any) -> None:
     """Ghi artifact ra file tạm .tmp_{timestamp} rồi dùng os.replace nguyên tử để chống partial-read."""
     target_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = target_path.with_name(f"{target_path.name}.tmp_{int(datetime.now().timestamp() * 1000)}")
+    tmp_path = target_path.with_name(f"{target_path.name}.tmp_{int(datetime.now(timezone.utc).timestamp() * 1000)}")
     try:
         write_fn(tmp_path)
         os.replace(tmp_path, target_path)
@@ -96,11 +91,12 @@ def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, An
         dict chứa accuracy, macro_f1, weighted_f1, precision_macro, recall_macro và confusion_matrix.
     """
     acc = float(accuracy_score(y_true, y_pred))
-    macro_f1 = float(f1_score(y_true, y_pred, average="macro", zero_division=0))
-    weighted_f1 = float(f1_score(y_true, y_pred, average="weighted", zero_division=0))
-    precision_m = float(precision_score(y_true, y_pred, average="macro", zero_division=0))
-    recall_m = float(recall_score(y_true, y_pred, average="macro", zero_division=0))
-    cm = confusion_matrix(y_true, y_pred).tolist()
+    labels = list(range(NUM_CLASSES))
+    macro_f1 = float(f1_score(y_true, y_pred, labels=labels, average="macro", zero_division=0))
+    weighted_f1 = float(f1_score(y_true, y_pred, labels=labels, average="weighted", zero_division=0))
+    precision_m = float(precision_score(y_true, y_pred, labels=labels, average="macro", zero_division=0))
+    recall_m = float(recall_score(y_true, y_pred, labels=labels, average="macro", zero_division=0))
+    cm = confusion_matrix(y_true, y_pred, labels=labels).tolist()
 
     return {
         "accuracy": acc,
@@ -122,6 +118,7 @@ def train_production_model(
     seq_length: int = DEFAULT_SEQ_LENGTH,
     save_artifacts: bool = True,
     models_dir: Path = MODELS_DIR,
+    raw_panel: pd.DataFrame | None = None,
 ) -> dict[str, Any]:
     """
     Huấn luyện mô hình thực chiến (Production Model) phục vụ dự báo trực tuyến:
@@ -133,6 +130,9 @@ def train_production_model(
     6. Lưu trữ artifacts sản xuất và cập nhật mô hình mặc định.
     """
     from vn_stock.config import DEFAULT_SYMBOLS, VN30_SYMBOLS
+
+    if min(horizon, val_buffer_days, epochs, seq_length) < 1 or threshold < 0:
+        raise ValueError("Training sizes must be positive and threshold nonnegative.")
 
     if symbols is None or (isinstance(symbols, str) and symbols.upper() in ["VN30", "ALL"]):
         target_symbols = list(VN30_SYMBOLS)
@@ -167,12 +167,14 @@ def train_production_model(
     # Bước 1: Tự động đồng bộ nến thị trường mới nhất và nạp panel dataset
     from vn_stock.data_ingestion import sync_latest_market_data
 
-    try:
-        sync_latest_market_data(symbols=target_symbols, force=False)
-    except Exception as sync_exc:
-        logger.warning("Không thể tự động đồng bộ nến mới trước khi huấn luyện: %s", sync_exc)
-
-    raw_panel = build_panel_dataset(symbols=target_symbols, force_refresh=False)
+    if raw_panel is None:
+        try:
+            sync_latest_market_data(symbols=target_symbols, force=False)
+        except Exception as sync_exc:
+            logger.warning("Không thể tự động đồng bộ nến mới trước khi huấn luyện: %s", sync_exc)
+        raw_panel = build_panel_dataset(symbols=target_symbols, force_refresh=False)
+    else:
+        raw_panel = raw_panel[raw_panel["Symbol"].isin(target_symbols)].copy()
     feat_df = compute_features_per_symbol(raw_panel, drop_na=True)
     study_df = apply_study_window(feat_df)
 
@@ -202,6 +204,8 @@ def train_production_model(
     # Bước 4: Huấn luyện LightGBM
     X_tr_lgb, y_tr_lgb = drop_ignored_labels(train_df[ALL_FEATURE_COLS], train_df["Label"].values)
     X_va_lgb, y_va_lgb = drop_ignored_labels(val_df[ALL_FEATURE_COLS], val_df["Label"].values)
+    if set(np.unique(y_tr_lgb)) != set(range(NUM_CLASSES)):
+        raise ValueError("Training requires all three classes to preserve probability-column semantics.")
 
     lgb_model = create_lightgbm_model()
     lgb_model.fit(
@@ -252,16 +256,20 @@ def train_production_model(
         dropout=DEFAULT_LSTM_DROPOUT,
     ).to(device)
 
-    classes = np.unique(y_tr_seq)
-    weights = compute_class_weight(class_weight="balanced", classes=classes, y=y_tr_seq)
+    if not len(y_tr_seq) or not len(y_va_seq):
+        raise ValueError("Insufficient valid sequences for training/validation.")
+    counts = np.bincount(y_tr_seq, minlength=NUM_CLASSES)
+    weights = np.divide(len(y_tr_seq), NUM_CLASSES * counts,
+                        out=np.ones(NUM_CLASSES, dtype=float), where=counts > 0)
     class_weights = torch.tensor(weights, dtype=torch.float32).to(device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = optim.Adam(lstm_model.parameters(), lr=DEFAULT_LSTM_LR, weight_decay=DEFAULT_LSTM_WEIGHT_DECAY)
 
     best_vloss = float("inf")
+    best_epoch = 0
     best_weights = copy.deepcopy(lstm_model.state_dict())
 
-    for _ in range(epochs):
+    for epoch in range(epochs):
         lstm_model.train()
         for bx, by in tr_loader:
             bx, by = bx.to(device), by.to(device)
@@ -272,16 +280,17 @@ def train_production_model(
             optimizer.step()
 
         lstm_model.eval()
-        vloss, vtotal = 0.0, 0
+        vloss, vtotal = 0.0, 0.0
         with torch.no_grad():
             for bx, by in va_loader:
                 bx, by = bx.to(device), by.to(device)
                 logits = lstm_model(bx)
-                vloss += criterion(logits, by).item() * len(by)
-                vtotal += len(by)
-        avg_vloss = vloss / max(vtotal, 1)
+                vloss += nn.functional.cross_entropy(logits, by, weight=class_weights, reduction="sum").item()
+                vtotal += class_weights[by].sum().item()
+        avg_vloss = vloss / max(vtotal, 1e-12)
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
+            best_epoch = epoch + 1
             best_weights = copy.deepcopy(lstm_model.state_dict())
 
     lstm_model.load_state_dict(best_weights)
@@ -309,7 +318,7 @@ def train_production_model(
     )
     summary = {
         "status": "success",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "scope": scope_name,
         "symbols_count": len(target_symbols),
         "symbols": target_symbols,
@@ -321,6 +330,23 @@ def train_production_model(
         "train_samples": int(len(train_df)),
         "val_samples": int(len(val_df)),
         "total_samples": int(len(train_df) + len(val_df)),
+        "evaluation_role": "model_selection_validation_not_independent_test",
+        "train_fit_samples": {"lightgbm": len(y_tr_lgb), "lstm": len(y_tr_seq)},
+        "purged_samples": splits.get("purged_samples_count", 0),
+        "train_end_date": str(train_df["Date"].max().date()),
+        "validation_start_date": str(val_df["Date"].min().date()),
+        "validation_end_date": str(val_df["Date"].max().date()),
+        "seq_length": seq_length,
+        "hidden_size": DEFAULT_LSTM_HIDDEN_SIZE,
+        "num_layers": DEFAULT_LSTM_NUM_LAYERS,
+        "optimizer": "Adam",
+        "seed": RANDOM_SEED,
+        "epochs_completed": epochs,
+        "best_lstm_epoch": best_epoch,
+        "best_lstm_validation_loss": best_vloss,
+        "lightgbm_best_iteration": int(lgb_model.best_iteration_),
+        "lightgbm_parameters": lgb_model.get_params(),
+        "train_class_counts": np.bincount(y_tr_lgb, minlength=NUM_CLASSES).tolist(),
         "lightgbm_metrics": lgb_metrics,
         "lstm_metrics": lstm_metrics,
     }
@@ -335,6 +361,15 @@ def train_production_model(
         def _write_json(p: Path, obj: Any) -> None:
             with open(p, "w", encoding="utf-8") as f:
                 json.dump(obj, f, ensure_ascii=False, indent=2)
+
+        from vn_stock.modeling.artifacts import publish_bundle
+
+        publish_bundle(models_dir, horizon, {
+            f"production_lgb_t{horizon}.txt": lambda p: lgb_model.booster_.save_model(str(p)),
+            f"production_lgb_t{horizon}.pkl": lambda p: _write_pkl(p, lgb_model),
+            f"production_lstm_t{horizon}.pth": lambda p: torch.save(lstm_model.state_dict(), p),
+            f"production_scaler_t{horizon}.pkl": lambda p: _write_pkl(p, scaler),
+        }, summary)
 
         # 1. Lưu theo tên production cụ thể qua file tạm và os.replace nguyên tử
         prod_lgb_txt = models_dir / f"production_lgb_t{horizon}.txt"

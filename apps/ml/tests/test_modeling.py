@@ -254,6 +254,7 @@ def test_train_production_model(tmp_path):
     """Kiểm tra quy trình huấn luyện lại mô hình sản xuất train_production_model."""
     dates = pd.date_range("2023-01-01", periods=250, freq="B")
     records = []
+    np.random.seed(42)
     for d in dates:
         row = {
             "Date": d,
