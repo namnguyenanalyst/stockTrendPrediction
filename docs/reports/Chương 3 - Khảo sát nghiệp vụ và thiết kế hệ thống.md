@@ -479,9 +479,9 @@ graph LR
 ```
 
 1. **Phân chia không rò rỉ ranh giới (`prepare_production_training_data`):**
-   - **Tập Train (Tích lũy lịch sử):** Bao gồm toàn bộ dữ liệu từ ngày `2023-04-03` đến trước 40 phiên gần nhất ($T-40$), đạt quy mô **25.410 mẫu** trên toàn bộ 30 cổ phiếu rổ VN30. Tập này chiếm $\approx 95.5\%$ tổng dữ liệu, giúp mô hình học trọn vẹn các pha thị trường quá khứ.
+   - **Tập Train (Tích lũy lịch sử):** Bao gồm toàn bộ dữ liệu từ ngày `2023-04-03` đến trước 40 phiên gần nhất ($T-40$), đạt quy mô **25.800 mẫu** trên toàn bộ 30 cổ phiếu rổ VN30. Tập này chiếm $\approx 95.5\%$ tổng dữ liệu, giúp mô hình học trọn vẹn các pha thị trường quá khứ.
    - **Bộ đệm Thẩm định Động (Dynamic Validation Buffer - 40 phiên gần nhất):** Dành đúng 40 phiên giao dịch gần nhất (~2 tháng gần nhất, gồm **1.200 mẫu**) làm tập kiểm định độc lập. Tập này phục vụ cơ chế Dừng sớm (Early Stopping) sau 30 vòng không cải thiện của LightGBM và chọn lọc checkpoint trọng số tối ưu nhất cho PyTorch Global LSTM.
-   - **Tổng quy mô dữ liệu thực chiến:** Đạt chính xác **26.610 mẫu** (được xác thực tại production_training_info_t3.json).
+   - **Tổng quy mô dữ liệu thực chiến:** Đạt chính xác **27.000 mẫu** (được xác thực tại production_training_info_t3.json).
 2. **Kỹ thuật Đệm Khởi động Chuỗi (Warm-up Sequence Tail):**  
    Mạng nơ-ron PyTorch LSTM yêu cầu đầu vào chuỗi 3 chiều với độ dài cố định $seq\_len = 20$ phiên. Khi cắt rời tập Train và Validation Buffer tại điểm $T-40$, các phiên đầu tiên của tập Validation sẽ bị thiếu ngữ cảnh quá khứ.  
    Hàm `get_warmup_tail()` trích xuất đúng 19 phiên cuối cùng của tập Train gắn vào đầu tập Validation Buffer. Nhờ đó, tập Validation bảo toàn trọn vẹn $100\%$ số lượng 1.200 mẫu kiểm định cho LSTM mà không làm rò rỉ nhãn, đảm bảo tính công bằng tuyệt đối khi so sánh đối chứng hiệu năng giữa LightGBM và LSTM.
@@ -714,9 +714,9 @@ Bên cạnh PostgreSQL quản lý người dùng và cá nhân hóa, hệ thốn
    - `threshold`: Ngưỡng lọc nhiễu (**0.02**).
    - `val_buffer_days`: Số phiên đệm thẩm định (**40 phiên**).
    - `latest_market_date`: Mốc ngày chốt dữ liệu thị trường thực tế.
-   - `train_samples`: **25.410 mẫu**.
+   - `train_samples`: **25.800 mẫu**.
    - `val_samples`: **1.200 mẫu**.
-   - `total_samples`: **26.610 mẫu**.
+   - `total_samples`: **27.000 mẫu**.
    - `lightgbm_metrics` và `lstm_metrics`: Toàn bộ chỉ số Accuracy, Macro F1, Weighted F1, Precision Macro, Recall Macro và Ma trận nhầm lẫn Confusion Matrix của hai mô hình.
 
 ---
