@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-14",
+  "counts": {
+    "ml": 138,
+    "api": 216,
+    "web": 178,
+    "infra": 37,
+    "e2e_live": 87
+  },
+  "unique_total": 656,
+  "reference_e2e_also_passed_but_not_added": 87,
+  "web_typecheck_and_docker_build_passed": true,
+  "production_retrained": false,
+  "word_modified": false,
+  "scope": "isolated acceptance stack, inference only"
+}

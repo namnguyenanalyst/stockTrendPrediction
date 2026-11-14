@@ -1,0 +1,21 @@
+{
+  "acceptance_containers_removed": true,
+  "acceptance_volume_removed": true,
+  "original_containers_after_cleanup": [
+    {
+      "Names": "vn_stock_api",
+      "Status": "Up 8 hours (healthy)",
+      "Ports": "0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp"
+    },
+    {
+      "Names": "vn_stock_retrain_worker",
+      "Status": "Up 8 hours",
+      "Ports": ""
+    },
+    {
+      "Names": "vn_stock_db",
+      "Status": "Up 8 hours (healthy)",
+      "Ports": "0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp"
+    }
+  ]
+}

@@ -72,6 +72,7 @@ apps/ml/data/external/*
 !apps/ml/data/external/.gitkeep
 apps/ml/models/*
 !apps/ml/models/.gitkeep
+apps/ml/reports/experiments/
 *.pth
 *.pt
 *.pkl

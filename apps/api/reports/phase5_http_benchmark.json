@@ -1,0 +1,605 @@
+{
+  "timestamp_utc": "2026-11-14T15:59:38.208248+00:00",
+  "base_url": "http://127.0.0.1:8105",
+  "transport": "real HTTP to isolated Docker API",
+  "client_platform": "macOS-27.2-arm64-arm-64bit",
+  "health_concurrency_limit": 5,
+  "warm_up_excluded": true,
+  "results": {
+    "health_serial": {
+      "requests": 30,
+      "successes": 30,
+      "failures": 0,
+      "median_ms": 1.8948959987028502,
+      "p95_nearest_rank_ms": 2.3222089985210914,
+      "max_ms": 2.75054200028535,
+      "observations": [
+        {
+          "milliseconds": 2.0161250031378586,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 2.0485830027610064,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.8244580023747403,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.895208999485476,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.8232080001325812,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 2.0206669978506397,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 2.112500002112938,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 2.210500002547633,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 2.75054200028535,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 2.309791998413857,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 2.3184170022432227,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.8613749998621643,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.8587080012366641,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.7449170009058435,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 2.2517919969686773,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 2.3222089985210914,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.9241660011175554,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.976042000023881,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.8945829979202244,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.7916249998961575,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.788707999367034,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.7126250022556633,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.7054579984687734,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 2.154750000045169,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 2.145374997780891,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.826040999731049,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.7369170018355362,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.8335419990762603,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.750999999785563,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 1.7213340033777058,
+          "status": 200,
+          "response_bytes": 90
+        }
+      ]
+    },
+    "readiness_serial": {
+      "requests": 30,
+      "successes": 30,
+      "failures": 0,
+      "median_ms": 3.1716875000711298,
+      "p95_nearest_rank_ms": 4.282874997443287,
+      "max_ms": 4.503542000747984,
+      "observations": [
+        {
+          "milliseconds": 3.942542000004323,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.386000000318745,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.068958001676947,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 2.8904999999213032,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 2.875915997719858,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.449415999057237,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 4.503542000747984,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.7037910005892627,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 2.9861249968234915,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 2.9778330026601907,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.6971250010537915,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.233874998841202,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.205875000276137,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 2.962499998830026,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 2.8898750024382025,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.7684999988414347,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.2717499998398125,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.0632500020146836,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 2.9578329995274544,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 2.996708997670794,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.4442500000295695,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.3324159994663205,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.096791999269044,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 2.922874999057967,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 2.882083997974405,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.38016699970467,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 4.282874997443287,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.8715419977961574,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 3.1374999998661224,
+          "status": 200,
+          "response_bytes": 70
+        },
+        {
+          "milliseconds": 2.977708001708379,
+          "status": 200,
+          "response_bytes": 70
+        }
+      ]
+    },
+    "history_250_bars": {
+      "requests": 10,
+      "successes": 10,
+      "failures": 0,
+      "median_ms": 19.973249998656684,
+      "p95_nearest_rank_ms": 21.31616699989536,
+      "max_ms": 21.31616699989536,
+      "observations": [
+        {
+          "milliseconds": 19.188082998880418,
+          "status": 200,
+          "response_bytes": 22734
+        },
+        {
+          "milliseconds": 21.31616699989536,
+          "status": 200,
+          "response_bytes": 22734
+        },
+        {
+          "milliseconds": 18.956582996906945,
+          "status": 200,
+          "response_bytes": 22734
+        },
+        {
+          "milliseconds": 19.39358299932792,
+          "status": 200,
+          "response_bytes": 22734
+        },
+        {
+          "milliseconds": 18.74020800096332,
+          "status": 200,
+          "response_bytes": 22734
+        },
+        {
+          "milliseconds": 21.138959000381874,
+          "status": 200,
+          "response_bytes": 22734
+        },
+        {
+          "milliseconds": 19.967749998613726,
+          "status": 200,
+          "response_bytes": 22734
+        },
+        {
+          "milliseconds": 20.332834003056632,
+          "status": 200,
+          "response_bytes": 22734
+        },
+        {
+          "milliseconds": 19.97874999869964,
+          "status": 200,
+          "response_bytes": 22734
+        },
+        {
+          "milliseconds": 20.794625001144595,
+          "status": 200,
+          "response_bytes": 22734
+        }
+      ]
+    },
+    "prediction_serial": {
+      "requests": 5,
+      "successes": 5,
+      "failures": 0,
+      "median_ms": 27.914874997804873,
+      "p95_nearest_rank_ms": 34.28183300275123,
+      "max_ms": 34.28183300275123,
+      "observations": [
+        {
+          "milliseconds": 28.12087500205962,
+          "status": 200,
+          "response_bytes": 2859
+        },
+        {
+          "milliseconds": 27.75554199979524,
+          "status": 200,
+          "response_bytes": 2859
+        },
+        {
+          "milliseconds": 27.914874997804873,
+          "status": 200,
+          "response_bytes": 2859
+        },
+        {
+          "milliseconds": 27.22229099890683,
+          "status": 200,
+          "response_bytes": 2859
+        },
+        {
+          "milliseconds": 34.28183300275123,
+          "status": 200,
+          "response_bytes": 2859
+        }
+      ]
+    },
+    "health_concurrent_with_prediction": {
+      "requests": 30,
+      "successes": 30,
+      "failures": 0,
+      "median_ms": 10.127875000762288,
+      "p95_nearest_rank_ms": 16.391917000873946,
+      "max_ms": 17.343999999866355,
+      "observations": [
+        {
+          "milliseconds": 9.477416999288835,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 15.519332999247126,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 15.12545899822726,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 14.758749999600695,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 16.391917000873946,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 4.7828749993641395,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 9.7700000005716,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 8.910249998734798,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 10.83120800103643,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 13.739666999754263,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 17.343999999866355,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 8.382832998904632,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 15.804124999704072,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 9.72241599811241,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 12.106166999728885,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 5.814333002490457,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 10.515291996853193,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 9.311791996879037,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 10.232374999759486,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 10.023375001765089,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 7.190208001702558,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 10.917957999481587,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 7.372416999714915,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 14.740624999831198,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 7.177208000939572,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 9.313708000263432,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 11.940874999709195,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 10.70054200317827,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 8.718125001905719,
+          "status": 200,
+          "response_bytes": 90
+        },
+        {
+          "milliseconds": 6.109582998760743,
+          "status": 200,
+          "response_bytes": 90
+        }
+      ]
+    },
+    "prediction_during_health_burst": {
+      "requests": 1,
+      "successes": 1,
+      "failures": 0,
+      "median_ms": 62.45675000172923,
+      "p95_nearest_rank_ms": 62.45675000172923,
+      "max_ms": 62.45675000172923,
+      "observations": [
+        {
+          "milliseconds": 62.45675000172923,
+          "status": 200,
+          "response_bytes": 2859
+        }
+      ]
+    }
+  },
+  "limitations": [
+    "Local machine, not a production capacity test.",
+    "Small samples; p95 is nearest-rank and not a confidence bound.",
+    "No browser FPS, network WAN or distributed load was measured."
+  ]
+}

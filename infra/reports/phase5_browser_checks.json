@@ -1,0 +1,15 @@
+{
+  "created_rows": 1,
+  "original_preset_id": "a7cdf644-61e3-47e2-a61d-07ab88cc3529",
+  "created_status": "draft",
+  "network_failure_kept_dialog_and_input": true,
+  "overwrite_kept_id": true,
+  "rows_after_overwrite": 1,
+  "active_observed_after_browser_reload": true,
+  "toggle_persisted_status": "draft",
+  "histories_after_browser_run": 1,
+  "escape_cancel_preserved_record": true,
+  "browser_delete_success": true,
+  "records_after_delete": 0,
+  "record_survived_api_and_database_restart": true
+}

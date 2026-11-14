@@ -1,0 +1,46 @@
+{
+  "stocktrend-phase5-api-1": {
+    "image_id": "sha256:f4d75878c1bd487086fc6b9435e212558a4169bcf86bdfb41cd2be691f23caee",
+    "user": "apiuser",
+    "health": "healthy",
+    "mounts": [
+      {
+        "destination": "/app/apps/ml/data",
+        "writable": false
+      },
+      {
+        "destination": "/app/apps/ml/models",
+        "writable": false
+      }
+    ]
+  },
+  "stocktrend-phase5-web-1": {
+    "image_id": "sha256:8846f207ee5c0e3bcc115783594d5de0c31da4c3cdc682b53b26606c44a0ce48",
+    "user": "nextjs",
+    "health": "healthy",
+    "mounts": []
+  },
+  "stocktrend-phase5-db-1": {
+    "image_id": "sha256:dc638cdfb3aa32b6ff16a84de36d866b2c9f1089da8b6f23b060f874d3e1e8ce",
+    "user": "",
+    "health": "healthy",
+    "mounts": [
+      {
+        "destination": "/var/lib/postgresql/data",
+        "writable": true
+      }
+    ]
+  },
+  "api_library_versions": {
+    "fastapi": "0.143.0",
+    "pydantic": "2.14.0",
+    "sqlalchemy": "2.1.6",
+    "torch": "2.14.1+cpu",
+    "lightgbm": "4.7.0",
+    "scikit-learn": "1.9.1",
+    "numpy": "1.26.4",
+    "pandas": "2.3.3"
+  },
+  "docker_version": "Docker version 29.9.2, build a82e528",
+  "docker_resources": "CPUs=8 MemoryBytes=12526571520"
+}

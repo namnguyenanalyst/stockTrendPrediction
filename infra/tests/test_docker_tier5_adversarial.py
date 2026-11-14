@@ -45,7 +45,7 @@ def test_nextjs_public_env_build_vs_runtime_discrepancy():
 
     # Check whether Dockerfile builder stage declares ARG NEXT_PUBLIC_API_URL
     builder_stage_match = re.search(
-        r"FROM node:20-alpine AS builder(.*?)FROM node:20-alpine AS runner",
+        r"FROM node:22-alpine AS builder(.*?)FROM node:22-alpine AS runner",
         web_dockerfile_content,
         re.DOTALL,
     )

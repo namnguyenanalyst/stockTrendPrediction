@@ -166,11 +166,11 @@ def test_dockerfile_monorepo_copy_ordering():
     content = API_DOCKERFILE.read_text(encoding="utf-8")
     ml_copy_pos = content.find("COPY apps/ml")
     api_copy_pos = content.find("COPY apps/api")
-    pip_install_pos = content.find("uv pip install")
+    pip_install_pos = content.find("uv sync")
 
     assert ml_copy_pos != -1, "Missing COPY apps/ml"
     assert api_copy_pos != -1, "Missing COPY apps/api"
-    assert pip_install_pos != -1, "Missing uv pip install"
+    assert pip_install_pos != -1, "Missing frozen uv sync"
     assert ml_copy_pos < pip_install_pos, "COPY apps/ml must precede pip install"
     assert api_copy_pos < pip_install_pos, "COPY apps/api must precede pip install"
 

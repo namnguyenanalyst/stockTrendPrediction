@@ -1,0 +1,40 @@
+{
+  "before_fix": {
+    "/health": {
+      "status": 200,
+      "response": {
+        "status": "healthy",
+        "service": "vn-stock-api",
+        "version": "0.1.0",
+        "environment": "acceptance"
+      }
+    },
+    "/ready": {
+      "status": 500,
+      "response": {
+        "detail": "L\u1ed7i x\u1eed l\u00fd y\u00eau c\u1ea7u."
+      }
+    }
+  },
+  "after_fix": {
+    "/health": {
+      "status": 200,
+      "response": {
+        "status": "healthy",
+        "service": "vn-stock-api",
+        "version": "0.1.0",
+        "environment": "acceptance"
+      }
+    },
+    "/ready": {
+      "status": 503,
+      "response": {
+        "detail": "D\u1ecbch v\u1ee5 hi\u1ec7n kh\u00f4ng th\u1ec3 x\u1eed l\u00fd y\u00eau c\u1ea7u."
+      }
+    }
+  },
+  "final_frozen_image": {
+    "health": 200,
+    "ready": 503
+  }
+}

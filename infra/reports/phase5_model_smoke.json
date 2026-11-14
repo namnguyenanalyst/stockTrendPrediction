@@ -1,0 +1,14 @@
+[
+  {
+    "model": "lightgbm",
+    "status": 200,
+    "data_as_of_date": "2026-11-13",
+    "probability_sum": 1.0
+  },
+  {
+    "model": "lstm",
+    "status": 200,
+    "data_as_of_date": "2026-11-13",
+    "probability_sum": 1.0
+  }
+]

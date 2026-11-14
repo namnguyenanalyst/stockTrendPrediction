@@ -134,8 +134,8 @@ def test_api_dockerfile_monorepo_symlink_editable_stability():
     assert "COPY apps/ml /app/apps/ml" in content
     assert "COPY apps/api /app/apps/api" in content
     # Install command
-    assert "-e /app/apps/ml" in content
-    assert "-e /app/apps/api" in content
+    assert "uv sync --frozen" in content
+    assert "/app/apps/api/.venv/bin:$PATH" in content
 
 
 # ==============================================================================

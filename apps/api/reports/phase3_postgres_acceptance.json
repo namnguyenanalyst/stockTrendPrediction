@@ -1,0 +1,12 @@
+{
+  "migration": "003_refresh_sessions",
+  "register_login_real_postgres": true,
+  "owner_isolation_and_durable_update": true,
+  "concurrent_refresh_statuses": [
+    200,
+    401
+  ],
+  "logout_revocation": true,
+  "remaining_probe_users": 0,
+  "remaining_probe_sessions": 0
+}
