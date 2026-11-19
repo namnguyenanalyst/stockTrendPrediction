@@ -570,6 +570,7 @@ export interface User {
   email: string;
   full_name?: string | null;
   role: UserRole | string;
+  email_verified_at?: string | null;
   is_active: boolean;
   created_at?: string;
   updated_at?: string | null;
@@ -660,6 +661,7 @@ export interface AdminUserItem {
   email: string;
   full_name: string | null;
   role: "admin" | "trader";
+  email_verified_at?: string | null;
   is_active: boolean;
   created_at: string;
   last_seen_at: string | null;

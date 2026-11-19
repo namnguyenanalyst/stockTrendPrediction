@@ -1,6 +1,8 @@
 import React from "react";
 import Link from "next/link";
-import { Terminal, TrendingUp } from "lucide-react";
+import { TrendingUp } from "lucide-react";
+
+export const metadata = { referrer: "no-referrer" as const, robots: { index: false, follow: false } };
 
 export default function AuthLayout({
   children,
@@ -31,32 +33,12 @@ export default function AuthLayout({
             </span>
           </div>
         </Link>
-
-        <div className="hidden sm:flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1 text-xs text-slate-400 backdrop-blur-md">
-          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span>Hệ Thống Đa Người Dùng Chuẩn Production</span>
-        </div>
       </header>
 
       {/* Vùng Form Trung tâm */}
       <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-8 sm:px-6">
         <div className="w-full max-w-md">{children}</div>
       </main>
-
-      {/* Chân trang bản quyền */}
-      <footer className="relative z-10 border-t border-slate-800/80 bg-slate-950/80 py-4 text-xs text-slate-500 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 sm:flex-row sm:px-6">
-          <div className="flex items-center gap-2">
-            <Terminal className="h-3.5 w-3.5 text-emerald-500" />
-            <span>
-              ĐATN: <strong>Dự báo Xu hướng &amp; Đánh giá Chiến lược Đầu tư</strong>
-            </span>
-          </div>
-          <div className="text-[11px] text-slate-500">
-            Trường Đại học Mỏ - Địa chất &bull; Tin học Kinh tế
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

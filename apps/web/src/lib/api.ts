@@ -425,3 +425,42 @@ export async function getPredictStatus(): Promise<PredictStatusResponse> {
 export async function updateUserPreset(id: string, name: string, description: string | null | undefined, parameters: Record<string, unknown>): Promise<UserStrategyPreset> {
   return fetchJson<UserStrategyPreset>(`/api/v1/user/presets/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify({ name, description, parameters }) });
 }
+
+
+export class AccountApiError extends Error {
+  constructor(public code: string, message: string, public retryAfter = 0) {
+    super(message);
+  }
+}
+
+async function accountRequest(path: string, body: object = {}): Promise<{ message: string }> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/v1/auth/${path}`, {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json", ...(inMemoryToken ? { Authorization: `Bearer ${inMemoryToken}` } : {}) },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new AccountApiError("NETWORK_ERROR", "Không thể kết nối. Vui lòng thử lại.");
+  }
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const code = payload?.detail?.code || "REQUEST_FAILED";
+    const retryAfter = Number(response.headers.get("Retry-After")) || 60;
+    const message = response.status === 429
+      ? `Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau ${retryAfter} giây.`
+      : code === "INVALID_OR_EXPIRED_TOKEN"
+        ? "Liên kết không hợp lệ, đã hết hạn hoặc đã được sử dụng. Vui lòng yêu cầu liên kết mới."
+        : response.status === 401 ? "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+        : response.status === 422 ? "Thông tin chưa hợp lệ. Vui lòng kiểm tra lại."
+        : "Chưa thể xử lý yêu cầu. Vui lòng thử lại sau.";
+    throw new AccountApiError(code, message, response.status === 429 ? retryAfter : 0);
+  }
+  return response.json();
+}
+
+export const requestPasswordReset = (email: string) => accountRequest("forgot-password", { email });
+export const resetAccountPassword = (token: string, new_password: string) => accountRequest("reset-password", { token, new_password });
+export const verifyAccountEmail = (token: string) => accountRequest("verify-email", { token });
+export const resendVerification = () => accountRequest("resend-verification");

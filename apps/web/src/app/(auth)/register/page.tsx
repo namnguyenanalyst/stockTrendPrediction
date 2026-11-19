@@ -12,6 +12,7 @@ import {
   User as UserIcon,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+
 function RegisterForm() {
   const router = useRouter();
   const { register } = useAuth();
@@ -23,6 +24,7 @@ function RegisterForm() {
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [accountCreated, setAccountCreated] = useState(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -50,7 +52,13 @@ function RegisterForm() {
 
     setIsSubmitting(true);
     try {
-      await register(cleanEmail, password, fullName.trim() || null);
+      const result = await register(cleanEmail, password, fullName.trim() || null);
+      setPassword("");
+      setConfirmPassword("");
+      if (result.status === "created") {
+        setAccountCreated(true);
+        return;
+      }
       setIsSuccess(true);
       setTimeout(() => {
         router.push("/dashboard");
@@ -97,7 +105,10 @@ function RegisterForm() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      {accountCreated ? <div role="status" className="space-y-4 text-sm text-slate-200">
+        <p>Tài khoản đã được tạo. Vui lòng đăng nhập để tiếp tục.</p>
+        <Link className="inline-flex min-h-11 items-center text-emerald-300 underline" href={`/login?email=${encodeURIComponent(email.trim().toLowerCase())}`}>Đăng nhập</Link>
+      </div> : <form onSubmit={handleSubmit} className="space-y-4">
         {/* Họ và tên */}
         <div>
           <label
@@ -110,6 +121,8 @@ function RegisterForm() {
             <UserIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
             <input
               id="fullName"
+              maxLength={255}
+              autoComplete="name"
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -131,12 +144,13 @@ function RegisterForm() {
             <Mail className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
             <input
               id="reg-email"
+              maxLength={255}
               type="email"
               required
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="trader@quantinvest.vn"
+              placeholder="Nhập email của quý khách"
               className="w-full rounded-xl border border-slate-800 bg-slate-950/70 py-2.5 pl-10 pr-4 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
             />
           </div>
@@ -157,6 +171,7 @@ function RegisterForm() {
               type="password"
               required
               minLength={8}
+              maxLength={1024}
               autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -181,6 +196,7 @@ function RegisterForm() {
               type="password"
               required
               minLength={8}
+              maxLength={1024}
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -199,7 +215,7 @@ function RegisterForm() {
           <span>{isSubmitting ? "Đang xử lý đăng ký..." : "Hoàn tất đăng ký"}</span>
           <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
         </button>
-      </form>
+      </form>}
 
       {/* Điều hướng Đăng nhập */}
       <div className="mt-6 border-t border-slate-800/80 pt-4 text-center text-xs text-slate-400">

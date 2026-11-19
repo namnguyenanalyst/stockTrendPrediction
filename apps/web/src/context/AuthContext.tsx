@@ -18,6 +18,8 @@ import {
 } from "@/lib/api";
 import { User } from "@/lib/types";
 
+export type RegistrationResult = { status: "authenticated"; user: User } | { status: "created" };
+
 interface AuthContextType {
   user: User | null;
   accessToken: string | null;
@@ -29,7 +31,7 @@ interface AuthContextType {
     email: string,
     password: string,
     fullName?: string | null,
-  ) => Promise<User>;
+  ) => Promise<RegistrationResult>;
   logout: () => Promise<void>;
   clearError: () => void;
   refreshUser: () => Promise<void>;
@@ -200,7 +202,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           errMessage.includes("401") ||
           errMessage.includes("Incorrect email")
             ? "Email hoặc mật khẩu không chính xác."
-            : errMessage || "Đăng nhập thất bại. Vui lòng thử lại.";
+            : "Chưa thể đăng nhập. Vui lòng thử lại sau.";
         setError(message);
         throw new Error(message);
       } finally {
@@ -211,32 +213,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const register = useCallback(
-    async (
-      email: string,
-      password: string,
-      fullName?: string | null,
-    ): Promise<User> => {
+    async (email: string, password: string, fullName?: string | null): Promise<RegistrationResult> => {
       setIsLoading(true);
       setError(null);
       try {
         await registerUser(email, password, fullName);
-        // Tự động đăng nhập sau khi đăng ký thành công
-        const loggedInUser = await login(email, password);
-        return loggedInUser;
       } catch (err: unknown) {
-        const errMessage = err instanceof Error ? err.message : String(err);
-        const message =
-          errMessage.includes("400") ||
-          errMessage.includes("already registered")
-            ? "Email này đã được sử dụng. Vui lòng chọn email khác."
-            : errMessage || "Đăng ký không thành công. Vui lòng kiểm tra lại.";
+        const raw = err instanceof Error ? err.message : "";
+        const message = raw.includes("already registered") || raw.includes("409") || raw.includes("400")
+          ? "Email này đã được sử dụng. Vui lòng đăng nhập hoặc khôi phục mật khẩu."
+          : "Chưa thể tạo tài khoản. Vui lòng kiểm tra kết nối và thông tin đăng ký.";
         setError(message);
+        setIsLoading(false);
         throw new Error(message);
+      }
+      try {
+        return { status: "authenticated", user: await login(email, password) };
+      } catch {
+        // Account creation succeeded; discard any partially initialized session.
+        try { await logoutUser(); } catch { /* The API may be offline. */ }
+        setUser(null);
+        setAccessToken(null);
+        setAuthToken(null);
+        removeTokenCookie();
+        if (typeof window !== "undefined") window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+        setError(null);
+        return { status: "created" };
       } finally {
         setIsLoading(false);
       }
-    },
-    [login]
+    }, [login]
   );
 
   const logout = useCallback(async (): Promise<void> => {

@@ -20,7 +20,7 @@ function LoginForm() {
       : "/dashboard";
 
   const { login } = useAuth();
-  const [email, setEmail] = useState<string>("");
+  const [email, setEmail] = useState<string>(searchParams.get("email")?.slice(0, 255) || "");
   const [password, setPassword] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -62,11 +62,8 @@ function LoginForm() {
     <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
       <div className="mb-6 text-center">
         <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-100">
-          Đăng nhập tài khoản
+          Đăng nhập
         </h2>
-        <p className="mt-1 text-xs sm:text-sm text-slate-400">
-          Truy cập nền tảng phân tích định lượng &amp; dự báo xu hướng
-        </p>
       </div>
 
       {errorMessage && (
@@ -89,6 +86,7 @@ function LoginForm() {
         </div>
       )}
 
+      {searchParams.get("reset") === "success" && <p role="status" className="mb-4 text-sm text-emerald-300">Đã đặt lại mật khẩu. Vui lòng đăng nhập lại.</p>}
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Email */}
         <div>
@@ -107,7 +105,7 @@ function LoginForm() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="trader@quantinvest.vn"
+              placeholder="Nhập email của quý khách"
               className="w-full rounded-xl border border-slate-800 bg-slate-950/70 py-2.5 pl-10 pr-4 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
             />
           </div>
@@ -138,6 +136,7 @@ function LoginForm() {
           </div>
         </div>
 
+        <Link href="/forgot-password" className="inline-flex min-h-11 items-center text-sm text-emerald-300 underline">Quên mật khẩu?</Link>
         {/* Nút Submit */}
         <button
           type="submit"
@@ -151,7 +150,7 @@ function LoginForm() {
 
       {/* Điều hướng Đăng ký */}
       <div className="mt-6 border-t border-slate-800/80 pt-4 text-center text-xs text-slate-400">
-        <span>Chưa có tài khoản giao dịch? </span>
+        <span>Chưa có tài khoản? </span>
         <Link
           href="/register"
           className="font-semibold text-emerald-400 hover:text-emerald-300 hover:underline transition-colors"
