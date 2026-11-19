@@ -25,22 +25,21 @@ def _is_live_server_available(url: str) -> bool:
     try:
         with httpx.Client(timeout=2.0) as check_client:
             res = check_client.get(f"{url}/health")
-            return res.status_code == 200
+            return res.status_code == 200 and res.json().get("environment") == "acceptance"
     except Exception:
         return False
 
 
-# Determine default mode at test session start
+# Live execution must be explicitly selected on a separate acceptance stack.
 LIVE_AVAILABLE = False
+if os.environ.get("E2E_MODE") == "live" and (not E2E_BASE_URL or E2E_FORCE_MOCK):
+    raise pytest.UsageError("Live E2E requires an explicit URL and cannot force mock")
 if not E2E_FORCE_MOCK and E2E_BASE_URL:
-    LIVE_AVAILABLE = _is_live_server_available(E2E_BASE_URL)
-    if not LIVE_AVAILABLE:
-        raise pytest.UsageError("Explicit E2E_BASE_URL unavailable; refusing mock fallback.")
-elif not E2E_FORCE_MOCK and not E2E_BASE_URL:
-    # Try local default port 8000
-    if _is_live_server_available("http://localhost:8000"):
-        E2E_BASE_URL = "http://localhost:8000"
-        LIVE_AVAILABLE = True
+    if os.environ.get("E2E_MODE") != "live" or os.environ.get("E2E_TARGET_ENV") != "acceptance":
+        raise pytest.UsageError("Live E2E requires E2E_MODE=live and E2E_TARGET_ENV=acceptance")
+    if not _is_live_server_available(E2E_BASE_URL):
+        raise pytest.UsageError("Explicit acceptance API unavailable")
+    LIVE_AVAILABLE = True
 
 
 @pytest.fixture(autouse=True)
