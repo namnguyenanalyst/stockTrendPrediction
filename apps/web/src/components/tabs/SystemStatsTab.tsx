@@ -11,7 +11,6 @@ import {
   RefreshCw,
   Search,
   Shield,
-  ShieldAlert,
   ShieldCheck,
   TrendingUp,
   Unlock,
@@ -147,35 +146,6 @@ export const SystemStatsTab: React.FC = () => {
       );
       setActionSuccessMsg(
         `Đã ${updated.is_active ? "mở khóa" : "khóa"} tài khoản ${updated.email} thành công.`
-      );
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Thao tác cập nhật thất bại.";
-      setError(msg);
-    } finally {
-      setUpdatingUserId(null);
-    }
-  };
-
-  // Xử lý thay đổi vai trò (ADMIN / TRADER)
-  const handleToggleUserRole = async (user: AdminUserItem) => {
-    const nextRole = user.role === "admin" ? "trader" : "admin";
-    const confirmText =
-      nextRole === "admin"
-        ? `Nâng quyền người dùng ${user.email} thành QUẢN TRỊ VIÊN (ADMIN)?`
-        : `Hạ quyền người dùng ${user.email} xuống TRADER?`;
-
-    if (!window.confirm(confirmText)) return;
-
-    setUpdatingUserId(user.id);
-    setActionSuccessMsg(null);
-    setError(null);
-    try {
-      const updated = await updateAdminUser(user.id, { role: nextRole });
-      setUsers((prev) =>
-        prev.map((u) => (u.id === user.id ? { ...u, role: updated.role } : u))
-      );
-      setActionSuccessMsg(
-        `Đã chuyển vai trò của ${updated.email} thành ${updated.role.toUpperCase()} thành công.`
       );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Thao tác cập nhật thất bại.";
@@ -449,21 +419,10 @@ export const SystemStatsTab: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex items-center gap-1.5">
-                          {/* Nút Đổi Role */}
-                          <button
-                            onClick={() => handleToggleUserRole(u)}
-                            disabled={isBusy}
-                            title={u.role === "admin" ? "Hạ xuống Trader" : "Nâng lên Admin"}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-[11px] font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition-all disabled:opacity-50"
-                          >
-                            <ShieldAlert className="h-3 w-3 text-amber-400" />
-                            <span>{u.role === "admin" ? "Hạ quyền" : "Cấp Admin"}</span>
-                          </button>
-
                           {/* Nút Khóa / Mở khóa */}
                           <button
                             onClick={() => handleToggleUserStatus(u)}
-                            disabled={isBusy}
+                            disabled={isBusy || u.role === "admin"}
                             title={u.is_active ? "Khóa tài khoản" : "Mở khóa tài khoản"}
                             className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-medium transition-all disabled:opacity-50 ${u.is_active
                                 ? "border border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
