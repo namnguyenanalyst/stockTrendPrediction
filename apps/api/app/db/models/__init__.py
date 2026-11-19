@@ -21,3 +21,5 @@ __all__ = [
     "UserRole",
     "UserWatchlist",
 ]
+
+from app.db.models.user_management_audit import UserManagementAudit

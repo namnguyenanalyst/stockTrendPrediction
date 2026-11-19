@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.security import create_access_token, get_password_hash
 from app.db.models.user import User, UserRole
+from app.core.config import settings
 
 VN_TZ = timezone(timedelta(hours=7))
 
@@ -327,7 +328,7 @@ async def test_admin_stats_utc7_midnight_boundary_and_online(
 
     # Admin user (tạo lúc này, online)
     _admin, admin_token = await _create_test_user(
-        db_session, "admin_stats_master@test.vn", UserRole.ADMIN,
+        db_session, settings.SOLE_ADMIN_EMAIL, UserRole.ADMIN,
         created_at=now_utc,
         last_seen_at=now_utc,
     )

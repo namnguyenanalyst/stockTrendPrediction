@@ -14,9 +14,12 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
+from app.db.models.refresh_session import RefreshSession
+from app.db.models.user_management_audit import UserManagementAudit
 from app.core.deps import get_current_admin_user, get_db
 from app.db.models.audit import PredictionAudit
 from app.db.models.backtest import BacktestHistory
@@ -225,7 +228,7 @@ async def update_admin_user(
     db: AsyncSession = Depends(get_db),
 ) -> AdminUserItem:
     """Cập nhật quyền hạn (role) hoặc trạng thái khóa/mở khóa (is_active) của người dùng."""
-    user_res = await db.execute(select(User).where(User.id == user_id))
+    user_res = await db.execute(select(User).where(User.id == user_id).with_for_update())
     target_user = user_res.scalar_one_or_none()
 
     if not target_user:
@@ -246,6 +249,23 @@ async def update_admin_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Bạn không thể tự hạ quyền quản trị viên của chính mình.",
             )
+
+    if payload.role == UserRole.ADMIN and target_user.email != settings.SOLE_ADMIN_EMAIL:
+        raise HTTPException(status_code=403, detail="Only the configured sole administrator may hold ADMIN")
+
+    changed = (
+        payload.is_active is not None and payload.is_active != target_user.is_active
+    ) or (payload.role is not None and payload.role != target_user.role)
+    if changed:
+        db.add(UserManagementAudit(
+            actor=current_admin.email, target_id=target_user.id, target_email=target_user.email,
+            old_role=target_user.role.value, new_role=(payload.role or target_user.role).value,
+            old_active=target_user.is_active,
+            new_active=payload.is_active if payload.is_active is not None else target_user.is_active,
+            source="api",
+        ))
+        target_user.auth_version += 1
+        await db.execute(delete(RefreshSession).where(RefreshSession.user_id == target_user.id))
 
     if payload.is_active is not None:
         target_user.is_active = payload.is_active
@@ -365,7 +385,18 @@ async def get_admin_activity_logs(
             )
         )
 
+    audit_rows = await db.execute(select(UserManagementAudit).order_by(desc(UserManagementAudit.created_at)).limit(limit))
+    for entry in audit_rows.scalars():
+        activities.append(AdminActivityItem(
+            id=f"management_{entry.id}", timestamp=entry.created_at,
+            event_type="user_management", title="Cập nhật tài khoản",
+            description=f"Thay đổi quyền hoặc trạng thái: {entry.target_email}",
+            actor=entry.actor, status="info",
+            metadata={"source": entry.source, "old_role": entry.old_role, "new_role": entry.new_role,
+                      "old_active": entry.old_active, "new_active": entry.new_active},
+        ))
+
     # Sắp xếp hợp nhất tất cả sự kiện theo thời gian giảm dần
-    activities.sort(key=lambda x: x.timestamp, reverse=True)
+    activities.sort(key=lambda x: x.timestamp.replace(tzinfo=timezone.utc) if x.timestamp.tzinfo is None else x.timestamp, reverse=True)
 
     return AdminActivityResponse(items=activities[:limit])

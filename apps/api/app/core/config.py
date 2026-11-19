@@ -85,6 +85,7 @@ class Settings(BaseSettings):
 
     # Cấu hình Bảo mật & JWT Authentication
     JWT_SECRET_KEY: str = "super_secret_jwt_key_must_be_changed_in_prod_32chars"
+    SOLE_ADMIN_EMAIL: str = "admin@vnstock"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7

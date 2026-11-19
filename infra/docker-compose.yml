@@ -43,6 +43,7 @@ services:
     container_name: vn_stock_api
     restart: unless-stopped
     environment:
+      SOLE_ADMIN_EMAIL: ${SOLE_ADMIN_EMAIL:-admin@vnstock}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@vn_stock_db:5432/${POSTGRES_DB:-vn_stock}
       SECRET_KEY: ${SECRET_KEY:-super_secret_jwt_key_must_be_changed_in_prod_32chars}
       JWT_SECRET_KEY: ${SECRET_KEY:-super_secret_jwt_key_must_be_changed_in_prod_32chars}

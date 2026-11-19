@@ -139,7 +139,7 @@ async def get_current_admin_user(
     current_user: User = Depends(get_current_active_user),
 ) -> User:
     """Xác thực người dùng hiện tại có vai trò ADMIN."""
-    if current_user.role != UserRole.ADMIN:
+    if current_user.role != UserRole.ADMIN or current_user.email != settings.SOLE_ADMIN_EMAIL:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Admin role required",

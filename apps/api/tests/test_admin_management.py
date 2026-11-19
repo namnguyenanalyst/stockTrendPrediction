@@ -5,6 +5,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.security import create_access_token, get_password_hash
 from app.db.models.user import User, UserRole
 
@@ -14,7 +15,7 @@ async def admin_user(db_session: AsyncSession) -> User:
     """Tạo user có quyền ADMIN."""
     user = User(
         id=uuid.uuid4(),
-        email="admin_super@example.com",
+        email=settings.SOLE_ADMIN_EMAIL,
         hashed_password=get_password_hash("AdminSecret123"),
         role=UserRole.ADMIN,
         is_active=True,
@@ -109,8 +110,7 @@ async def test_admin_update_user_status_and_role(
         json={"role": "admin"},
         headers=headers,
     )
-    assert res_role.status_code == 200
-    assert res_role.json()["role"] == "admin"
+    assert res_role.status_code == 403
 
 
 @pytest.mark.asyncio
@@ -153,3 +153,55 @@ async def test_admin_activity_logs(
     data = response.json()
     assert "items" in data
     assert isinstance(data["items"], list)
+
+@pytest.mark.asyncio
+async def test_wrong_admin_email_denied(async_client, db_session, sample_trader):
+    sample_trader.role = UserRole.ADMIN
+    await db_session.commit()
+    token = create_access_token(subject=sample_trader.id)
+    res = await async_client.get('/api/v1/admin/users', headers={'Authorization': f'Bearer {token}'})
+    assert res.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_changes_revoke_sessions_and_record_audit(async_client, db_session, admin_token, sample_trader):
+    from sqlalchemy import select
+    from app.db.models import RefreshSession, UserManagementAudit
+    from datetime import datetime, timezone, timedelta
+    from app.core.security import create_refresh_token
+    from app.core.sessions import add_refresh_session
+    refresh = create_refresh_token(subject=str(sample_trader.id), extra_claims={"auth_version": 0})
+    access = create_access_token(subject=sample_trader.id)
+    add_refresh_session(db_session, refresh, sample_trader.id)
+    await db_session.commit()
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    url = f"/api/v1/admin/users/{sample_trader.id}"
+    assert (await async_client.patch(url, json={"is_active": False}, headers=headers)).status_code == 200
+    assert sample_trader.auth_version == 1
+    assert not (await db_session.execute(select(RefreshSession))).scalars().all()
+    entries = (await db_session.execute(select(UserManagementAudit))).scalars().all()
+    assert len(entries) == 1 and entries[0].old_active and not entries[0].new_active
+    assert (await async_client.patch(url, json={"is_active": False}, headers=headers)).status_code == 200
+    assert sample_trader.auth_version == 1
+    assert (await async_client.get('/api/v1/admin/users', headers={"Authorization": f"Bearer {access}"})).status_code == 401
+    assert (await async_client.post('/api/v1/auth/refresh', json={"refresh_token": refresh})).status_code == 401
+    logs = (await async_client.get('/api/v1/admin/activity-logs', headers=headers)).json()
+    assert any(x['event_type'] == 'user_management' for x in logs['items'])
+
+@pytest.mark.asyncio
+async def test_audit_failure_rolls_back(async_client, db_session, admin_token, sample_trader):
+    from sqlalchemy import event, select
+    from app.db.models import UserManagementAudit
+    uid = sample_trader.id
+    def fail(*args):
+        raise RuntimeError('audit unavailable')
+    event.listen(UserManagementAudit, 'before_insert', fail)
+    try:
+        with pytest.raises(RuntimeError, match='audit unavailable'):
+            await async_client.patch(f'/api/v1/admin/users/{uid}', json={'is_active': False},
+                                     headers={'Authorization': f'Bearer {admin_token}'})
+    finally:
+        event.remove(UserManagementAudit, 'before_insert', fail)
+    await db_session.rollback()  # Test dependency shares the session; production get_db rolls back.
+    user = (await db_session.execute(select(User).where(User.id == uid))).scalar_one()
+    assert user.is_active and user.auth_version == 0
