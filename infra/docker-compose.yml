@@ -52,6 +52,12 @@ services:
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
       CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:3000","http://127.0.0.1:3000","http://localhost:8000"]}'
       ENVIRONMENT: ${ENVIRONMENT:-production}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL:?Set FRONTEND_PUBLIC_URL to the public Web URL}
       INTERNAL_WORKER_SECRET: ${INTERNAL_WORKER_SECRET:-}
     ports:
       - "${API_PORT:-8000}:8000"

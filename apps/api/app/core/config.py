@@ -89,6 +89,23 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    FRONTEND_PUBLIC_URL: str = "http://localhost:3000"
+
+    @model_validator(mode="after")
+    def validate_frontend_url(self):
+        from urllib.parse import urlsplit
+        url = urlsplit(self.FRONTEND_PUBLIC_URL)
+        if url.scheme not in ("http", "https") or not url.netloc or url.query or url.fragment or url.username:
+            raise ValueError("FRONTEND_PUBLIC_URL must be a trusted HTTP(S) URL")
+        if self.ENVIRONMENT.lower() == "production" and url.scheme != "https":
+            raise ValueError("Production FRONTEND_PUBLIC_URL requires HTTPS")
+        return self
+
     # Khóa bí mật phục vụ quy trình retrain tự trị nội bộ (Gói 2/3)
     INTERNAL_WORKER_SECRET: str | None = None
 

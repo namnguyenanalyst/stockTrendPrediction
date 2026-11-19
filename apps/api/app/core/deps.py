@@ -99,6 +99,9 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    if payload.get("auth_version", 0) != user.auth_version:
+        raise HTTPException(status_code=401, detail="Session revoked", headers={"WWW-Authenticate": "Bearer"})
+
     # Cập nhật có điều kiện last_seen_at ở tầng CSDL (throttle tối đa 1 lần/phút/user)
     # Không dùng biến bộ nhớ tiến trình, điều kiện WHERE giải quyết hoàn toàn tại CSDL
     now_utc = datetime.now(timezone.utc)

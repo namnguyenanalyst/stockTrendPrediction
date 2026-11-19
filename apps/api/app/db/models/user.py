@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, Enum, String, Uuid, func
+from sqlalchemy import Boolean, DateTime, Enum, Integer, String, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -68,10 +68,13 @@ class User(Base):
         onupdate=func.now(),
         nullable=False,
     )
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    auth_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
         default=None,
+        index=True,
     )
 
     # Relationships với cascade deletes

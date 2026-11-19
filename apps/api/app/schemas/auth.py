@@ -15,7 +15,6 @@ class UserRegisterRequest(BaseModel):
     email: str = Field(max_length=255)
     password: str = Field(..., min_length=8, max_length=1024, description="Mật khẩu từ 8 đến 1024 ký tự")
     full_name: str | None = Field(default=None, max_length=255)
-
     @field_validator("email")
     @classmethod
     def validate_email(cls, v: str) -> str:
@@ -23,7 +22,6 @@ class UserRegisterRequest(BaseModel):
         if not EMAIL_REGEX.match(cleaned):
             raise ValueError("Invalid email format")
         return cleaned
-
 
 
 class UserLoginRequest(BaseModel):
@@ -52,3 +50,23 @@ class TokenRefreshResponse(BaseModel):
 
     access_token: str
     token_type: str = "bearer"
+
+
+class AccountEmailRequest(BaseModel):
+    email: str = Field(min_length=1, max_length=255)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        value = value.strip().lower()
+        if not EMAIL_REGEX.fullmatch(value):
+            raise ValueError("Invalid email format")
+        return value
+
+
+class AccountTokenRequest(BaseModel):
+    token: str = Field(min_length=1, max_length=256)
+
+
+class ResetPasswordRequest(AccountTokenRequest):
+    new_password: str = Field(min_length=8, max_length=1024)
