@@ -35,7 +35,7 @@ from app.core.security import (
 )
 from app.db.models.backtest import BacktestHistory
 from app.db.models.preset import StrategyPreset
-from app.db.models.user import RiskProfile, User, UserRole
+from app.db.models.user import User, UserRole
 from app.db.models.watchlist import UserWatchlist
 from app.main import app
 

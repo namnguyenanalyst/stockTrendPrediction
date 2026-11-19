@@ -29,7 +29,7 @@ from app.core.sessions import (
     token_digest,
 )
 from app.db.models.refresh_session import RefreshSession
-from app.db.models.user import RiskProfile, User, UserRole
+from app.db.models.user import User, UserRole
 from app.schemas.auth import (
     RefreshRequest,
     TokenRefreshResponse,
@@ -65,13 +65,6 @@ async def register(
             detail="Email already registered",
         )
 
-    # Chuyển đổi khẩu vị rủi ro sang enum
-    profile_str = (req.risk_profile or "balanced").strip().lower()
-    try:
-        risk_enum = RiskProfile(profile_str)
-    except ValueError:
-        risk_enum = RiskProfile.BALANCED
-
     hashed_pwd = await run_in_threadpool(get_password_hash, req.password)
     user_id = uuid.uuid4()
 
@@ -81,7 +74,6 @@ async def register(
         hashed_password=hashed_pwd,
         full_name=req.full_name,
         role=UserRole.TRADER,
-        risk_profile=risk_enum,
         is_active=True,
     )
     db.add(new_user)

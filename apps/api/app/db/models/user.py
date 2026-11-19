@@ -23,14 +23,6 @@ class UserRole(str, enum.Enum):
     ADMIN = "admin"
 
 
-class RiskProfile(str, enum.Enum):
-    """Khẩu vị rủi ro đầu tư của người dùng."""
-
-    CONSERVATIVE = "conservative"
-    BALANCED = "balanced"
-    AGGRESSIVE = "aggressive"
-
-
 class User(Base):
     """Bảng người dùng cốt lõi (users) phục vụ xác thực JWT và phân quyền."""
 
@@ -58,11 +50,6 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, name="user_role_enum", native_enum=False),
         default=UserRole.TRADER,
-        nullable=False,
-    )
-    risk_profile: Mapped[RiskProfile] = mapped_column(
-        Enum(RiskProfile, name="risk_profile_enum", native_enum=False),
-        default=RiskProfile.BALANCED,
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(

@@ -50,17 +50,6 @@ def test_register_password_under_minimum_length_returns_422(client: E2EClient):
     assert res.status_code == 422
 
 
-def test_register_invalid_risk_profile_returns_422(client: E2EClient):
-    """Registering with an unsupported risk profile returns HTTP 422."""
-    uid = uuid.uuid4().hex[:8]
-    res = client.register(
-        email=f"bad_risk_{uid}@quant.vn",
-        password="ValidPassword@123",
-        risk_profile="reckless_gambler",
-    )
-    assert res.status_code == 422
-
-
 def test_register_sql_injection_payload_sanitized(client: E2EClient):
     """Registering with SQL injection characters is safely escaped and does not crash."""
     uid = uuid.uuid4().hex[:8]

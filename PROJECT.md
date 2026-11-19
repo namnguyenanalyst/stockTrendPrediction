@@ -46,7 +46,7 @@ The platform is upgraded from a single-user demo to a production-grade, multi-us
 - Dialects supported: `postgresql+asyncpg://` for production, `sqlite+aiosqlite://` for lightning test isolation.
 - Session dependency: `get_db() -> AsyncGenerator[AsyncSession, None]`.
 - Tables:
-  - `users`: `id` (UUID PK), `email` (str, unique, index), `hashed_password` (str), `full_name` (str, nullable), `role` (`trader` | `admin`), `risk_profile` (`conservative` | `balanced` | `aggressive`), `is_active` (bool), `created_at`, `updated_at`.
+  - `users`: `id` (UUID PK), `email` (str, unique, index), `hashed_password` (str), `full_name` (str, nullable), `role` (`trader` | `admin`), `is_active` (bool), `created_at`, `updated_at`.
   - `user_watchlists`: `id` (UUID PK), `user_id` (UUID FK -> users.id, cascade), `name` (str), `symbols` (JSONB list of strings), `created_at`, `updated_at`.
   - `strategy_presets`: `id` (UUID PK), `user_id` (UUID FK -> users.id, cascade), `name` (str), `description` (str, nullable), `parameters` (JSONB dict), `created_at`, `updated_at`.
   - `backtest_histories`: `id` (UUID PK), `user_id` (UUID FK -> users.id, cascade), `symbol` (str, index), `strategy_name` (str), `strategy_type` (str), `start_date` (date), `end_date` (date), `initial_capital` (float), `total_return` (float), `sharpe_ratio` (float), `max_drawdown` (float), `win_rate` (float), `equity_curve` (JSONB list), `executed_at` (datetime).
@@ -56,10 +56,10 @@ The platform is upgraded from a single-user demo to a production-grade, multi-us
 - Authentication Header: `Authorization: Bearer <access_token>`
 - Refresh Token Cookie: `refresh_token=<token>; HttpOnly; Path=/api/v1/auth; SameSite=Lax`
 - Endpoints:
-  - `POST /api/v1/auth/register`: Request `{ email, password, full_name?, risk_profile? }` -> Response `{ id, email, full_name, role, risk_profile, is_active, created_at }`
+  - `POST /api/v1/auth/register`: Request `{ email, password, full_name? }` -> Response `{ id, email, full_name, role, is_active, created_at }`
   - `POST /api/v1/auth/login`: Request `{ email, password }` -> Response `{ access_token, token_type: "bearer", user: {...} }` + Set-Cookie `refresh_token`
   - `POST /api/v1/auth/refresh`: Request (reads cookie `refresh_token` or body) -> Response `{ access_token, token_type: "bearer" }`
-  - `GET /api/v1/auth/me`: Requires Bearer token -> Response `{ id, email, full_name, role, risk_profile, is_active }`
+  - `GET /api/v1/auth/me`: Requires Bearer token -> Response `{ id, email, full_name, role, is_active }`
   - `GET /api/v1/user/watchlists`: -> Response `list[WatchlistOut]`
   - `POST /api/v1/user/watchlists`: Request `{ name, symbols }` -> Response `WatchlistOut`
   - `DELETE /api/v1/user/watchlists/{watchlist_id}`: -> Response `204 No Content`

@@ -16,7 +16,7 @@ import {
   registerUser,
   setAuthToken,
 } from "@/lib/api";
-import { RiskProfile, User } from "@/lib/types";
+import { User } from "@/lib/types";
 
 interface AuthContextType {
   user: User | null;
@@ -29,7 +29,6 @@ interface AuthContextType {
     email: string,
     password: string,
     fullName?: string | null,
-    riskProfile?: RiskProfile | string
   ) => Promise<User>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -216,12 +215,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       email: string,
       password: string,
       fullName?: string | null,
-      riskProfile?: RiskProfile | string
     ): Promise<User> => {
       setIsLoading(true);
       setError(null);
       try {
-        await registerUser(email, password, fullName, riskProfile);
+        await registerUser(email, password, fullName);
         // Tự động đăng nhập sau khi đăng ký thành công
         const loggedInUser = await login(email, password);
         return loggedInUser;

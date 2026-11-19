@@ -6,7 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token, get_password_hash
-from app.db.models.user import RiskProfile, User, UserRole
+from app.db.models.user import User, UserRole
 
 
 @pytest.fixture
@@ -17,7 +17,6 @@ async def admin_user(db_session: AsyncSession) -> User:
         email="admin_super@example.com",
         hashed_password=get_password_hash("AdminSecret123"),
         role=UserRole.ADMIN,
-        risk_profile=RiskProfile.BALANCED,
         is_active=True,
     )
     db_session.add(user)
@@ -41,7 +40,6 @@ async def sample_trader(db_session: AsyncSession) -> User:
         full_name="John Trader",
         hashed_password=get_password_hash("TraderSecret123"),
         role=UserRole.TRADER,
-        risk_profile=RiskProfile.AGGRESSIVE,
         is_active=True,
     )
     db_session.add(user)

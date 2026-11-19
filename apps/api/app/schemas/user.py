@@ -13,7 +13,6 @@ class UserResponse(BaseModel):
     email: str
     full_name: str | None = None
     role: str
-    risk_profile: str
     is_active: bool
     created_at: datetime
     updated_at: datetime | None = None
@@ -23,13 +22,6 @@ class UserResponse(BaseModel):
     @field_validator("role", mode="before")
     @classmethod
     def serialize_role(cls, v: object) -> str:
-        if hasattr(v, "value"):
-            return str(v.value)
-        return str(v)
-
-    @field_validator("risk_profile", mode="before")
-    @classmethod
-    def serialize_risk_profile(cls, v: object) -> str:
         if hasattr(v, "value"):
             return str(v.value)
         return str(v)

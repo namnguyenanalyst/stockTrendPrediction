@@ -53,7 +53,6 @@ describe("Frontend Auth Suite (src/lib/auth.test.ts)", () => {
           id: "u-123",
           email: "trader@quantinvest.vn",
           role: "trader",
-          risk_profile: "balanced",
           is_active: true,
         },
       };
@@ -100,7 +99,6 @@ describe("Frontend Auth Suite (src/lib/auth.test.ts)", () => {
         email: "newtrader@quantinvest.vn",
         full_name: "Nguyen Van A",
         role: "trader",
-        risk_profile: "aggressive",
         is_active: true,
         created_at: "2026-10-30T10:00:00Z",
       };
@@ -113,8 +111,7 @@ describe("Frontend Auth Suite (src/lib/auth.test.ts)", () => {
       const res = await registerUser(
         "newtrader@quantinvest.vn",
         "ValidPass123",
-        "Nguyen Van A",
-        "aggressive"
+        "Nguyen Van A"
       );
 
       expect(fetch).toHaveBeenCalledWith(
@@ -126,13 +123,11 @@ describe("Frontend Auth Suite (src/lib/auth.test.ts)", () => {
             email: "newtrader@quantinvest.vn",
             password: "ValidPass123",
             full_name: "Nguyen Van A",
-            risk_profile: "aggressive",
           }),
         })
       );
 
       expect(res.email).toBe("newtrader@quantinvest.vn");
-      expect(res.risk_profile).toBe("aggressive");
     });
 
     it("refreshToken should call /api/v1/auth/refresh and update inMemoryToken", async () => {
@@ -167,7 +162,6 @@ describe("Frontend Auth Suite (src/lib/auth.test.ts)", () => {
         id: "u-789",
         email: "active@quant.vn",
         role: "admin",
-        risk_profile: "conservative",
         is_active: true,
       };
 

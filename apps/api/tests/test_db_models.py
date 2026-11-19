@@ -1,7 +1,6 @@
 """Automated Unit Tests cho 5 Core SQLAlchemy Models.
 
 Kiểm tra:
-1. Khởi tạo CRUD và giá trị mặc định (UUID, role, risk_profile, timestamps).
 2. Ràng buộc toàn vẹn Unique (email người dùng).
 3. Ràng buộc Foreign Key và Cascade Delete (Watchlists, Presets, Backtests bị xóa khi User bị xóa).
 4. Khả năng serialize/deserialize JSONB/JSON (symbols, parameters, equity_curve, predicted_probabilities).
@@ -20,7 +19,6 @@ from app.db.models import (
     BacktestHistory,
     Base,
     PredictionAudit,
-    RiskProfile,
     StrategyPreset,
     User,
     UserRole,
@@ -56,7 +54,6 @@ async def test_create_user_and_default_values(db_session: AsyncSession):
     assert isinstance(user.id, uuid.UUID)
     assert user.email == "trader_default@vnstock.vn"
     assert user.role == UserRole.TRADER
-    assert user.risk_profile == RiskProfile.BALANCED
     assert user.is_active is True
     assert user.created_at is not None
     assert user.updated_at is not None
@@ -85,22 +82,6 @@ async def test_user_unique_email_constraint(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_user_custom_role_and_risk_profile(db_session: AsyncSession):
-    """Kiểm tra gán role admin và khẩu vị rủi ro tùy biến."""
-    user = User(
-        email="admin@vnstock.vn",
-        hashed_password="admin_hashed_pw",
-        role=UserRole.ADMIN,
-        risk_profile=RiskProfile.AGGRESSIVE,
-    )
-    db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
-
-    assert user.role == UserRole.ADMIN
-    assert user.risk_profile == RiskProfile.AGGRESSIVE
-
-
 @pytest.mark.asyncio
 async def test_watchlist_crud_and_json_symbols(db_session: AsyncSession):
     """Kiểm tra CRUD Watchlist và lưu trữ danh sách mã JSON/JSONB."""

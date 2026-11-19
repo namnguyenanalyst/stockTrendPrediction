@@ -14,3 +14,16 @@ Thư mục này được sử dụng để lưu trữ các script chuyển đổ
    ```
 
 *Hiện tại thư mục này được để trống làm khung chờ, sẵn sàng khi bắt đầu phát triển tầng ORM/Database.*
+
+## Remove user risk profile (004)
+
+Deploy API and Web together. Back up PostgreSQL before applying this migration.
+Stop the old API, run `uv run alembic upgrade head` from `apps/api` using the
+intended database settings, then start the updated API and Web. The API Docker
+entrypoint also applies migrations before starting Uvicorn.
+
+Migration 004 permanently removes saved risk preferences, preserving users,
+roles and related records. For rollback, stop the new API, run
+`uv run alembic downgrade 003_refresh_sessions`, then start the old application.
+Downgrade restores the column with balanced values; original choices require
+the backup to recover.

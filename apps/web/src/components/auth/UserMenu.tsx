@@ -6,35 +6,8 @@ import {
   ChevronDown,
   LogIn,
   LogOut,
-  Shield,
-  ShieldAlert,
-  ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-
-const RISK_LABELS: Record<
-  string,
-  { label: string; bg: string; text: string; icon: React.ComponentType<{ className?: string }> }
-> = {
-  conservative: {
-    label: "Thận trọng",
-    bg: "bg-sky-500/15 border-sky-500/30",
-    text: "text-sky-300",
-    icon: ShieldCheck,
-  },
-  balanced: {
-    label: "Cân bằng",
-    bg: "bg-emerald-500/15 border-emerald-500/30",
-    text: "text-emerald-300",
-    icon: Shield,
-  },
-  aggressive: {
-    label: "Tăng trưởng",
-    bg: "bg-amber-500/15 border-amber-500/30",
-    text: "text-amber-300",
-    icon: ShieldAlert,
-  },
-};
 
 export const UserMenu: React.FC = () => {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
@@ -78,13 +51,6 @@ export const UserMenu: React.FC = () => {
     );
   }
 
-  const riskInfo = RISK_LABELS[user.risk_profile] || {
-    label: user.risk_profile || "Cân bằng",
-    bg: "bg-emerald-500/15 border-emerald-500/30",
-    text: "text-emerald-300",
-    icon: Shield,
-  };
-  const RiskIcon = riskInfo.icon;
   const displayName = user.full_name || user.email.split("@")[0];
   const initial = displayName.charAt(0).toUpperCase();
 
@@ -113,14 +79,6 @@ export const UserMenu: React.FC = () => {
             {user.role === "admin" ? "ADMIN" : "TRADER"}
           </span>
         </div>
-
-        {/* Badge khẩu vị rủi ro */}
-        <span
-          className={`hidden md:inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${riskInfo.bg} ${riskInfo.text}`}
-        >
-          <RiskIcon className="h-3 w-3" />
-          <span>{riskInfo.label}</span>
-        </span>
 
         <ChevronDown className="h-3 w-3 text-slate-400 shrink-0" />
       </button>
@@ -152,12 +110,7 @@ export const UserMenu: React.FC = () => {
               >
                 Vai trò: {user.role === "admin" ? "ADMIN" : "TRADER"}
               </span>
-              <span
-                className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium ${riskInfo.bg} ${riskInfo.text}`}
-              >
-                <RiskIcon className="h-2.5 w-2.5" />
-                <span>{riskInfo.label}</span>
-              </span>
+
             </div>
           </div>
 

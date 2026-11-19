@@ -266,13 +266,11 @@ export async function registerUser(
   email: string,
   password: string,
   fullName?: string | null,
-  riskProfile?: string
 ): Promise<User> {
   const data: RegisterRequest = {
     email,
     password,
     full_name: fullName,
-    risk_profile: riskProfile,
   };
   return fetchJson<User>("/api/v1/auth/register", {
     method: "POST",

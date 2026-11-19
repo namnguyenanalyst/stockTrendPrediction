@@ -20,36 +20,17 @@ from tests.e2e.client import E2EClient
 # Feature 1: User Registration (POST /api/v1/auth/register)
 # =============================================================================
 
-def test_register_balanced_profile_default(client: E2EClient):
-    """Register user with default balanced risk profile."""
+def test_register_default_account(client: E2EClient):
+    """Register a user without optional profile fields."""
     uid = uuid.uuid4().hex[:8]
-    email = f"balanced_{uid}@quant.vn"
-    res = client.register(email=email, password="SafePassword@123", risk_profile="balanced")
+    email = f"default_{uid}@quant.vn"
+    res = client.register(email=email, password="SafePassword@123")
     assert res.status_code in (200, 201)
     data = res.json()
     assert data["email"] == email
-    assert data["risk_profile"] == "balanced"
     assert data["role"] == "trader"
     assert data["is_active"] is True
     assert "id" in data
-
-
-def test_register_conservative_profile(client: E2EClient):
-    """Register user with conservative risk profile."""
-    uid = uuid.uuid4().hex[:8]
-    email = f"conservative_{uid}@quant.vn"
-    res = client.register(email=email, password="SafePassword@123", risk_profile="conservative")
-    assert res.status_code in (200, 201)
-    assert res.json()["risk_profile"] == "conservative"
-
-
-def test_register_aggressive_profile(client: E2EClient):
-    """Register user with aggressive risk profile."""
-    uid = uuid.uuid4().hex[:8]
-    email = f"aggressive_{uid}@quant.vn"
-    res = client.register(email=email, password="SafePassword@123", risk_profile="aggressive")
-    assert res.status_code in (200, 201)
-    assert res.json()["risk_profile"] == "aggressive"
 
 
 def test_register_with_vietnamese_fullname(client: E2EClient):
@@ -70,7 +51,6 @@ def test_register_minimal_payload_uses_defaults(client: E2EClient):
     assert res.status_code in (200, 201)
     data = res.json()
     assert data["email"] == email
-    assert data["risk_profile"] == "balanced"
     assert data["role"] == "trader"
 
 
@@ -146,17 +126,15 @@ def test_login_case_insensitive_email(client: E2EClient):
 
 
 def test_login_returns_complete_user_profile(client: E2EClient):
-    """Login payload includes user metadata (id, email, full_name, role, risk_profile)."""
     uid = uuid.uuid4().hex[:8]
     email = f"meta_{uid}@quant.vn"
     pwd = "MetaPassword@123"
-    client.register(email=email, password=pwd, full_name="Meta Trader", risk_profile="aggressive")
+    client.register(email=email, password=pwd, full_name="Meta Trader")
 
     res = client.login(email=email, password=pwd)
     assert res.status_code == 200
     user_info = res.json()["user"]
     assert user_info["full_name"] == "Meta Trader"
-    assert user_info["risk_profile"] == "aggressive"
     assert user_info["role"] == "trader"
 
 
@@ -229,13 +207,12 @@ def test_refresh_token_preserves_user_identity_and_role(client: E2EClient):
     uid = uuid.uuid4().hex[:8]
     email = f"pres_{uid}@quant.vn"
     pwd = "PresPassword@123"
-    client.register(email=email, password=pwd, risk_profile="conservative")
+    client.register(email=email, password=pwd)
     client.login(email=email, password=pwd)
 
     client.refresh()
     me_data = client.me().json()
     assert me_data["email"] == email
-    assert me_data["risk_profile"] == "conservative"
     assert me_data["role"] == "trader"
 
 
@@ -255,12 +232,6 @@ def test_me_returns_uuid_and_matching_email(registered_user, client: E2EClient):
     data = res.json()
     assert data["email"] == registered_user["email"]
     assert len(data["id"]) >= 32
-
-
-def test_me_reflects_registered_risk_profile(registered_user, client: E2EClient):
-    """GET /api/v1/auth/me reflects the assigned risk profile."""
-    res = client.me()
-    assert res.json()["risk_profile"] == registered_user["risk_profile"]
 
 
 def test_me_confirms_trader_role_and_active_status(registered_user, client: E2EClient):

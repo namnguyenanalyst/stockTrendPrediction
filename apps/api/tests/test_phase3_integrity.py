@@ -296,7 +296,7 @@ def test_refresh_session_migration_round_trip(tmp_path, monkeypatch):
     path = tmp_path / "migration.db"
     monkeypatch.setattr(settings, "ASYNC_DATABASE_URL", f"sqlite+aiosqlite:///{path}")
     config = Config("alembic.ini")
-    command.upgrade(config, "head")
+    command.upgrade(config, "003_refresh_sessions")
     with sqlite3.connect(path) as db:
         assert db.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "003_refresh_sessions"
         assert db.execute("PRAGMA table_info(refresh_sessions)").fetchall()

@@ -17,7 +17,7 @@ Hệ thống kiểm thử End-to-End (E2E) được thiết kế theo nguyên t�
 3. **Boundary Value Analysis (BVA - Phân tích Giá trị Biên):**
    - Tập trung vào các điểm biên nhạy cảm: vốn đầu tư tối thiểu/tối đa, chu kỳ thanh toán chứng khoán Việt Nam ($T+2.5$, $T+2$, $T+3$), chuỗi nến lịch sử tối thiểu (5 nến), độ dài mật khẩu, token hết hạn tại ranh giới thời gian (0 giây vs 1 giây), và danh sách mã rỗng `[]`.
 4. **Pairwise / Combinatorial Testing (Kiểm thử Tổ hợp Cặp):**
-   - Phối hợp các chiều biến: `risk_profile` (`conservative`, `balanced`, `aggressive`) $\times$ `strategy_type` (`macd_crossover`, `bollinger_breakout`, `ensemble_ai`) $\times$ `role` (`trader`, `admin`) để đảm bảo phát hiện lỗi giao thoa dữ liệu.
+   - Phối hợp các chiều biến: `strategy_type` (`macd_crossover`, `bollinger_breakout`, `ensemble_ai`) $\times$ `role` (`trader`, `admin`) để đảm bảo phát hiện lỗi giao thoa dữ liệu.
 5. **Workload & Multi-Tenant Scenario Testing (Kiểm thử Kịch bản Đa người dùng):**
    - Mô phỏng hành trình nhà đầu tư thực tế (Real-world Investor Lifecycle) từ đăng ký, đăng nhập, nạp danh mục theo dõi, cấu hình chiến lược, chạy backtest và lưu nhật ký.
    - Thẩm tra cô lập dữ liệu tuyệt đối giữa các người dùng (Zero Cross-Tenant Leakage & IDOR Prevention).

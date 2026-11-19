@@ -81,13 +81,11 @@ def registered_user(client: E2EClient) -> dict:
     email = f"investor_{unique_id}@quantplatform.vn"
     password = "StrongPassword@123"
     full_name = f"Investor {unique_id}"
-    risk_profile = "balanced"
 
     reg_res = client.register(
         email=email,
         password=password,
         full_name=full_name,
-        risk_profile=risk_profile,
     )
     assert reg_res.status_code in (200, 201), f"User registration failed: {reg_res.text}"
 
@@ -99,7 +97,6 @@ def registered_user(client: E2EClient) -> dict:
         "email": email,
         "password": password,
         "full_name": full_name,
-        "risk_profile": risk_profile,
         "access_token": login_data.get("access_token"),
         "user": login_data.get("user"),
     }
@@ -117,7 +114,7 @@ def user_a_client(test_app) -> E2EClient:
     email = f"user_a_{unique_id}@firm.vn"
     pwd = "UserAPassword@123"
 
-    reg = cli.register(email=email, password=pwd, full_name="User Alpha", risk_profile="conservative")
+    reg = cli.register(email=email, password=pwd, full_name="User Alpha")
     assert reg.status_code in (200, 201)
     login = cli.login(email=email, password=pwd)
     assert login.status_code == 200
@@ -138,7 +135,7 @@ def user_b_client(test_app) -> E2EClient:
     email = f"user_b_{unique_id}@firm.vn"
     pwd = "UserBPassword@456"
 
-    reg = cli.register(email=email, password=pwd, full_name="User Beta", risk_profile="aggressive")
+    reg = cli.register(email=email, password=pwd, full_name="User Beta")
     assert reg.status_code in (200, 201)
     login = cli.login(email=email, password=pwd)
     assert login.status_code == 200

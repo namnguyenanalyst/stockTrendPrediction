@@ -110,13 +110,10 @@ class E2EClient:
         email: str,
         password: str,
         full_name: Optional[str] = None,
-        risk_profile: Optional[str] = None,
     ) -> httpx.Response:
         payload: Dict[str, Any] = {"email": email, "password": password}
         if full_name is not None:
             payload["full_name"] = full_name
-        if risk_profile is not None:
-            payload["risk_profile"] = risk_profile
         return self.post("/api/v1/auth/register", json=payload)
 
     def login(self, email: str, password: str) -> httpx.Response:

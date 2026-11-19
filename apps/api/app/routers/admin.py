@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_admin_user, get_db
 from app.db.models.audit import PredictionAudit
 from app.db.models.backtest import BacktestHistory
-from app.db.models.user import RiskProfile, User, UserRole
+from app.db.models.user import User, UserRole
 
 router = APIRouter(tags=["Admin"])
 
@@ -42,7 +42,6 @@ class AdminUserItem(BaseModel):
     email: str
     full_name: str | None = None
     role: UserRole
-    risk_profile: RiskProfile
     is_active: bool
     created_at: datetime
     last_seen_at: datetime | None = None
@@ -197,7 +196,6 @@ async def list_admin_users(
             email=u.email,
             full_name=u.full_name,
             role=u.role,
-            risk_profile=u.risk_profile,
             is_active=u.is_active,
             created_at=u.created_at,
             last_seen_at=u.last_seen_at,
@@ -268,7 +266,6 @@ async def update_admin_user(
         email=target_user.email,
         full_name=target_user.full_name,
         role=target_user.role,
-        risk_profile=target_user.risk_profile,
         is_active=target_user.is_active,
         created_at=target_user.created_at,
         last_seen_at=target_user.last_seen_at,
@@ -364,7 +361,7 @@ async def get_admin_activity_logs(
                 description=f"Tài khoản {u.email} đã đăng ký vào hệ thống",
                 actor=u.email,
                 status="info" if u.is_active else "warning",
-                metadata={"role": u.role, "risk_profile": u.risk_profile},
+                metadata={"role": u.role},
             )
         )
 

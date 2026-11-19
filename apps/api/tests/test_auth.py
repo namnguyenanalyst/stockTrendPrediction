@@ -13,10 +13,9 @@ from app.db.models.user import User
 
 
 @pytest.mark.asyncio
-async def test_register_balanced_default(async_client: httpx.AsyncClient):
-    """Đăng ký tài khoản với các thông số mặc định (risk_profile='balanced', role='trader')."""
+async def test_register_default_account(async_client: httpx.AsyncClient):
     uid = uuid.uuid4().hex[:8]
-    email = f"balanced_{uid}@quant.vn"
+    email = f"default_{uid}@quant.vn"
     res = await async_client.post(
         "/api/v1/auth/register",
         json={"email": email, "password": "SafePassword@123"},
@@ -24,40 +23,11 @@ async def test_register_balanced_default(async_client: httpx.AsyncClient):
     assert res.status_code == 201
     data = res.json()
     assert data["email"] == email
-    assert data["risk_profile"] == "balanced"
     assert data["role"] == "trader"
     assert data["is_active"] is True
     assert "id" in data
     assert "password" not in data
     assert "hashed_password" not in data
-
-
-@pytest.mark.asyncio
-async def test_register_conservative_and_aggressive_profiles(async_client: httpx.AsyncClient):
-    """Đăng ký tài khoản với khẩu vị conservative và aggressive."""
-    uid1 = uuid.uuid4().hex[:8]
-    res1 = await async_client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": f"cons_{uid1}@quant.vn",
-            "password": "SafePassword@123",
-            "risk_profile": "conservative",
-        },
-    )
-    assert res1.status_code == 201
-    assert res1.json()["risk_profile"] == "conservative"
-
-    uid2 = uuid.uuid4().hex[:8]
-    res2 = await async_client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": f"aggr_{uid2}@quant.vn",
-            "password": "SafePassword@123",
-            "risk_profile": "aggressive",
-        },
-    )
-    assert res2.status_code == 201
-    assert res2.json()["risk_profile"] == "aggressive"
 
 
 @pytest.mark.asyncio
@@ -145,19 +115,6 @@ async def test_register_short_password_returns_422(async_client: httpx.AsyncClie
 
 
 @pytest.mark.asyncio
-async def test_register_invalid_risk_profile_returns_422(async_client: httpx.AsyncClient):
-    """Đăng ký với khẩu vị rủi ro không hỗ trợ trả về 422."""
-    res = await async_client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": "bad_risk@quant.vn",
-            "password": "SafePassword@123",
-            "risk_profile": "ultra_speculator",
-        },
-    )
-    assert res.status_code == 422
-
-
 @pytest.mark.asyncio
 async def test_login_valid_credentials(async_client: httpx.AsyncClient):
     """Đăng nhập thành công trả về access token và thông tin người dùng."""
@@ -346,7 +303,6 @@ async def test_get_me_success(async_client: httpx.AsyncClient):
             "email": email,
             "password": pwd,
             "full_name": "Test Trader",
-            "risk_profile": "aggressive",
         },
     )
     login_res = await async_client.post(
@@ -362,7 +318,6 @@ async def test_get_me_success(async_client: httpx.AsyncClient):
     data = res.json()
     assert data["email"] == email
     assert data["full_name"] == "Test Trader"
-    assert data["risk_profile"] == "aggressive"
     assert data["role"] == "trader"
     assert "password" not in data
     assert "hashed_password" not in data
@@ -394,3 +349,17 @@ async def test_get_me_expired_token_returns_401(async_client: httpx.AsyncClient)
         "/api/v1/auth/me", headers={"Authorization": f"Bearer {expired_token}"}
     )
     assert res.status_code == 401
+
+@pytest.mark.asyncio
+async def test_removed_risk_profile_is_ignored(async_client):
+    response = await async_client.post("/api/v1/auth/register", json={
+        "email": f"legacy_{uuid.uuid4().hex}@test.vn",
+        "password": "SafePassword@123",
+        "risk_profile": "aggressive",
+    })
+    assert response.status_code == 201
+    assert "risk_profile" not in response.json()
+    from app.db.models.user import User
+    from app.main import app
+    assert "risk_profile" not in User.__table__.columns
+    assert "risk_profile" not in str(app.openapi())

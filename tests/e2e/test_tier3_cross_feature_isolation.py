@@ -135,7 +135,7 @@ def test_full_investor_journey_e2e(client: E2EClient):
     full_name = "Trần Đình Khang"
 
     # Step 1: Register
-    reg_res = client.register(email=email, password=pwd, full_name=full_name, risk_profile="balanced")
+    reg_res = client.register(email=email, password=pwd, full_name=full_name)
     assert reg_res.status_code in (200, 201)
 
     # Step 2: Login

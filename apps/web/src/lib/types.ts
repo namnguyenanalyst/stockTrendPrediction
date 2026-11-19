@@ -564,14 +564,12 @@ export interface SavedStrategyItem {
 // =============================================================================
 
 export type UserRole = "trader" | "admin";
-export type RiskProfile = "conservative" | "balanced" | "aggressive";
 
 export interface User {
   id: string;
   email: string;
   full_name?: string | null;
   role: UserRole | string;
-  risk_profile: RiskProfile | string;
   is_active: boolean;
   created_at?: string;
   updated_at?: string | null;
@@ -592,7 +590,6 @@ export interface RegisterRequest {
   email: string;
   password: string;
   full_name?: string | null;
-  risk_profile?: RiskProfile | string;
 }
 
 export interface RefreshTokenResponse {
@@ -663,7 +660,6 @@ export interface AdminUserItem {
   email: string;
   full_name: string | null;
   role: "admin" | "trader";
-  risk_profile: "conservative" | "balanced" | "aggressive";
   is_active: boolean;
   created_at: string;
   last_seen_at: string | null;

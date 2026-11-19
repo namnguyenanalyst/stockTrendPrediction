@@ -15,9 +15,6 @@ class UserRegisterRequest(BaseModel):
     email: str = Field(max_length=255)
     password: str = Field(..., min_length=8, max_length=1024, description="Mật khẩu từ 8 đến 1024 ký tự")
     full_name: str | None = Field(default=None, max_length=255)
-    risk_profile: str | None = Field(
-        default="balanced", description="conservative | balanced | aggressive"
-    )
 
     @field_validator("email")
     @classmethod
@@ -27,17 +24,6 @@ class UserRegisterRequest(BaseModel):
             raise ValueError("Invalid email format")
         return cleaned
 
-    @field_validator("risk_profile")
-    @classmethod
-    def validate_risk_profile(cls, v: str | None) -> str:
-        if v is None:
-            return "balanced"
-        cleaned = v.strip().lower()
-        if cleaned not in ("conservative", "balanced", "aggressive"):
-            raise ValueError(
-                "Invalid risk profile. Must be one of: conservative, balanced, aggressive"
-            )
-        return cleaned
 
 
 class UserLoginRequest(BaseModel):

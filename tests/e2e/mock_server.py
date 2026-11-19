@@ -106,7 +106,6 @@ class UserRegisterRequest(BaseModel):
     email: str
     password: str
     full_name: Optional[str] = None
-    risk_profile: Optional[str] = "balanced"
 
 
 class UserLoginRequest(BaseModel):
@@ -307,8 +306,6 @@ def create_reference_app() -> FastAPI:
             raise HTTPException(status_code=422, detail="Invalid email format")
         if len(req.password) < 8:
             raise HTTPException(status_code=422, detail="Password must be at least 8 characters")
-        if req.risk_profile not in ["conservative", "balanced", "aggressive"]:
-            raise HTTPException(status_code=422, detail="Invalid risk profile")
 
         if email_clean in STORE.users_by_email:
             raise HTTPException(status_code=400, detail="Email already registered")
@@ -321,7 +318,6 @@ def create_reference_app() -> FastAPI:
             "hashed_password": hash_password(req.password),
             "full_name": req.full_name,
             "role": "trader",
-            "risk_profile": req.risk_profile or "balanced",
             "is_active": True,
             "created_at": created_at,
             "updated_at": created_at,
@@ -335,7 +331,6 @@ def create_reference_app() -> FastAPI:
             "email": user_record["email"],
             "full_name": user_record["full_name"],
             "role": user_record["role"],
-            "risk_profile": user_record["risk_profile"],
             "is_active": user_record["is_active"],
             "created_at": user_record["created_at"],
         }
@@ -373,7 +368,6 @@ def create_reference_app() -> FastAPI:
                 "email": user["email"],
                 "full_name": user["full_name"],
                 "role": user["role"],
-                "risk_profile": user["risk_profile"],
                 "is_active": user["is_active"],
             },
         }
@@ -408,7 +402,6 @@ def create_reference_app() -> FastAPI:
             "email": current_user["email"],
             "full_name": current_user["full_name"],
             "role": current_user["role"],
-            "risk_profile": current_user["risk_profile"],
             "is_active": current_user["is_active"],
         }
 

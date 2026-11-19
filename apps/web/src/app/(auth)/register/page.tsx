@@ -9,40 +9,9 @@ import {
   CheckCircle2,
   Lock,
   Mail,
-  Shield,
-  ShieldAlert,
-  ShieldCheck,
   User as UserIcon,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { RiskProfile } from "@/lib/types";
-
-const RISK_PROFILES: {
-  id: RiskProfile;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}[] = [
-  {
-    id: "conservative",
-    label: "Thận trọng",
-    description: "Ưu tiên bảo toàn vốn, quản trị rủi ro chặt chẽ",
-    icon: ShieldCheck,
-  },
-  {
-    id: "balanced",
-    label: "Cân bằng",
-    description: "Cân đối giữa tăng trưởng lợi nhuận và kiểm soát sụt giảm",
-    icon: Shield,
-  },
-  {
-    id: "aggressive",
-    label: "Tăng trưởng",
-    description: "Chấp nhận biến động cao để tối đa hóa tỷ suất sinh lời",
-    icon: ShieldAlert,
-  },
-];
-
 function RegisterForm() {
   const router = useRouter();
   const { register } = useAuth();
@@ -51,7 +20,6 @@ function RegisterForm() {
   const [fullName, setFullName] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
-  const [riskProfile, setRiskProfile] = useState<RiskProfile>("balanced");
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -82,7 +50,7 @@ function RegisterForm() {
 
     setIsSubmitting(true);
     try {
-      await register(cleanEmail, password, fullName.trim() || null, riskProfile);
+      await register(cleanEmail, password, fullName.trim() || null);
       setIsSuccess(true);
       setTimeout(() => {
         router.push("/dashboard");
@@ -219,37 +187,6 @@ function RegisterForm() {
               placeholder="••••••••"
               className="w-full rounded-xl border border-slate-800 bg-slate-950/70 py-2.5 pl-10 pr-4 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
             />
-          </div>
-        </div>
-
-        {/* Khẩu vị rủi ro (Risk Profile) */}
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-            Khẩu vị rủi ro đầu tư
-          </label>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {RISK_PROFILES.map((item) => {
-              const Icon = item.icon;
-              const isSelected = riskProfile === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setRiskProfile(item.id)}
-                  className={`flex flex-col items-center p-2.5 rounded-xl border text-center transition-all ${
-                    isSelected
-                      ? "border-emerald-500 bg-emerald-500/15 text-emerald-300 shadow-sm shadow-emerald-500/20"
-                      : "border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:text-slate-200"
-                  }`}
-                >
-                  <Icon className="h-5 w-5 mb-1 text-emerald-400" />
-                  <span className="text-xs font-bold">{item.label}</span>
-                  <span className="text-[10px] leading-tight text-slate-500 mt-0.5 line-clamp-2">
-                    {item.description}
-                  </span>
-                </button>
-              );
-            })}
           </div>
         </div>
 
