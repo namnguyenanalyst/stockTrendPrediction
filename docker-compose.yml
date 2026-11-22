@@ -45,6 +45,9 @@ services:
     restart: unless-stopped
     environment:
       SOLE_ADMIN_EMAIL: ${SOLE_ADMIN_EMAIL:-admin@vnstock}
+      SSI_CONSUMER_ID: ${SSI_CONSUMER_ID:-}
+      SSI_CONSUMER_SECRET: ${SSI_CONSUMER_SECRET:-}
+      SSI_API_URL: ${SSI_API_URL:-https://fc-data.ssi.com.vn/}
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@vn_stock_db:5432/${POSTGRES_DB:-vn_stock}
       SECRET_KEY: ${SECRET_KEY:-super_secret_jwt_key_must_be_changed_in_prod_32chars}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
