@@ -246,18 +246,32 @@ def load_stock_dataframe(symbol: str, allow_remote_fetch: bool = True) -> pd.Dat
             return df_out.sort_values("Date").reset_index(drop=True)
 
     panel_path = settings.DATA_DIR / "interim" / "panel" / f"Symbol={clean_sym}"
-    if panel_path.exists():
-        df = pd.read_parquet(panel_path)
-        if "Symbol" not in df.columns:
-            df["Symbol"] = clean_sym
-        return df.sort_values("Date").reset_index(drop=True)
-
     raw_path = settings.DATA_DIR / "raw" / f"{clean_sym}.parquet"
-    if raw_path.exists():
-        df = pd.read_parquet(raw_path)
-        if "Symbol" not in df.columns:
-            df["Symbol"] = clean_sym
-        return df.sort_values("Date").reset_index(drop=True)
+    frames = []
+    for path in (panel_path, raw_path):
+        if path.exists():
+            frame = pd.read_parquet(path)
+            if not frame.empty:
+                frame["Date"] = pd.to_datetime(frame["Date"])
+                frames.append(frame)
+    if frames:
+        # SSI raw candles may be newer than the periodically rebuilt panel.
+        # Retain panel history, using raw candles for overlapping sessions.
+        df = pd.concat(frames, ignore_index=True)
+        df["Symbol"] = clean_sym
+        df = df.drop_duplicates(subset=["Date"], keep="last").sort_values("Date").reset_index(drop=True)
+        # Recompute the market feature after raw rows replace derived panel rows.
+        index_path = settings.DATA_DIR / "raw" / "VNINDEX.parquet"
+        if index_path.exists():
+            index = pd.read_parquet(index_path).sort_values("Date")
+            index["Date"] = pd.to_datetime(index["Date"])
+            close_col = "VNINDEX_Close" if "VNINDEX_Close" in index else "Close"
+            returns = pd.Series(index[close_col].pct_change().to_numpy(), index=index["Date"])
+            df["VNINDEX_Return_1d"] = df["Date"].map(returns)
+        # Legacy panel helper columns can be NaN on new raw sessions and must
+        # not participate in dropna after recomputing model features.
+        columns = ["Date", "Symbol", "Open", "High", "Low", "Close", "Volume", "VNINDEX_Return_1d"]
+        return df[[col for col in columns if col in df]]
 
     # Hệ số tổng hợp nhanh cho các mã rổ VN30
     stock_factors = {
@@ -782,3 +796,38 @@ def get_market_board_data() -> MarketBoardResponse:
         top_volume=top_volume,
     )
 
+
+
+def get_chart_indicators(symbol: str, limit: int = 1500) -> dict[str, Any]:
+    """Compute on complete history before selecting the response window."""
+    import math
+    from vn_stock.chart_indicators import compute_chart_indicators
+
+    raw = load_stock_dataframe(symbol)
+    if raw.empty:
+        return {"symbol": symbol.upper(), "total_bars": 0, "indicators": []}
+    frame = compute_chart_indicators(raw)
+    columns = (
+        [f"SMA{p}" for p in (5, 10, 20, 50, 100, 200)]
+        + [f"EMA{p}" for p in (5, 10, 12, 20, 26, 50, 100, 200)]
+        + ["BB_Upper", "BB_Lower", "RSI", "MACD", "MACD_Signal", "ADX"]
+        + [f"Vol_SMA{p}" for p in (5, 10, 20)]
+    )
+    records = []
+    for index, row in frame.tail(limit).iterrows():
+        values = {}
+        for column in columns:
+            value = float(row[column])
+            # Chart warmup masks do not change the legacy backtest calculations.
+            if column.startswith("SMA"):
+                warmup = int(column[3:])
+            elif column.startswith("EMA"):
+                warmup = int(column[3:])
+            elif column.startswith("Vol_SMA"):
+                warmup = int(column[7:])
+            else:
+                warmup = {"RSI": 14, "ADX": 28, "BB_Upper": 20,
+                          "BB_Lower": 20, "MACD": 26, "MACD_Signal": 34}[column]
+            values[column] = value if math.isfinite(value) and index >= warmup - 1 else None
+        records.append({"date": pd.Timestamp(row["Date"]).strftime("%Y-%m-%d"), "values": values})
+    return {"symbol": symbol.upper(), "total_bars": len(frame), "indicators": records}

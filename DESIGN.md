@@ -155,3 +155,7 @@ Bảng màu tuân thủ nghiêm ngặt nguyên tắc **Restrained Semantic Palet
 - **KHÔNG dùng bóng đổ phát sáng lòe loẹt** (`shadow-emerald-500/20`, `shadow-rose-500/20`).
 - **KHÔNG viết tắt thuật ngữ mà không có chú thích** (người dùng phổ thông không thể tự hiểu Sharpe, Sortino hay Purged Horizon nếu không có tooltip/phụ đề).
 
+
+### Chỉ báo trong cửa sổ chi tiết
+
+Cửa sổ chi tiết dùng ô tìm kiếm đa lựa chọn và nhãn có thể gỡ. Danh sách giới hạn ở SMA, EMA, Bollinger Bands, khối lượng, MA khối lượng, RSI, MACD và ADX được tính bởi module dùng chung với backtest. Lựa chọn lưu trên trình duyệt. Biểu đồ chi tiết dùng các pane trên cùng một trục thời gian để đồng bộ kéo/phóng to; trang tổng quan giữ component hiện có.

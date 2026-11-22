@@ -119,3 +119,11 @@ def trigger_sync() -> dict:
     from app.services.prediction_service import trigger_market_sync
 
     return trigger_market_sync()
+
+
+@router.get("/chart-indicators", summary="Chỉ báo cho biểu đồ chi tiết")
+def get_chart_indicators(
+    symbol: str = Query("VIC"),
+    limit: int = Query(1500, ge=1, le=5000),
+) -> dict[str, Any]:
+    return stock_service.get_chart_indicators(symbol, limit)

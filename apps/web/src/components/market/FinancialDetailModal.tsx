@@ -1,20 +1,30 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { X, ArrowUpRight, ArrowDownRight, RefreshCw } from "lucide-react";
+import { DetailIndicatorChart } from "@/components/charts/DetailIndicatorChart";
+import { IndicatorSearch } from "./IndicatorSearch";
 import {
-  X,
-  Activity,
-  ArrowUpRight,
-  ArrowDownRight,
-  RefreshCw,
-} from "lucide-react";
-import { IChartApi } from "lightweight-charts";
-import { CandlestickChart } from "@/components/charts/CandlestickChart";
-import { RSIChart } from "@/components/charts/RSIChart";
-import { getStockHistory, getStockIndicators, getStockSummary } from "@/lib/api";
-import { StockBar, StockIndicatorBar, StockSummaryResponse } from "@/lib/types";
+  getStockHistory,
+  getChartIndicators,
+  getStockSummary,
+} from "@/lib/api";
+import {
+  DEFAULT_INDICATORS,
+  INDICATOR_STORAGE_KEY,
+  parseSelection,
+  type ChartIndicatorBar,
+} from "@/lib/chartIndicators";
+import { StockBar, StockSummaryResponse } from "@/lib/types";
 
-export type DetailTimeframe = "1D" | "1W" | "1M" | "3M" | "6M" | "1Y" | "ALL" | "CUSTOM";
+export type DetailTimeframe =
+  "1D" | "1W" | "1M" | "3M" | "6M" | "1Y" | "ALL" | "CUSTOM";
 
 export interface TimeframePreset {
   id: DetailTimeframe;
@@ -24,13 +34,48 @@ export interface TimeframePreset {
 }
 
 export const TIMEFRAME_PRESETS: TimeframePreset[] = [
-  { id: "1D", label: "1D", count: 1, description: "1 phiên giao dịch gần nhất" },
-  { id: "1W", label: "1W", count: 5, description: "1 tuần giao dịch (5 phiên)" },
-  { id: "1M", label: "1M", count: 22, description: "1 tháng giao dịch (22 phiên)" },
-  { id: "3M", label: "3M", count: 66, description: "1 quý giao dịch (66 phiên)" },
-  { id: "6M", label: "6M", count: 130, description: "6 tháng giao dịch (130 phiên)" },
-  { id: "1Y", label: "1Y", count: 250, description: "1 năm giao dịch (250 phiên)" },
-  { id: "ALL", label: "ALL", count: 9999, description: "Toàn bộ chuỗi nến lịch sử" },
+  {
+    id: "1D",
+    label: "1D",
+    count: 1,
+    description: "1 phiên giao dịch gần nhất",
+  },
+  {
+    id: "1W",
+    label: "1W",
+    count: 5,
+    description: "1 tuần giao dịch (5 phiên)",
+  },
+  {
+    id: "1M",
+    label: "1M",
+    count: 22,
+    description: "1 tháng giao dịch (22 phiên)",
+  },
+  {
+    id: "3M",
+    label: "3M",
+    count: 66,
+    description: "1 quý giao dịch (66 phiên)",
+  },
+  {
+    id: "6M",
+    label: "6M",
+    count: 130,
+    description: "6 tháng giao dịch (130 phiên)",
+  },
+  {
+    id: "1Y",
+    label: "1Y",
+    count: 250,
+    description: "1 năm giao dịch (250 phiên)",
+  },
+  {
+    id: "ALL",
+    label: "ALL",
+    count: 9999,
+    description: "Toàn bộ chuỗi nến lịch sử",
+  },
 ];
 
 export interface FinancialItemContext {
@@ -99,55 +144,80 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
   const [timeframe, setTimeframe] = useState<DetailTimeframe>("3M");
   const [sessionCount, setSessionCount] = useState<number>(66);
 
-  // Toggle cấu hình chỉ báo kỹ thuật (Phase 2 D)
-  const [showSMA20, setShowSMA20] = useState<boolean>(true);
-  const [showSMA50, setShowSMA50] = useState<boolean>(true);
-  const [showSMA200, setShowSMA200] = useState<boolean>(false);
-  const [showVolume, setShowVolume] = useState<boolean>(true);
-  const [showRSI, setShowRSI] = useState<boolean>(true);
-
+  const [selected, setSelected] = useState<string[]>(DEFAULT_INDICATORS);
+  const [selectionLoaded, setSelectionLoaded] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        setSelected(
+          parseSelection(localStorage.getItem(INDICATOR_STORAGE_KEY)),
+        );
+      } catch {
+        setSelected([...DEFAULT_INDICATORS]);
+      }
+      setSelectionLoaded(true);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (selectionLoaded)
+      try {
+        localStorage.setItem(INDICATOR_STORAGE_KEY, JSON.stringify(selected));
+      } catch {}
+  }, [selected, selectionLoaded]);
+  const removeIndicator = (id: string) =>
+    setSelected((ids) => ids.filter((x) => x !== id));
+  const [indicatorError, setIndicatorError] = useState(false);
   // Dữ liệu API
   const [bars, setBars] = useState<StockBar[]>([]);
-  const [indicators, setIndicators] = useState<StockIndicatorBar[]>([]);
+  const [indicators, setIndicators] = useState<ChartIndicatorBar[]>([]);
   const [summary, setSummary] = useState<StockSummaryResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const candleChartRef = useRef<IChartApi | null>(null);
-  const rsiChartRef = useRef<IChartApi | null>(null);
-
+  const requestId = useRef(0);
   // Tải dữ liệu an toàn, nạp toàn bộ lịch sử (limit 1500) để phục vụ mọi khung thời gian
   const fetchData = useCallback(async (sym: string) => {
+    const request = ++requestId.current;
     setLoading(true);
+    setIndicatorError(false);
+    setIndicators([]);
+    setSummary(null);
     setErrorMsg(null);
 
     try {
       const [histRes, indRes, sumRes] = await Promise.allSettled([
         getStockHistory(sym, undefined, 1500),
-        getStockIndicators(sym, 1500),
+        getChartIndicators(sym),
         getStockSummary(sym),
       ]);
 
+      if (request !== requestId.current) return;
       if (histRes.status === "fulfilled") {
         const fetchedBars = histRes.value.bars;
         setBars(fetchedBars);
       } else {
-        throw new Error(histRes.reason?.message || "Không thể tải lịch sử giá.");
+        throw new Error(
+          histRes.reason?.message || "Không thể tải lịch sử giá.",
+        );
       }
 
       if (indRes.status === "fulfilled") {
         setIndicators(indRes.value.indicators);
+      } else {
+        setIndicatorError(true);
       }
 
       if (sumRes.status === "fulfilled") {
         setSummary(sumRes.value);
       }
     } catch (err: unknown) {
+      if (request !== requestId.current) return;
       const message = err instanceof Error ? err.message : "Đã có lỗi xảy ra.";
       console.warn("Lỗi tải chi tiết tài chính:", message);
       setErrorMsg(message);
     } finally {
-      setLoading(false);
+      if (request === requestId.current) setLoading(false);
     }
   }, []);
 
@@ -164,6 +234,9 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
 
     return () => {
       isCurrent = false;
+      // Invalidate async responses when closing or switching symbols.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      requestId.current++;
       clearTimeout(timer);
     };
   }, [isOpen, activeSymbol, fetchData]);
@@ -187,7 +260,9 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
     const clamped = Math.max(1, Math.min(newCount, maxBars));
     setSessionCount(clamped);
 
-    const matched = TIMEFRAME_PRESETS.find((p) => p.id !== "ALL" && p.count === clamped);
+    const matched = TIMEFRAME_PRESETS.find(
+      (p) => p.id !== "ALL" && p.count === clamped,
+    );
     if (matched) {
       setTimeframe(matched.id);
     } else if (clamped >= maxBars) {
@@ -204,76 +279,37 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
     return bars.slice(-count);
   }, [bars, sessionCount]);
 
-  const filteredIndicators = useMemo(() => {
-    if (!indicators || indicators.length === 0 || !filteredBars || filteredBars.length === 0) {
-      return [];
-    }
-    const validDates = new Set(filteredBars.map((b) => b.date));
-    return indicators.filter((ind) => validDates.has(ind.date));
-  }, [indicators, filteredBars]);
-
-  // Đồng bộ VisibleLogicalRange giữa Nến và RSI
-  const syncTimeScales = useCallback(() => {
-    const c1 = candleChartRef.current;
-    const c2 = rsiChartRef.current;
-    if (!c1 || !c2) return;
-
-    let isSyncing = false;
-
-    c1.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-      if (isSyncing || !range || !rsiChartRef.current) return;
-      isSyncing = true;
-      try {
-        rsiChartRef.current.timeScale().setVisibleLogicalRange(range);
-      } catch (err) {
-        console.debug("Lỗi đồng bộ RSI:", err);
-      }
-      isSyncing = false;
-    });
-
-    c2.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-      if (isSyncing || !range || !candleChartRef.current) return;
-      isSyncing = true;
-      try {
-        candleChartRef.current.timeScale().setVisibleLogicalRange(range);
-      } catch (err) {
-        console.debug("Lỗi đồng bộ Nến:", err);
-      }
-      isSyncing = false;
-    });
-  }, []);
-
-  const handleCandleReady = useCallback(
-    (chart: IChartApi | null) => {
-      candleChartRef.current = chart;
-      syncTimeScales();
-    },
-    [syncTimeScales]
-  );
-
-  const handleRsiReady = useCallback(
-    (chart: IChartApi | null) => {
-      rsiChartRef.current = chart;
-      syncTimeScales();
-    },
-    [syncTimeScales]
-  );
-
   if (!isOpen) return null;
 
   // Tính toán thị giá hiển thị
-  const latestClose = bars.length > 0 ? bars[bars.length - 1].close : summary?.latest_close ?? 0;
-  const prevClose = bars.length > 1 ? bars[bars.length - 2].close : summary?.prev_close ?? latestClose;
+  const latestClose =
+    bars.length > 0
+      ? bars[bars.length - 1].close
+      : (summary?.latest_close ?? 0);
+  const prevClose =
+    bars.length > 1
+      ? bars[bars.length - 2].close
+      : (summary?.prev_close ?? latestClose);
   const displayVal = item?.currentValue ?? propCurrentValue ?? latestClose;
-  const displayChg = item?.change ?? propChange ?? (latestClose - prevClose);
+  const displayChg = item?.change ?? propChange ?? latestClose - prevClose;
   const displayPct =
-    item?.changePct ?? propChangePct ?? (prevClose > 0 ? (displayChg / prevClose) * 100 : 0);
+    item?.changePct ??
+    propChangePct ??
+    (prevClose > 0 ? (displayChg / prevClose) * 100 : 0);
   const isUp = displayChg >= 0;
 
   const latestBar = bars.length > 0 ? bars[bars.length - 1] : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-4 backdrop-blur-md animate-in fade-in duration-200">
+    <div
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-4 backdrop-blur-md animate-in fade-in duration-200"
+    >
       <div className="relative flex max-h-[95vh] w-full max-w-5xl flex-col rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl overflow-hidden">
         {/* ========================================================================= */}
         {/* 1. HEADER MODAL: THÔNG TIN CỐT LÕI (PHASE 2 A)                            */}
@@ -328,7 +364,9 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
               className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors"
               title="Làm mới dữ liệu"
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-emerald-400" : ""}`} />
+              <RefreshCw
+                className={`h-4 w-4 ${loading ? "animate-spin text-emerald-400" : ""}`}
+              />
             </button>
             <button
               onClick={onClose}
@@ -351,18 +389,36 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
                 <div className="flex items-center gap-2 text-[11px]">
                   <span className="text-slate-400 font-semibold">Độ rộng:</span>
                   <span className="text-emerald-400 font-bold">
-                    ▲ {item.advancing} {item.ceiling ? `(${item.ceiling} Trần)` : ""}
+                    ▲ {item.advancing}{" "}
+                    {item.ceiling ? `(${item.ceiling} Trần)` : ""}
                   </span>
-                  <span className="text-amber-400 font-bold">■ {item.unchanged ?? 0}</span>
+                  <span className="text-amber-400 font-bold">
+                    ■ {item.unchanged ?? 0}
+                  </span>
                   <span className="text-rose-400 font-bold">
-                    ▼ {item.declining ?? 0} {item.floor ? `(${item.floor} Sàn)` : ""}
+                    ▼ {item.declining ?? 0}{" "}
+                    {item.floor ? `(${item.floor} Sàn)` : ""}
                   </span>
                 </div>
               )}
               {(item?.volumeStr || item?.valueStr) && (
                 <div className="flex items-center gap-2 border-l border-slate-800 pl-3 text-[11px] text-slate-400">
-                  {item.volumeStr && <span>KL: <strong className="text-slate-200">{item.volumeStr}</strong></span>}
-                  {item.valueStr && <span>GT: <strong className="text-slate-200">{item.valueStr}</strong></span>}
+                  {item.volumeStr && (
+                    <span>
+                      KL:{" "}
+                      <strong className="text-slate-200">
+                        {item.volumeStr}
+                      </strong>
+                    </span>
+                  )}
+                  {item.valueStr && (
+                    <span>
+                      GT:{" "}
+                      <strong className="text-slate-200">
+                        {item.valueStr}
+                      </strong>
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -375,19 +431,49 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
                 </span>
               )}
               {item?.reference !== undefined && (
-                <span>TC: <strong className="text-amber-400">{item.reference.toFixed(2)}</strong></span>
+                <span>
+                  TC:{" "}
+                  <strong className="text-amber-400">
+                    {item.reference.toFixed(2)}
+                  </strong>
+                </span>
               )}
               {item?.stockCeiling !== undefined && (
-                <span>Trần: <strong className="text-purple-400">{item.stockCeiling.toFixed(2)}</strong></span>
+                <span>
+                  Trần:{" "}
+                  <strong className="text-purple-400">
+                    {item.stockCeiling.toFixed(2)}
+                  </strong>
+                </span>
               )}
               {item?.stockFloor !== undefined && (
-                <span>Sàn: <strong className="text-cyan-400">{item.stockFloor.toFixed(2)}</strong></span>
+                <span>
+                  Sàn:{" "}
+                  <strong className="text-cyan-400">
+                    {item.stockFloor.toFixed(2)}
+                  </strong>
+                </span>
               )}
               {latestBar && (
                 <>
-                  <span>Cao: <strong className="text-slate-200">{latestBar.high.toFixed(2)}</strong></span>
-                  <span>Thấp: <strong className="text-slate-200">{latestBar.low.toFixed(2)}</strong></span>
-                  <span>KL: <strong className="text-slate-200">{latestBar.volume.toLocaleString("vi-VN")}</strong></span>
+                  <span>
+                    Cao:{" "}
+                    <strong className="text-slate-200">
+                      {latestBar.high.toFixed(2)}
+                    </strong>
+                  </span>
+                  <span>
+                    Thấp:{" "}
+                    <strong className="text-slate-200">
+                      {latestBar.low.toFixed(2)}
+                    </strong>
+                  </span>
+                  <span>
+                    KL:{" "}
+                    <strong className="text-slate-200">
+                      {latestBar.volume.toLocaleString("vi-VN")}
+                    </strong>
+                  </span>
                 </>
               )}
             </div>
@@ -396,10 +482,21 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
           {/* OHLC Status bar hover của phiên gần nhất */}
           {latestBar && (
             <div className="hidden md:flex items-center gap-2 text-[11px] text-slate-400">
-              <span>O: <strong className="text-slate-200">{latestBar.open}</strong></span>
-              <span>H: <strong className="text-slate-200">{latestBar.high}</strong></span>
-              <span>L: <strong className="text-slate-200">{latestBar.low}</strong></span>
-              <span>C: <strong className={isUp ? "text-emerald-400" : "text-rose-400"}>{latestBar.close}</strong></span>
+              <span>
+                O: <strong className="text-slate-200">{latestBar.open}</strong>
+              </span>
+              <span>
+                H: <strong className="text-slate-200">{latestBar.high}</strong>
+              </span>
+              <span>
+                L: <strong className="text-slate-200">{latestBar.low}</strong>
+              </span>
+              <span>
+                C:{" "}
+                <strong className={isUp ? "text-emerald-400" : "text-rose-400"}>
+                  {latestBar.close}
+                </strong>
+              </span>
             </div>
           )}
         </div>
@@ -429,7 +526,9 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
 
             {/* Tinh chỉnh số phiên (Session Fine-Tuning) */}
             <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/80 px-2 py-0.5 text-xs text-slate-400">
-              <span className="text-[11px] text-slate-500 hidden sm:inline">Số phiên:</span>
+              <span className="text-[11px] text-slate-500 hidden sm:inline">
+                Số phiên:
+              </span>
               <button
                 type="button"
                 onClick={() => handleCustomSessionChange(sessionCount - 10)}
@@ -443,7 +542,9 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
                 min={1}
                 max={bars.length > 0 ? bars.length : 2000}
                 value={sessionCount}
-                onChange={(e) => handleCustomSessionChange(parseInt(e.target.value) || 1)}
+                onChange={(e) =>
+                  handleCustomSessionChange(parseInt(e.target.value) || 1)
+                }
                 className="w-14 rounded bg-slate-950 px-1 py-0.5 text-center text-xs font-bold text-emerald-400 border border-slate-700/60 focus:border-emerald-500 focus:outline-none"
                 title="Nhập số phiên nạp mong muốn"
               />
@@ -458,78 +559,7 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Bộ nút Bật / Tắt Chỉ báo Kỹ thuật (Toggles) */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] font-semibold text-slate-500 mr-1 flex items-center gap-1">
-              <Activity className="h-3 w-3" />
-              <span>Chỉ báo:</span>
-            </span>
-
-            {/* Toggle SMA 20 */}
-            <button
-              onClick={() => setShowSMA20(!showSMA20)}
-              className={`rounded px-2 py-0.5 text-[11px] font-bold transition-all border ${
-                showSMA20
-                  ? "border-amber-500/60 bg-amber-500/15 text-amber-300"
-                  : "border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300"
-              }`}
-              title="Bật/Tắt đường trung bình động 20 phiên"
-            >
-              MA 20
-            </button>
-
-            {/* Toggle SMA 50 */}
-            <button
-              onClick={() => setShowSMA50(!showSMA50)}
-              className={`rounded px-2 py-0.5 text-[11px] font-bold transition-all border ${
-                showSMA50
-                  ? "border-purple-500/60 bg-purple-500/15 text-purple-300"
-                  : "border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300"
-              }`}
-              title="Bật/Tắt đường trung bình động 50 phiên"
-            >
-              MA 50
-            </button>
-
-            {/* Toggle SMA 200 */}
-            <button
-              onClick={() => setShowSMA200(!showSMA200)}
-              className={`rounded px-2 py-0.5 text-[11px] font-bold transition-all border ${
-                showSMA200
-                  ? "border-sky-500/60 bg-sky-500/15 text-sky-300"
-                  : "border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300"
-              }`}
-              title="Bật/Tắt đường trung bình động 200 phiên"
-            >
-              MA 200
-            </button>
-
-            {/* Toggle Khối lượng */}
-            <button
-              onClick={() => setShowVolume(!showVolume)}
-              className={`rounded px-2 py-0.5 text-[11px] font-bold transition-all border ${
-                showVolume
-                  ? "border-slate-600 bg-slate-800 text-slate-200"
-                  : "border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300"
-              }`}
-              title="Bật/Tắt cột khối lượng giao dịch"
-            >
-              Volume
-            </button>
-
-            {/* Toggle RSI (14) */}
-            <button
-              onClick={() => setShowRSI(!showRSI)}
-              className={`rounded px-2 py-0.5 text-[11px] font-bold transition-all border ${
-                showRSI
-                  ? "border-indigo-500/60 bg-indigo-500/15 text-indigo-300"
-                  : "border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300"
-              }`}
-              title="Bật/Tắt chỉ số sức mạnh tương đối RSI"
-            >
-              RSI (14)
-            </button>
-          </div>
+          <IndicatorSearch selected={selected} onChange={setSelected} />
         </div>
 
         {/* ========================================================================= */}
@@ -559,26 +589,26 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
             </div>
           ) : (
             <>
-              {/* Biểu đồ nến chính kèm các đường MA và Volume */}
-              <CandlestickChart
-                bars={filteredBars}
-                allBars={bars}
-                height={showRSI ? 340 : 450}
-                onChartReady={handleCandleReady}
-                showSMA20={showSMA20}
-                showSMA50={showSMA50}
-                showSMA200={showSMA200}
-                showVolume={showVolume}
-              />
-
-              {/* Panel phụ RSI (chỉ render nếu bật showRSI) */}
-              {showRSI && (
-                <RSIChart
-                  indicators={filteredIndicators}
-                  height={130}
-                  onChartReady={handleRsiReady}
-                />
+              {indicatorError && (
+                <div
+                  role="status"
+                  className="flex items-center justify-between gap-2 text-sm text-amber-300"
+                >
+                  Không thể tải chỉ báo. Biểu đồ giá vẫn khả dụng.
+                  <button
+                    onClick={() => fetchData(activeSymbol)}
+                    className="min-h-9 underline"
+                  >
+                    Thử lại
+                  </button>
+                </div>
               )}
+              <DetailIndicatorChart
+                bars={filteredBars}
+                indicators={indicators}
+                selected={selected}
+                onRemove={removeIndicator}
+              />
             </>
           )}
         </div>
@@ -597,21 +627,36 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
               </strong>{" "}
               phiên{" "}
               <span className="text-slate-500">
-                ({timeframe === "CUSTOM" ? "Tùy chỉnh" : timeframe === "ALL" ? "Toàn bộ" : timeframe})
+                (
+                {timeframe === "CUSTOM"
+                  ? "Tùy chỉnh"
+                  : timeframe === "ALL"
+                    ? "Toàn bộ"
+                    : timeframe}
+                )
               </span>
             </span>
             {filteredBars.length > 0 && (
               <>
                 <span className="h-3 w-[1px] bg-slate-800 hidden md:inline" />
                 <span className="hidden md:inline text-slate-500">
-                  Khoảng ngày: <span className="text-slate-300 font-medium">{filteredBars[0].date}</span> → <span className="text-slate-300 font-medium">{filteredBars[filteredBars.length - 1].date}</span>
+                  Khoảng ngày:{" "}
+                  <span className="text-slate-300 font-medium">
+                    {filteredBars[0].date}
+                  </span>{" "}
+                  →{" "}
+                  <span className="text-slate-300 font-medium">
+                    {filteredBars[filteredBars.length - 1].date}
+                  </span>
                 </span>
               </>
             )}
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-emerald-400 text-[11px]">Dữ liệu SSI FastConnect</span>
+            <span className="font-semibold text-emerald-400 text-[11px]">
+              Dữ liệu SSI FastConnect
+            </span>
           </div>
         </div>
       </div>

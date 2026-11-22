@@ -464,3 +464,7 @@ export const requestPasswordReset = (email: string) => accountRequest("forgot-pa
 export const resetAccountPassword = (token: string, new_password: string) => accountRequest("reset-password", { token, new_password });
 export const verifyAccountEmail = (token: string) => accountRequest("verify-email", { token });
 export const resendVerification = () => accountRequest("resend-verification");
+
+export function getChartIndicators(symbol: string) {
+ return fetchJson<import('./chartIndicators').ChartIndicatorsResponse>(`/api/stocks/chart-indicators?symbol=${encodeURIComponent(symbol)}&limit=1500`);
+}
