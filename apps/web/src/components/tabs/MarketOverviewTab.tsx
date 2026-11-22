@@ -1,5 +1,6 @@
 "use client";
 
+import { formatSmaDeviation, describeSmaDeviation, describeVolumeRatio } from "@/lib/marketMetricPresentation";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownRight,
@@ -489,7 +490,6 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-slate-400" role="note">Nguồn nến: SSI, theo phiên chốt. Một số chỉ số tổng quan, dòng tiền và dữ liệu cơ bản đang dùng giá trị ước lượng hoặc dự phòng; chưa phải dữ liệu thị trường đã xác minh đầy đủ.</p>
       {/* ========================================================================= */}
       {/* 1. BĂNG CHUYỂN CHỈ SỐ THỊ TRƯỜNG TÁCH BIỆT (INDEX RIBBON COMPONENT)       */}
       {/* ========================================================================= */}
@@ -1067,9 +1067,6 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                       {summary?.latest_date ? `Phiên: ${summary.latest_date}` : "Đang cập nhật..."}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    Chi tiết Hành động Giá OHLCV, Khối lượng & Dao động RSI
-                  </p>
                 </div>
               </div>
 
@@ -1141,9 +1138,9 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
 
           {/* Lưới 6 Thẻ Đo lường Kỹ thuật Cốt lõi (13 Đặc trưng ML) */}
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6 pt-1">
-            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
+            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
               <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-medium">Lệch SMA(20)</span>
+                <span className="text-xs font-medium">Giá so với TB 20 phiên</span>
                 <Layers className="h-3.5 w-3.5" />
               </div>
               <div className="mt-1">
@@ -1151,15 +1148,16 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                   className={`text-sm font-bold tabular-nums ${(summary?.sma_20_dev ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
                     }`}
                 >
-                  {summary ? `${(summary.sma_20_dev * 100).toFixed(2)}%` : "---"}
+                  {summary ? formatSmaDeviation(summary.sma_20_dev) : "---"}
                 </span>
               </div>
-              <p className="mt-0.5 text-[9px] text-slate-500">So với TB 20 phiên</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">{summary ? describeSmaDeviation(summary.sma_20_dev, 20) : "Chưa có dữ liệu"}</p>
+              <details className="mt-2 text-[11px] leading-relaxed text-slate-300"><summary className="cursor-pointer text-slate-400 focus-visible:outline focus-visible:outline-emerald-400">Cách đọc</summary><p className="mt-1">Giá đóng cửa gần nhất cao hoặc thấp hơn giá đóng cửa trung bình 20 phiên bao nhiêu %. Dấu + là cao hơn, dấu − là thấp hơn. Đây không phải mức tăng giá trong 20 phiên.</p></details>
             </div>
 
-            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
+            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
               <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-medium">Lệch SMA(50)</span>
+                <span className="text-xs font-medium">Giá so với TB 50 phiên</span>
                 <Layers className="h-3.5 w-3.5" />
               </div>
               <div className="mt-1">
@@ -1167,15 +1165,16 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                   className={`text-sm font-bold tabular-nums ${(summary?.sma_50_dev ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
                     }`}
                 >
-                  {summary ? `${(summary.sma_50_dev * 100).toFixed(2)}%` : "---"}
+                  {summary ? formatSmaDeviation(summary.sma_50_dev) : "---"}
                 </span>
               </div>
-              <p className="mt-0.5 text-[9px] text-slate-500">Xu hướng trung hạn</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">{summary ? describeSmaDeviation(summary.sma_50_dev, 50) : "Chưa có dữ liệu"}</p>
+              <details className="mt-2 text-[11px] leading-relaxed text-slate-300"><summary className="cursor-pointer text-slate-400 focus-visible:outline focus-visible:outline-emerald-400">Cách đọc</summary><p className="mt-1">Giá đóng cửa gần nhất cao hoặc thấp hơn giá đóng cửa trung bình 50 phiên bao nhiêu %. SMA là đường trung bình động đơn giản.</p></details>
             </div>
 
-            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
+            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
               <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-medium">Biến động CV(50)</span>
+                <span className="text-xs font-medium">Độ dao động giá · 50 phiên</span>
                 <Percent className="h-3.5 w-3.5" />
               </div>
               <div className="mt-1">
@@ -1183,12 +1182,13 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                   {latestInd ? `${(latestInd.cv_50 * 100).toFixed(2)}%` : "---"}
                 </span>
               </div>
-              <p className="mt-0.5 text-[9px] text-slate-500">Hệ số biến thiên 50p</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">Số càng lớn, giá dao động càng mạnh</p>
+              <details className="mt-2 text-[11px] leading-relaxed text-slate-300"><summary className="cursor-pointer text-slate-400 focus-visible:outline focus-visible:outline-emerald-400">Cách đọc</summary><p className="mt-1">CV(50) = độ lệch chuẩn của giá đóng cửa 50 phiên / giá trung bình 50 phiên × 100%. Đo độ phân tán của mức giá; không phải mức tăng giảm trong ngày hay xác suất thua lỗ.</p></details>
             </div>
 
-            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
+            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
               <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-medium">Tỷ lệ KL / TB20</span>
+                <span className="text-xs font-medium">Khối lượng so với trung bình 20 phiên</span>
                 <BarChart2 className="h-3.5 w-3.5" />
               </div>
               <div className="mt-1">
@@ -1200,15 +1200,16 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                       : "text-slate-200"
                     }`}
                 >
-                  {latestInd ? `${latestInd.vol_ratio.toFixed(2)}x` : "---"}
+                  {latestInd ? describeVolumeRatio(latestInd.vol_ratio).replace(" so với TB 20 phiên", "") : "---"}
                 </span>
               </div>
-              <p className="mt-0.5 text-[9px] text-slate-500">So với mức bình quân</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">Số cổ phiếu giao dịch trong phiên gần nhất</p>
+              <details className="mt-2 text-[11px] leading-relaxed text-slate-300"><summary className="cursor-pointer text-slate-400 focus-visible:outline focus-visible:outline-emerald-400">Cách đọc</summary><p className="mt-1">Cộng số cổ phiếu giao dịch của 20 phiên gần nhất (có cả phiên đang xét), rồi chia 20 để lấy mức trung bình. So sánh khối lượng phiên gần nhất với mức này. Ví dụ: trung bình 1 triệu cổ phiếu/phiên, phiên gần nhất có 900 nghìn → ít hơn 100 nghìn, tức ít hơn 10%. Công thức chênh lệch: (khối lượng phiên gần nhất ÷ khối lượng trung bình − 1) × 100%. Ví dụ trên: (900.000 ÷ 1.000.000 − 1) × 100% = −10%.</p></details>
             </div>
 
-            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
+            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
               <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-medium">Khối lượng GD</span>
+                <span className="text-xs font-medium">Số cổ phiếu giao dịch</span>
                 <BarChart2 className="h-3.5 w-3.5" />
               </div>
               <div className="mt-1">
@@ -1217,12 +1218,13 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                   <span className="text-[10px] font-normal text-slate-400">nghìn CP</span>
                 </span>
               </div>
-              <p className="mt-0.5 text-[9px] text-slate-500">Khớp phiên gần nhất</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">Tổng khối lượng phiên gần nhất</p>
+              <details className="mt-2 text-[11px] leading-relaxed text-slate-300"><summary className="cursor-pointer text-slate-400 focus-visible:outline focus-visible:outline-emerald-400">Cách đọc</summary><p className="mt-1">Tổng số cổ phiếu giao dịch trong phiên gần nhất. Ví dụ 1.799,1 nghìn cổ phiếu = 1.799.100 cổ phiếu. Đây là số lượng, không phải giá trị bằng tiền.</p></details>
             </div>
 
-            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
+            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
               <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-medium">VN-Index (1 Phiên)</span>
+                <span className="text-xs font-medium">VN-Index · phiên gần nhất</span>
                 {(latestInd?.vnindex_return_1d ?? 0) >= 0 ? (
                   <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
                 ) : (
@@ -1241,7 +1243,8 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                     : "---"}
                 </span>
               </div>
-              <p className="mt-0.5 text-[9px] text-slate-500">Lợi suất toàn sàn 1D</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">So với phiên giao dịch trước</p>
+              <details className="mt-2 text-[11px] leading-relaxed text-slate-300"><summary className="cursor-pointer text-slate-400 focus-visible:outline focus-visible:outline-emerald-400">Cách đọc</summary><p className="mt-1">Mức thay đổi của VN-Index so với giá đóng cửa phiên trước. Ví dụ −1,37% nghĩa là chỉ số giảm 1,37%; không có nghĩa mọi cổ phiếu đều giảm như nhau.</p></details>
             </div>
           </div>
         </div>
