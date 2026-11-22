@@ -24,23 +24,20 @@ export interface SidebarProps {
 const BASE_NAV_ITEMS = [
   {
     id: "market" as const,
-    label: "Thị trường & Bảng giá",
+    label: "Thị trường & bảng điện",
     shortLabel: "Bảng giá",
-    description: "Bối cảnh thị trường & phân tích kỹ thuật",
     icon: BarChart3,
   },
   {
     id: "prediction" as const,
-    label: "Tín hiệu dự báo xu hướng",
+    label: "Dự báo xu hướng",
     shortLabel: "Dự báo",
-    description: "Tín hiệu xu hướng từ mô hình",
     icon: BrainCircuit,
   },
   {
     id: "backtest" as const,
     label: "Kiểm thử chiến lược",
     shortLabel: "Kiểm thử",
-    description: "Giả lập chiến lược & quản trị rủi ro",
     icon: History,
   },
 ];
@@ -98,9 +95,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="text-base font-extrabold tracking-tight text-slate-100 whitespace-nowrap">
                   STOCK<span className="text-emerald-400">PULSE</span>
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap truncate">
-                  AI Stock Prediction
-                </span>
               </div>
             </div>
 
@@ -138,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 role="tab"
                 aria-selected={isActive}
                 onClick={() => setActiveTab(item.id)}
-                title={isCollapsed ? `${item.label} — ${item.description}` : undefined}
+                title={isCollapsed ? item.label : undefined}
                 className={`group relative flex items-center gap-3 rounded-xl px-3 py-3 text-left transition-all ${isActive
                   ? "bg-emerald-500/10 text-emerald-400 font-semibold shadow-sm shadow-emerald-500/5 border border-emerald-500/30"
                   : "text-slate-400 hover:bg-slate-900 hover:text-slate-200 border border-transparent"
@@ -153,9 +147,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="flex flex-col overflow-hidden">
                     <span className="text-xs font-medium leading-tight truncate">
                       {item.label}
-                    </span>
-                    <span className="text-[10px] text-slate-500 truncate mt-0.5">
-                      {item.description}
                     </span>
                   </div>
                 )}

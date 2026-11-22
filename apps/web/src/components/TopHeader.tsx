@@ -22,23 +22,19 @@ interface TopHeaderProps {
 
 const TAB_TITLES = {
   market: {
-    title: "Thị trường & Bảng giá Điện tử",
-    subtitle: "Bối cảnh thị trường & phân tích kỹ thuật",
+    title: "Thị trường & bảng điện",
     icon: BarChart3,
   },
   prediction: {
-    title: "Tín hiệu dự báo xu hướng của mô hình",
-    subtitle: "Dự báo xác suất 3 lớp (Tăng/Giữ/Giảm) qua LightGBM & PyTorch LSTM",
+    title: "Dự báo xu hướng của mô hình",
     icon: BrainCircuit,
   },
   backtest: {
     title: "Kiểm thử chiến lược",
-    subtitle: "Phòng giả lập kiểm thử chiến lược đầu tư",
     icon: History,
   },
   "admin-stats": {
     title: "Phòng kiểm soát của Quản trị viên",
-    subtitle: "Giám sát tài khoản người dùng & nhật ký hoạt động hệ thống",
     icon: ShieldCheck,
   },
 };
@@ -140,7 +136,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   ];
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/85 backdrop-blur-md">
+    <header className="sticky top-0 z-30 flex min-h-[73px] items-center border-b border-slate-800 bg-slate-950/85 backdrop-blur-md">
       <div className="mx-auto flex w-full flex-col gap-2.5 px-4 py-2.5 sm:px-6 md:flex-row md:items-center md:justify-between">
         {/* Bên Trái: Tiêu đề Tab & Badge Phiên giao dịch */}
         <div className="flex flex-wrap items-center gap-3">
@@ -154,9 +150,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                   {currentTabInfo.title}
                 </h1>
               </div>
-              <p className="hidden text-[11px] text-slate-400 md:block">
-                {currentTabInfo.subtitle}
-              </p>
             </div>
           </div>
 
@@ -179,11 +172,14 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                     }}
                     onFocus={() => setIsSearchOpen(true)}
                     onKeyDown={handleSearchKeyDown}
+                    aria-label="Chọn mã cổ phiếu hoặc chỉ số"
                     placeholder={`Chọn mã cổ phiếu (${selectedSymbol})...`}
                     className="h-8 w-44 rounded-lg border border-slate-800 bg-slate-900/90 pl-8 pr-7 text-xs font-bold uppercase text-slate-100 placeholder:text-slate-500 placeholder:font-normal placeholder:normal-case focus:border-emerald-500/60 focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 sm:w-56 transition-all"
                   />
                   <button
                     type="button"
+                    aria-label="Mở danh sách mã cổ phiếu"
+                    aria-expanded={isSearchOpen}
                     onClick={() => setIsSearchOpen(!isSearchOpen)}
                     className="absolute right-2 text-slate-400 hover:text-slate-200"
                   >

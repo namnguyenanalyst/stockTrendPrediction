@@ -28,9 +28,6 @@ export default function AuthLayout({
             <span className="text-lg font-black tracking-tight text-slate-100">
               STOCK<span className="text-emerald-400">PULSE</span>
             </span>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              Định Lượng &amp; Dự Báo Xu Hướng VN
-            </span>
           </div>
         </Link>
       </header>
