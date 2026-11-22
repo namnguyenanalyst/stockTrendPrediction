@@ -130,6 +130,7 @@ export interface MarketSyncStatusResponse {
 }
 
 export interface DayForecast {
+  holiday_calendar_verified?: boolean;
   day_offset: number; // 1, 2, 3
   day_name: string; // "T+1", "T+2", "T+3"
   date?: string; // "YYYY-MM-DD"
@@ -155,6 +156,7 @@ export interface ModelMetricsSummary {
 }
 
 export interface PredictionResponse {
+  data_quality?: { historical_adjustment_status: string; source_provenance: string } | null;
   symbol: string;
   date: string;
   data_as_of_date?: string;
@@ -177,6 +179,8 @@ export interface PredictionResponse {
   trajectory?: DayForecast[];
   summary_guidance?: string;
   training_info?: {
+    artifact_generation?: string;
+    serving_status?: "healthy" | "degraded_cached_generation";
     latest_market_date?: string;
     horizon?: string;
     threshold?: number;
@@ -189,6 +193,8 @@ export interface PredictionResponse {
 }
 
 export interface BatchPredictionResponse {
+  requested_symbols?: number;
+  errors?: { symbol: string; status_code: number; detail: string }[];
   model_type: string;
   total_symbols: number;
   predictions: PredictionResponse[];

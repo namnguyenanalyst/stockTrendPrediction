@@ -290,13 +290,16 @@ async def test_refresh_consumption_is_atomic_across_database_sessions(tmp_path):
 
 def test_refresh_session_migration_round_trip(tmp_path, monkeypatch):
     import sqlite3
+    import logging
     from alembic import command
     from alembic.config import Config
 
     path = tmp_path / "migration.db"
     monkeypatch.setattr(settings, "ASYNC_DATABASE_URL", f"sqlite+aiosqlite:///{path}")
     config = Config("alembic.ini")
+    prediction_logger = logging.getLogger("app.services.prediction_service")
     command.upgrade(config, "003_refresh_sessions")
+    assert not prediction_logger.disabled
     with sqlite3.connect(path) as db:
         assert db.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "003_refresh_sessions"
         assert db.execute("PRAGMA table_info(refresh_sessions)").fetchall()

@@ -89,6 +89,7 @@ def predict_batch_post(
 
 @router.post(
     "/live",
+    dependencies=[Depends(get_current_active_user)],
     response_model=PredictionResponse,
     summary="Đồng bộ dữ liệu phiên gần nhất và dự báo Live chu kỳ T+3 (POST)",
     description="Kết nối dữ liệu mới nhất (Near-realtime) và xuất tín hiệu khuyến nghị cho chu kỳ T+3 cùng Quỹ đạo 3 phiên.",
@@ -103,6 +104,7 @@ def predict_live_post(request: LiveSyncRequest) -> PredictionResponse:
 
 @router.get(
     "/live",
+    dependencies=[Depends(get_current_active_user)],
     response_model=PredictionResponse,
     summary="Đồng bộ dữ liệu phiên gần nhất và dự báo Live chu kỳ T+3 (GET)",
     description="Kết nối dữ liệu mới nhất (Near-realtime) và xuất tín hiệu khuyến nghị cho chu kỳ T+3 cùng Quỹ đạo 3 phiên qua GET query.",

@@ -310,8 +310,11 @@ def test_stocks_trigger_sync():
         assert response.status_code == 401
 
 
-def test_predict_live_endpoints():
+def test_predict_live_endpoints(monkeypatch):
     """Kiểm tra endpoint /api/predict/live (GET & POST) với trajectory 3 phiên."""
+    from app.core.deps import get_current_active_user
+    monkeypatch.setitem(app.dependency_overrides, get_current_active_user, lambda: object())
+    # The authorization matrix separately exercises real tokens and DB sessions.
     # Test GET
     res_get = client.get("/api/predict/live?symbol=VIC&model_type=lightgbm")
     assert res_get.status_code == 200

@@ -152,6 +152,7 @@ class MarketBoardResponse(BaseModel):
 # 3. AI PREDICTION SCHEMAS
 # ============================================================================
 class DayForecast(BaseModel):
+    holiday_calendar_verified: bool = False
     day_offset: int = Field(..., description="Chỉ số ngày (1: T+1, 2: T+2, 3: T+3)")
     day_name: str = Field(..., description="Tên phiên ('T+1', 'T+2', 'T+3')")
     date: str = Field(default="", description="Ngày giao dịch dương lịch tương ứng")
@@ -165,6 +166,7 @@ class DayForecast(BaseModel):
 
 
 class PredictionResponse(BaseModel):
+    data_quality: dict[str, str] | None = None
     symbol: str = Field(..., description="Mã cổ phiếu dự báo")
     date: str = Field(..., description="Ngày của phiên giao dịch căn cứ")
     data_as_of_date: str = Field(default="", description="Ngày chốt dữ liệu căn cứ")
@@ -180,7 +182,7 @@ class PredictionResponse(BaseModel):
     )
     horizon: str = Field(default="T+3", description="Kỳ hạn dự báo")
     horizon_days: int = Field(default=3, description="Số ngày nắm giữ mục tiêu (3 phiên)")
-    is_live_synced: bool = Field(default=False, description="Trạng thái đồng bộ nến mới nhất từ SSI")
+    is_live_synced: bool = Field(default=False, description="Dữ liệu SSI mới đã được dùng trong yêu cầu; không có nghĩa cache đã được ghi")
     market_session_label: str = Field(default="", description="Nhãn phiên giao dịch căn cứ")
     session_info: dict | None = Field(default=None, description="Chi tiết trạng thái phiên giao dịch")
     trajectory: list[DayForecast] = Field(
@@ -197,7 +199,15 @@ class LiveSyncRequest(BaseModel):
     model_type: str = Field(default="lightgbm", description="Loại mô hình ('lightgbm' hoặc 'lstm')")
 
 
+class PredictionFailure(BaseModel):
+    symbol: str
+    status_code: int
+    detail: str
+
+
 class BatchPredictionResponse(BaseModel):
+    requested_symbols: int = 0
+    errors: list[PredictionFailure] = Field(default_factory=list)
     model_type: str = Field(..., description="Loại mô hình sử dụng")
     total_symbols: int = Field(..., description="Tổng số mã đã phân tích")
     predictions: list[PredictionResponse] = Field(..., description="Danh sách kết quả dự báo")

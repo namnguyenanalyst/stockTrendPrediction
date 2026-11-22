@@ -17,7 +17,7 @@ config = context.config
 
 # Cấu hình logging
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # Metadata của toàn bộ 5 models
 target_metadata = Base.metadata
