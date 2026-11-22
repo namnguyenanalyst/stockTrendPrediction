@@ -15,6 +15,7 @@ import copy
 from datetime import datetime, timezone
 import json
 import logging
+from importlib.metadata import version
 from pathlib import Path
 import pickle
 from typing import Any
@@ -62,6 +63,27 @@ from vn_stock.splitting_data import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class ValidationEarlyStopping:
+    """Stop after consecutive validation epochs without a strict improvement."""
+
+    def __init__(self, patience: int = 10):
+        if patience < 1:
+            raise ValueError("Early stopping patience must be positive.")
+        self.patience = patience
+        self.best_loss = float("inf")
+        self.stale_epochs = 0
+
+    def observe(self, loss: float) -> bool:
+        if not np.isfinite(loss):
+            raise ValueError("Validation loss must be finite.")
+        if loss < self.best_loss:
+            self.best_loss = loss
+            self.stale_epochs = 0
+        else:
+            self.stale_epochs += 1
+        return self.stale_epochs >= self.patience
 
 
 def _atomic_save_artifact(target_path: Path, write_fn: Any) -> None:
@@ -119,6 +141,7 @@ def train_production_model(
     save_artifacts: bool = True,
     models_dir: Path = MODELS_DIR,
     raw_panel: pd.DataFrame | None = None,
+    lstm_patience: int = 10,
 ) -> dict[str, Any]:
     """
     Huấn luyện mô hình thực chiến (Production Model) phục vụ dự báo trực tuyến:
@@ -169,10 +192,14 @@ def train_production_model(
 
     if raw_panel is None:
         try:
-            sync_latest_market_data(symbols=target_symbols, force=False)
+            sync_result = sync_latest_market_data(symbols=target_symbols, force=False)
         except Exception as sync_exc:
-            logger.warning("Không thể tự động đồng bộ nến mới trước khi huấn luyện: %s", sync_exc)
-        raw_panel = build_panel_dataset(symbols=target_symbols, force_refresh=False)
+            raise RuntimeError("Market-data synchronization failed; training was not started.") from sync_exc
+        if sync_result.get("status") != "success" or sync_result.get("errors"):
+            raise RuntimeError("Market-data synchronization incomplete; training was not started.")
+        raw_panel = build_panel_dataset(symbols=target_symbols,
+                                        end_date=sync_result.get("target_date"),
+                                        force_refresh=False)
     else:
         raw_panel = raw_panel[raw_panel["Symbol"].isin(target_symbols)].copy()
     feat_df = compute_features_per_symbol(raw_panel, drop_na=True)
@@ -265,6 +292,8 @@ def train_production_model(
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = optim.Adam(lstm_model.parameters(), lr=DEFAULT_LSTM_LR, weight_decay=DEFAULT_LSTM_WEIGHT_DECAY)
 
+    early_stopping = ValidationEarlyStopping(lstm_patience)
+    epochs_completed = 0
     best_vloss = float("inf")
     best_epoch = 0
     best_weights = copy.deepcopy(lstm_model.state_dict())
@@ -292,6 +321,10 @@ def train_production_model(
             best_vloss = avg_vloss
             best_epoch = epoch + 1
             best_weights = copy.deepcopy(lstm_model.state_dict())
+        epochs_completed = epoch + 1
+        if early_stopping.observe(avg_vloss):
+            logger.info("LSTM stopped at epoch %d; best epoch %d", epochs_completed, best_epoch)
+            break
 
     lstm_model.load_state_dict(best_weights)
     lstm_model.eval()
@@ -340,8 +373,14 @@ def train_production_model(
         "hidden_size": DEFAULT_LSTM_HIDDEN_SIZE,
         "num_layers": DEFAULT_LSTM_NUM_LAYERS,
         "optimizer": "Adam",
+        "runtime_versions": {
+            package: version(package)
+            for package in ("scikit-learn", "numpy", "pandas", "lightgbm", "torch")
+        },
         "seed": RANDOM_SEED,
-        "epochs_completed": epochs,
+        "epochs_requested": epochs,
+        "epochs_completed": epochs_completed,
+        "lstm_early_stopping_patience": lstm_patience,
         "best_lstm_epoch": best_epoch,
         "best_lstm_validation_loss": best_vloss,
         "lightgbm_best_iteration": int(lgb_model.best_iteration_),
@@ -362,47 +401,28 @@ def train_production_model(
             with open(p, "w", encoding="utf-8") as f:
                 json.dump(obj, f, ensure_ascii=False, indent=2)
 
-        from vn_stock.modeling.artifacts import publish_bundle
+        from vn_stock.modeling.artifacts import publish_training_bundle
 
-        publish_bundle(models_dir, horizon, {
+        writers = {
             f"production_lgb_t{horizon}.txt": lambda p: lgb_model.booster_.save_model(str(p)),
             f"production_lgb_t{horizon}.pkl": lambda p: _write_pkl(p, lgb_model),
             f"production_lstm_t{horizon}.pth": lambda p: torch.save(lstm_model.state_dict(), p),
             f"production_scaler_t{horizon}.pkl": lambda p: _write_pkl(p, scaler),
-        }, summary)
-
-        # 1. Lưu theo tên production cụ thể qua file tạm và os.replace nguyên tử
-        prod_lgb_txt = models_dir / f"production_lgb_t{horizon}.txt"
-        prod_lgb_pkl = models_dir / f"production_lgb_t{horizon}.pkl"
-        prod_lstm_pth = models_dir / f"production_lstm_t{horizon}.pth"
-        prod_scaler_pkl = models_dir / f"production_scaler_t{horizon}.pkl"
-        prod_info_json = models_dir / f"production_training_info_t{horizon}.json"
-
-        _atomic_save_artifact(prod_lgb_txt, lambda p: lgb_model.booster_.save_model(str(p)))
-        _atomic_save_artifact(prod_lgb_pkl, lambda p: _write_pkl(p, lgb_model))
-        _atomic_save_artifact(prod_lstm_pth, lambda p: torch.save(lstm_model.state_dict(), p))
-        _atomic_save_artifact(prod_scaler_pkl, lambda p: _write_pkl(p, scaler))
-        _atomic_save_artifact(prod_info_json, lambda p: _write_json(p, summary))
-
-        # 2. Cập nhật model mặc định để duy trì tính tương thích
-        default_lgb_txt = models_dir / "lightgbm_classifier.txt"
-        default_lgb_pkl = models_dir / "lightgbm_classifier.pkl"
-        default_lstm_pth = models_dir / "global_lstm_classifier.pth"
-        default_scaler_pkl = models_dir / "scaler_window3.pkl"
-        default_info_json = models_dir / "production_training_info.json"
-
-        _atomic_save_artifact(default_lgb_txt, lambda p: lgb_model.booster_.save_model(str(p)))
-        _atomic_save_artifact(default_lgb_pkl, lambda p: _write_pkl(p, lgb_model))
-        _atomic_save_artifact(default_lstm_pth, lambda p: torch.save(lstm_model.state_dict(), p))
-        _atomic_save_artifact(default_scaler_pkl, lambda p: _write_pkl(p, scaler))
-        _atomic_save_artifact(default_info_json, lambda p: _write_json(p, summary))
-
-        # Lưu Feature Importance của LightGBM
-        feat_imp = {
-            col: int(imp) for col, imp in zip(ALL_FEATURE_COLS, lgb_model.feature_importances_)
+            "feature_importance.json": lambda p: _write_json(p, {
+                col: int(imp) for col, imp in zip(ALL_FEATURE_COLS, lgb_model.feature_importances_)
+            }),
         }
-        feat_imp_path = models_dir / "feature_importance.json"
-        _atomic_save_artifact(feat_imp_path, lambda p: _write_json(p, feat_imp))
+        aliases = {name: name for name in writers}
+        aliases[f"production_training_info_t{horizon}.json"] = f"production_training_info_t{horizon}.json"
+        aliases.update({
+            "lightgbm_classifier.txt": f"production_lgb_t{horizon}.txt",
+            "lightgbm_classifier.pkl": f"production_lgb_t{horizon}.pkl",
+            "global_lstm_classifier.pth": f"production_lstm_t{horizon}.pth",
+            "scaler_window3.pkl": f"production_scaler_t{horizon}.pkl",
+            "production_training_info.json": f"production_training_info_t{horizon}.json",
+        })
+        summary["artifact_publication"] = publish_training_bundle(
+            models_dir, horizon, writers, summary, aliases)
 
         print(f"\n[OK] Đã lưu Artifacts mô hình thực chiến T+{horizon} tại: {models_dir}")
         print(f" - Dữ liệu thị trường chốt tới: {latest_date_str}")
@@ -424,6 +444,9 @@ def train_lstm_model(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = GlobalLSTMClassifier().to(device)
     lstm_path = models_dir / "production_lstm_t3.pth"
+    if (models_dir / "production_bundle_t3.json").exists():
+        from vn_stock.modeling.artifacts import resolve_bundle
+        lstm_path = resolve_bundle(models_dir, 3)["production_lstm_t3.pth"]
     if not lstm_path.exists():
         lstm_path = models_dir / "global_lstm_classifier.pth"
     if lstm_path.exists():

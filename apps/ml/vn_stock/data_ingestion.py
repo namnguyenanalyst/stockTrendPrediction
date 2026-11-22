@@ -6,10 +6,11 @@ import time
 from typing import Any
 
 import pandas as pd
+import numpy as np
 
 from vn_stock.config import (
-    DEFAULT_END_DATE,
     DEFAULT_START_DATE,
+    DEFAULT_SEQ_LENGTH,
     DEFAULT_SYMBOL,
     DEFAULT_SYMBOLS,
     PANEL_DATA_DIR,
@@ -309,8 +310,11 @@ def fetch_stock_data(
     save_to_raw: bool = True,
     force_refresh: bool = False,
     unit: str = "kVND",
+    require_fresh: bool = False,
 ) -> pd.DataFrame:
     """Tải dữ liệu OHLCV đơn mã (Single-flight lock, Double-Checked Cache và error fallback)."""
+    # Live requires a response from SSI rather than silently using cached data.
+    force_refresh = force_refresh or require_fresh
     symbol = symbol.upper()
     effective_end = end_date or get_default_end_date()
 
@@ -380,6 +384,8 @@ def fetch_stock_data(
             if df.empty:
                 raise ValueError(f"SSI không trả về dữ liệu cho mã {symbol}")
         except Exception as exc:
+            if require_fresh:
+                raise RuntimeError("SSI refresh failed; cached data was not used.") from exc
             local_df = load_local_data(symbol)
             if local_df is not None and not local_df.empty:
                 logger.warning(
@@ -404,6 +410,38 @@ def fetch_stock_data(
             _atomic_save_parquet(cleaned_df, parquet_path)
 
         return cleaned_df
+
+
+def fetch_live_prediction_panel(symbol: str, target_date: str,
+                                seq_length: int = DEFAULT_SEQ_LENGTH) -> pd.DataFrame:
+    """Fetch a request-local SSI snapshot; never publish raw or interim cache files."""
+    stock = fetch_stock_data(symbol, end_date=target_date, save_to_raw=False, require_fresh=True)
+    cutoff = pd.Timestamp(target_date)
+    stock = stock.copy()
+    stock["Date"] = pd.to_datetime(stock["Date"])
+    stock = stock[stock.Date <= cutoff].sort_values("Date")
+    if stock.empty or stock.Date.max() != cutoff or stock.Date.duplicated().any():
+        raise ValueError("SSI stock snapshot is stale, empty or has duplicate dates.")
+    if seq_length < 1 or len(stock) < seq_length + 1:
+        raise ValueError("SSI stock snapshot is too short for the live inference window.")
+
+    # Price rolling features still use the complete stock history. Only the
+    # latest sequence consumes VNINDEX returns, plus one close for pct_change.
+    market_start = stock.Date.iloc[-seq_length - 1]
+    market = fetch_daily_index("VNINDEX", start_date=str(market_start.date()), end_date=target_date,
+                               save_to_raw=False, force_refresh=True).copy()
+    market["Date"] = pd.to_datetime(market["Date"])
+    market = market[(market.Date >= market_start) & (market.Date <= cutoff)].sort_values("Date")
+    close = pd.to_numeric(market["VNINDEX_Close"], errors="coerce")
+    if market.Date.duplicated().any() or not (np.isfinite(close) & (close > 0)).all():
+        raise ValueError("SSI market snapshot has invalid prices or duplicate dates.")
+    if not set(stock.Date.tail(seq_length + 1)).issubset(set(market.Date)):
+        raise ValueError("SSI market snapshot does not cover the stock snapshot.")
+    market["VNINDEX_Return_1d"] = close.pct_change(fill_method=None)
+    stock = stock.drop(columns=["VNINDEX_Return_1d"], errors="ignore")
+    stock["Symbol"] = symbol.upper()
+    return stock.merge(market[["Date", "VNINDEX_Return_1d"]], on="Date",
+                       how="left", validate="one_to_one")
 
 
 def resolve_target_symbols(symbols: list[str] | str | None = None) -> list[str]:
@@ -471,6 +509,7 @@ def sync_latest_market_data(
         build_panel_dataset(symbols=target_list, end_date=target_date, force_refresh=False)
     except Exception as exc:
         logger.warning("Lỗi cập nhật panel interim sau đồng bộ: %s", exc)
+        errors["panel"] = str(exc)
 
     return {
         "status": "success" if not errors else "partial",
@@ -484,7 +523,7 @@ def sync_latest_market_data(
 def build_panel_dataset(
     symbols: list[str] | str | None = None,
     start_date: str = DEFAULT_START_DATE,
-    end_date: str | None = DEFAULT_END_DATE,
+    end_date: str | None = None,
     save_to_interim: bool = True,
     force_refresh: bool = False,
 ) -> pd.DataFrame:
@@ -498,6 +537,9 @@ def build_panel_dataset(
         save_to_interim: Lưu phân vùng Parquet vào data/interim/panel/.
         force_refresh: Bắt buộc tải lại từ API thay vì đọc cache.
     """
+    # Resolve once per build so a long-running process does not retain its
+    # import-time date, and all constituent series use the same cutoff.
+    end_date = end_date or get_default_end_date()
     target_symbols = resolve_target_symbols(symbols)
 
     dfs: list[pd.DataFrame] = []

@@ -299,8 +299,8 @@ def prepare_production_training_data(
     train_dates = unique_dates[:t_end_idx]
     val_dates = unique_dates[t_end_idx:]
 
-    train_df = df[df[date_col].isin(train_dates)].copy()
-    val_df = df[df[date_col].isin(val_dates)].copy()
+    train_df = df[df[date_col].isin(train_dates)].copy().reset_index(drop=True)
+    val_df = df[df[date_col].isin(val_dates)].copy().reset_index(drop=True)
 
     # Cô lập ranh giới (Purged Boundary): Gán nhãn sentinel -1 cho purge_horizon phiên cuối của Train
     purged_dates = np.array([])
@@ -308,7 +308,11 @@ def prepare_production_training_data(
         purge_start_idx = max(0, len(train_dates) - purge_horizon)
         purged_dates = train_dates[purge_start_idx:]
         if "Label" in train_df.columns and len(purged_dates) > 0:
-            train_df.loc[train_df[date_col].isin(purged_dates), "Label"] = -1
+            # Labels use shift(-horizon) within each symbol. Global calendar
+            # dates alone under-purge a symbol with suspended/missing sessions.
+            trailing = train_df.sort_values([symbol_col, date_col]).groupby(symbol_col).tail(purge_horizon)
+            train_df.loc[trailing.index, "Label"] = -1
+            purged_dates = np.sort(trailing[date_col].unique())
 
     train_s, val_s, _, scaler = scale_window(
         train_df=train_df,

@@ -2,12 +2,15 @@
 
 import hashlib
 import json
+import logging
 from pathlib import Path
 import shutil
 from uuid import uuid4
 
 from vn_stock.config import SYMBOL_TO_CODE
 from vn_stock.features import ALL_FEATURE_COLS, FEATURE_COLS
+
+logger = logging.getLogger(__name__)
 
 
 def _digest(path: Path) -> str:
@@ -24,6 +27,10 @@ def _validate_names(names, horizon):
 
 def publish_bundle(models_dir: Path, horizon: int, writers: dict, metadata: dict) -> Path:
     """Only expose a generation once every model, scaler and metadata file is written."""
+    return _publish_bundle(models_dir, horizon, writers, metadata)[0]
+
+
+def _publish_bundle(models_dir: Path, horizon: int, writers: dict, metadata: dict) -> tuple[Path, dict]:
     models_dir = Path(models_dir)
     generation = models_dir / "runs" / uuid4().hex
     generation.mkdir(parents=True)
@@ -49,7 +56,33 @@ def publish_bundle(models_dir: Path, horizon: int, writers: dict, metadata: dict
         raise
     finally:
         temporary.unlink(missing_ok=True)
-    return manifest_path
+    return manifest_path, manifest
+
+
+def publish_training_bundle(models_dir: Path, horizon: int, writers: dict,
+                            metadata: dict, aliases: dict[str, str]) -> dict:
+    """Commit serving artifacts once; compatibility exports cannot undo that commit."""
+    models_dir = Path(models_dir)
+    sources = set(writers) | {f'production_training_info_t{horizon}.json'}
+    if any(Path(alias).name != alias or source not in sources for alias, source in aliases.items()):
+        raise ValueError("Invalid compatibility artifact alias.")
+    _, manifest = _publish_bundle(models_dir, horizon, writers, metadata)
+    failures = []
+    for alias, source in aliases.items():
+        temporary = models_dir / f".{alias}.{uuid4().hex}.tmp"
+        try:
+            shutil.copyfile(models_dir / manifest['files'][source]['path'], temporary)
+            temporary.replace(models_dir / alias)
+        except OSError:
+            failures.append(alias)
+            logger.warning("artifact_compatibility_export_failed file=%s", alias, exc_info=True)
+        finally:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                logger.warning("artifact_compatibility_cleanup_failed file=%s", alias)
+    generation = Path(next(iter(manifest['files'].values()))['path']).parent.name
+    return {'artifact_generation': generation, 'compatibility_export_failures': failures}
 
 
 def resolve_bundle(models_dir: Path, horizon: int) -> dict[str, Path]:

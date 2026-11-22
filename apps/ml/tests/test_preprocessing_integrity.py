@@ -65,3 +65,14 @@ def test_validation_backtest_uses_persisted_scaler_not_refitted_statistics(monke
                         lambda *a, **kw: (SimpleNamespace(predict=predict), scaler, {}))
     result = backtest_symbol_oos("VIC", "lightgbm")
     assert result.strategy_name == "AI_LIGHTGBM_VALIDATION"
+
+
+def test_purge_counts_each_symbols_sessions_when_dates_are_sparse():
+    from vn_stock.splitting_data import prepare_production_training_data
+    dates=pd.bdate_range('2026-03-02',periods=20)
+    dense=pd.DataFrame({'Date':dates,'Symbol':'VIC','Close':50.,'Label':1})
+    sparse=pd.DataFrame({'Date':dates[[0,3,6,9,12,15,18,19]],'Symbol':'HPG','Close':30.,'Label':1})
+    result=prepare_production_training_data(pd.concat([dense,sparse],ignore_index=True),val_buffer_days=4,
+                                            feature_cols=['Close'],seq_length=2,purge_horizon=3)
+    train=result['train'];tail=train[train.Symbol=='HPG'].sort_values('Date').tail(3)
+    assert tail.Label.tolist()==[-1,-1,-1]

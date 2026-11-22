@@ -184,13 +184,18 @@ def load_prediction_snapshot(
                 hidden_size=info.get("hidden_size", hidden_size),
                 num_layers=info.get("num_layers", num_layers),
             )
+            import hashlib
+            generation = model_path.parent.name if pointer.exists() else hashlib.sha256(
+                b"".join(hashlib.sha256(p.read_bytes()).digest() for p in paths)
+            ).hexdigest()[:16]
+            info = {**info, "artifact_generation": generation, "serving_status": "healthy"}
             _model_cache[cache_key] = (model, scaler, mtimes, info)
             return model, scaler, info
         except Exception:
             if cached is None:
                 raise
             logger.exception("Artifact reload failed; retaining the complete cached generation.")
-            return cached[0], cached[1], cached[3]
+            return cached[0], cached[1], {**cached[3], "serving_status": "degraded_cached_generation"}
 
 
 def load_prediction_artifacts(
@@ -206,6 +211,7 @@ def load_prediction_artifacts(
 def prepare_inference_features(
     symbol: str = DEFAULT_SYMBOL,
     seq_length: int = DEFAULT_SEQ_LENGTH,
+    raw_snapshot: pd.DataFrame | None = None,
 ) -> tuple[pd.DataFrame, float, str]:
     """
     Nạp dữ liệu lịch sử và tính toán bộ 13 đặc trưng tương đối + Symbol_Code cho một mã cổ phiếu hoặc chỉ số.
@@ -215,9 +221,18 @@ def prepare_inference_features(
     """
     clean_sym = symbol.upper()
     df_raw = None
+    if raw_snapshot is not None:
+        required = {"Date", "Symbol", "Open", "High", "Low", "Close", "Volume", "VNINDEX_Return_1d"}
+        if raw_snapshot.empty or not required.issubset(raw_snapshot.columns):
+            raise ValueError("Incomplete explicit inference snapshot.")
+        if set(raw_snapshot.Symbol.astype(str).str.upper()) != {clean_sym}:
+            raise ValueError("Inference snapshot symbol does not match the request.")
+        df_raw = raw_snapshot.copy(deep=True).sort_values("Date")
+        if pd.to_datetime(df_raw.Date).duplicated().any():
+            raise ValueError("Duplicate dates in explicit inference snapshot.")
 
     # 1. Hỗ trợ nạp chỉ số thị trường (VNINDEX, VN30, HNX30, ...)
-    if clean_sym in SUPPORTED_INDICES:
+    if raw_snapshot is None and clean_sym in SUPPORTED_INDICES:
         idx_df = load_local_data(clean_sym)
         if idx_df is not None:
             # Chuẩn hóa cột giá đóng cửa cho chỉ số nếu chỉ có VNINDEX_Close
@@ -278,7 +293,7 @@ def prepare_inference_features(
             logger.debug("Không thể nạp dữ liệu từ panel: %s", err)
 
     # 3. Fallback nếu panel chưa có hoặc thiếu nến phiên mục tiêu: nạp/kéo từ SSI và merge VNINDEX
-    if df_raw is None or df_raw.empty or len(df_raw) < 200:
+    if raw_snapshot is None and (df_raw is None or df_raw.empty or len(df_raw) < 200):
         try:
             stock_df = fetch_stock_data(clean_sym, end_date=target_date_str)
         except Exception as e:
@@ -338,6 +353,7 @@ def predict_trend(
     num_layers: int = DEFAULT_LSTM_NUM_LAYERS,
     horizon_days: int = DEFAULT_HORIZON_DAYS,
     is_live_synced: bool = False,
+    raw_snapshot: pd.DataFrame | None = None,
 ) -> dict[str, Any]:
     """
     Thực hiện suy luận dự báo xu hướng thị trường chu kỳ T+3 (khớp với thời gian cổ phiếu về tài khoản)
@@ -381,7 +397,7 @@ def predict_trend(
     if training_info.get("seq_length", seq_length) != seq_length:
         raise ValueError("Requested sequence length differs from the trained artifact.")
     df_feat, latest_close, latest_date = prepare_inference_features(
-        clean_sym, seq_length=seq_length
+        clean_sym, seq_length=seq_length, raw_snapshot=raw_snapshot
     )
 
     # Chuẩn hóa 13 đặc trưng số học bằng scaler (Symbol_Code giữ nguyên)
@@ -483,6 +499,9 @@ def predict_trend(
     else:
         guidance = "Thị trường ĐI NGANG: Xu hướng tích lũy trong chu kỳ T+3. Khuyến nghị giữ tiền mặt và quan sát điểm bứt phá."
 
+    for step, day in zip(trajectory, future_days):
+        step["holiday_calendar_verified"] = day["holiday_calendar_verified"]
+
     session_info = get_target_market_session_info()
 
     return {
@@ -498,6 +517,9 @@ def predict_trend(
         "horizon": f"T+{horizon_days}",
         "horizon_days": horizon_days,
         "is_live_synced": is_live_synced,
+        "data_quality": {"historical_adjustment_status": "unverified",
+                         "source_provenance": "SSI_request_snapshot" if raw_snapshot is not None
+                         else "local_dataset_not_independently_verified"},
         "trajectory": trajectory,
         "summary_guidance": guidance,
         "training_info": training_info,

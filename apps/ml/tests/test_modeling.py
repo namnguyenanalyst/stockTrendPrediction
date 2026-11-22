@@ -288,6 +288,11 @@ def test_train_production_model(tmp_path):
         assert "lstm_metrics" in res
         assert "horizon" in res
         assert res["horizon"] == "T+3"
+        from importlib.metadata import version
+        assert res["runtime_versions"]["scikit-learn"] == version("scikit-learn")
+        import json
+        stored_info = json.loads((tmp_path / "production_training_info_t3.json").read_text())
+        assert stored_info["runtime_versions"] == res["runtime_versions"]
         assert (tmp_path / "production_lgb_t3.txt").exists()
         assert (tmp_path / "production_lstm_t3.pth").exists()
         assert (tmp_path / "production_scaler_t3.pkl").exists()
