@@ -41,7 +41,7 @@ def test_docker_compose_cli_validation():
     docker_bin = shutil.which("docker")
     if docker_bin:
         cmd = [docker_bin, "compose", "-f", str(COMPOSE_FILE), "config"]
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        proc = subprocess.run(cmd, env={**os.environ, "FRONTEND_PUBLIC_URL": os.environ.get("FRONTEND_PUBLIC_URL") or "http://localhost:3000"}, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         assert proc.returncode == 0, f"docker compose config failed:\n{proc.stderr}"
     else:
         pytest.skip("Docker CLI not installed on host machine.")

@@ -34,8 +34,8 @@ def compose_yaml():
         return yaml.safe_load(f)
 
 
-def test_compose_parses_with_zero_env_vars():
-    """Verify compose file parses cleanly with zero environment variables set (all defaults)."""
+def test_compose_requires_public_url_and_parses_with_explicit_value():
+    """Required public URL must fail closed; explicit test URL permits rendering."""
     clean_env = {
         "PATH": os.environ.get("PATH", ""),
         "HOME": os.environ.get("HOME", ""),
@@ -46,7 +46,11 @@ def test_compose_parses_with_zero_env_vars():
 
     cmd = [docker_bin, "compose", "-f", str(COMPOSE_FILE), "config"]
     res = subprocess.run(cmd, env=clean_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    assert res.returncode == 0, f"docker compose config failed with empty env:\n{res.stderr}"
+    assert res.returncode != 0
+    assert "FRONTEND_PUBLIC_URL" in res.stderr
+    clean_env["FRONTEND_PUBLIC_URL"] = "http://localhost:3000"
+    res = subprocess.run(cmd, env=clean_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    assert res.returncode == 0, res.stderr
 
     config_data = yaml.safe_load(res.stdout)
     api_svc = config_data["services"]["vn_stock_api"]

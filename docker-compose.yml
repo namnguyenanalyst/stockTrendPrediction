@@ -37,13 +37,13 @@ services:
   # 2. BACKEND API SERVICE: FastAPI + Alembic Migrations
   # ----------------------------------------------------------------------------
   vn_stock_api:
-    image: infra-vn_stock_api:latest
+    image: ${VN_STOCK_API_IMAGE:-infra-vn_stock_api:latest}
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     container_name: vn_stock_api
     restart: unless-stopped
-    environment:
+    environment: &api_environment
       SOLE_ADMIN_EMAIL: ${SOLE_ADMIN_EMAIL:-admin@vnstock}
       SSI_CONSUMER_ID: ${SSI_CONSUMER_ID:-}
       SSI_CONSUMER_SECRET: ${SSI_CONSUMER_SECRET:-}
@@ -87,8 +87,35 @@ services:
   # ----------------------------------------------------------------------------
   # 3. FRONTEND WEB SERVICE: Next.js 16 Standalone Dashboard
   # ----------------------------------------------------------------------------
+  # Only the internal training service can write the shared data/model directories.
+  vn_stock_training_api:
+    image: ${VN_STOCK_API_IMAGE:-infra-vn_stock_api:latest}
+    container_name: vn_stock_training_api
+    restart: unless-stopped
+    user: "${ML_WRITER_UID:-1001}:${ML_WRITER_GID:-1001}"
+    environment:
+      <<: *api_environment
+      AUTO_SYNC_ON_STARTUP: "false"
+    volumes:
+      - ./apps/api/app:/app/apps/api/app:ro
+      - ./apps/ml/models:/app/apps/ml/models
+      - ./apps/ml/data:/app/apps/ml/data
+      - ./infra/scripts/training_api_entrypoint.py:/app/training_api_entrypoint.py:ro
+    command: python /app/training_api_entrypoint.py
+    depends_on:
+      vn_stock_api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - vn_stock_net
+
   vn_stock_web:
-    image: infra-vn_stock_web:latest
+    image: ${VN_STOCK_WEB_IMAGE:-infra-vn_stock_web:latest}
     build:
       context: apps/web
       dockerfile: Dockerfile
@@ -118,7 +145,7 @@ services:
     container_name: vn_stock_retrain_worker
     restart: unless-stopped
     environment:
-      API_BASE_URL: http://vn_stock_api:8000
+      API_BASE_URL: http://vn_stock_training_api:8000
       INTERNAL_WORKER_SECRET: ${INTERNAL_WORKER_SECRET:-}
       RETRAIN_SCOPE: "VN30"
       TZ: Asia/Ho_Chi_Minh
@@ -126,7 +153,7 @@ services:
       - ./infra/scripts/retrain_worker.py:/app/retrain_worker.py:ro
     command: python /app/retrain_worker.py
     depends_on:
-      vn_stock_api:
+      vn_stock_training_api:
         condition: service_healthy
     networks:
       - vn_stock_net
