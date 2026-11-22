@@ -9,6 +9,7 @@ import { BacktestSimulatorTab } from "@/components/tabs/BacktestSimulatorTab";
 import { MarketOverviewTab } from "@/components/tabs/MarketOverviewTab";
 import { SystemStatsTab } from "@/components/tabs/SystemStatsTab";
 import { useAuth } from "@/context/AuthContext";
+import { predictionLoadErrorMessage } from "@/lib/predictionPresentation";
 import {
   getBatchPrediction,
   getMarketBoard,
@@ -44,12 +45,25 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
   const [modelType, setModelType] = useState<"lightgbm" | "lstm">("lightgbm");
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const compact = () => { if (media.matches) setIsCollapsed(true); };
+    const timer = setTimeout(compact, 0);
+    media.addEventListener("change", compact);
+    return () => { clearTimeout(timer); media.removeEventListener("change", compact); };
+  }, []);
+
   // Dữ liệu Thị trường
   const [bars, setBars] = useState<StockBar[]>([]);
   const [indicators, setIndicators] = useState<StockIndicatorBar[]>([]);
   const [summary, setSummary] = useState<StockSummaryResponse | null>(null);
   const [marketBoard, setMarketBoard] = useState<MarketBoardResponse | null>(null);
   const [loadingMarket, setLoadingMarket] = useState<boolean>(true);
+
+  const [predictionError, setPredictionError] = useState<string | null>(null);
+  const [reloadPrediction, setReloadPrediction] = useState(0);
+  const [fetchedKey, setFetchedKey] = useState("");
+  const selectionKey = `${selectedSymbol}:${modelType}`;
 
   // Dữ liệu Dự báo AI
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
@@ -135,6 +149,7 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
       setIndicators([]);
       setSummary(null);
       setPrediction(null);
+      setPredictionError(null);
       setLoadingMarket(true);
       setLoadingPrediction(true);
 
@@ -152,6 +167,8 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
         if (indRes.status === "fulfilled") setIndicators(indRes.value.indicators);
         if (sumRes.status === "fulfilled") setSummary(sumRes.value);
         if (singlePred.status === "fulfilled") setPrediction(singlePred.value);
+        else setPredictionError(predictionLoadErrorMessage(singlePred.reason));
+        setFetchedKey(`${selectedSymbol}:${modelType}`);
       } catch (err) {
         console.warn("Lỗi tải dữ liệu chi tiết cổ phiếu:", err);
       } finally {
@@ -167,7 +184,7 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
     return () => {
       ignore = true;
     };
-  }, [selectedSymbol, modelType]);
+  }, [selectedSymbol, modelType, reloadPrediction]);
 
   // Hook 3: Tải dữ liệu bảng giá thị trường ban đầu khi mount
   useEffect(() => {
@@ -252,14 +269,18 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
 
           {activeTab === "prediction" && (
             <AIPredictionTab
+              key={`${user?.id ?? "guest"}:${selectionKey}`}
+              userId={user?.id}
+              error={predictionError}
+              onRetry={() => setReloadPrediction(value => value + 1)}
               selectedSymbol={selectedSymbol}
               onSelectSymbol={setSelectedSymbol}
-              bars={bars}
-              prediction={prediction}
+              bars={fetchedKey === selectionKey ? bars : []}
+              prediction={fetchedKey === selectionKey ? prediction : null}
               batchPrediction={batchPrediction}
               modelType={modelType}
               onChangeModelType={setModelType}
-              loading={loadingPrediction}
+              loading={loadingPrediction || fetchedKey !== selectionKey}
             />
           )}
 

@@ -1,4 +1,5 @@
 "use client";
+import { predictionHistoryKey, parsePredictionHistory } from "@/lib/predictionHistory";
 import { matchesPrediction } from "@/lib/predictionPresentation";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -19,7 +20,7 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import { getPredictStatus, getStockHistory } from "@/lib/api";
+import { getPredictStatus } from "@/lib/api";
 import {
   BatchPredictionResponse,
   PredictionResponse,
@@ -75,6 +76,9 @@ interface AIPredictionTabProps {
   modelType: "lightgbm" | "lstm";
   onChangeModelType: (model: "lightgbm" | "lstm") => void;
   loading: boolean;
+  userId?: string;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
@@ -85,13 +89,18 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   modelType,
   onChangeModelType,
   loading,
+  userId,
+  error,
+  onRetry,
 }) => {
   const [showInfo, setShowInfo] = useState(false);
-  const [localPrediction, setLocalPrediction] = useState<PredictionResponse | null>(null);
-  const [fallbackBars, setFallbackBars] = useState<StockBar[]>([]);
-  const chartBars = bars && bars.length > 0 ? bars : fallbackBars;
+  const chartBars = bars ?? [];
+  const historyKey = userId ? predictionHistoryKey(userId) : null;
 
   const [predictStatus, setPredictStatus] = useState<PredictStatusResponse | null>(null);
+
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [statusAttempt, setStatusAttempt] = useState(0);
 
   // Truy vấn trạng thái tự trị của mô hình AI từ /api/v1/predict/status
   useEffect(() => {
@@ -100,15 +109,21 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
       .then((res) => {
         if (!ignore && res) {
           setPredictStatus(res);
+          setStatusError(null);
         }
       })
       .catch((err) => {
-        console.warn("Lỗi truy vấn trạng thái mô hình AI:", err);
+        if (!ignore) {
+          setPredictStatus(null);
+          setStatusError(err?.status === 401
+            ? "Phiên đăng nhập đã hết hạn. Tải lại trang để khôi phục phiên."
+            : "Không tải được trạng thái mô hình.");
+        }
       });
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [userId, statusAttempt]);
 
   const formatRetrainTime = (timestamp: string | null | undefined): string => {
     if (!timestamp) return "Chưa có lần cập nhật nào";
@@ -128,28 +143,13 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
     }
   };
 
-  // Tải nến dự phòng nếu không nhận được bars từ props
-  useEffect(() => {
-    if (!bars || bars.length === 0) {
-      let ignore = false;
-      setFallbackBars([]);
-      getStockHistory(selectedSymbol)
-        .then((res) => {
-          if (!ignore && res && res.bars) setFallbackBars(res.bars);
-        })
-        .catch((err) => console.warn("Lỗi tải nến biểu đồ:", err));
-      return () => {
-        ignore = true;
-      };
-    }
-  }, [bars, selectedSymbol]);
   const [detailModalItem, setDetailModalItem] = useState<FinancialItemContext | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [history, setHistory] = useState<PredictionHistoryItem[]>(() => {
     if (typeof window === "undefined") return [];
     try {
-      const stored = localStorage.getItem("vn_stock_prediction_history");
-      return stored ? JSON.parse(stored) : [];
+      const stored = historyKey ? localStorage.getItem(historyKey) : null;
+      return parsePredictionHistory(stored);
     } catch (err) {
       console.warn("Không thể tải lịch sử dự báo từ localStorage:", err);
       return [];
@@ -160,6 +160,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   const [hoveredModel, setHoveredModel] = useState<"lightgbm" | "lstm" | null>(null);
   const [activeTooltipModel, setActiveTooltipModel] = useState<"lightgbm" | "lstm" | null>(null);
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const modelDialogRef = useRef<HTMLDivElement>(null);
 
   const startHoverTimer = (m: "lightgbm" | "lstm") => {
     setHoveredModel(m);
@@ -178,30 +179,46 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
     }
   };
 
-  // Lắng nghe phím Escape để đóng modal đặc tả mô hình
+  // Modal keyboard lifecycle: move focus inside, trap Tab, restore trigger.
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && activeTooltipModel) {
+    if (!activeTooltipModel) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const focusable = () => Array.from(modelDialogRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), a[href], input:not([disabled]), [tabindex="0"]'
+    ) ?? []);
+    const focusTimer = setTimeout(() => focusable()[0]?.focus(), 0);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
         setActiveTooltipModel(null);
         setHoveredModel(null);
       }
+      if (event.key === "Tab") {
+        const elements = focusable();
+        const first = elements[0];
+        const last = elements[elements.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      clearTimeout(focusTimer);
+      window.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus();
+    };
   }, [activeTooltipModel]);
 
-  // Hiển thị localPrediction nếu vừa đồng bộ Live, ngược lại hiển thị prediction từ props
-  const activePred = matchesPrediction(localPrediction, selectedSymbol, modelType)
-    ? localPrediction
-    : matchesPrediction(prediction, selectedSymbol, modelType) ? prediction : null;
+  useEffect(() => () => { if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current); }, []);
+  const activePred = !loading && matchesPrediction(prediction, selectedSymbol, modelType) ? prediction : null;
 
   // Tự động ghi vết dự báo vào lịch sử khi người dùng chọn cổ phiếu hoặc đổi mô hình
   useEffect(() => {
-    if (!activePred || loading) return;
+    if (!activePred || loading || !historyKey) return;
 
     const timer = setTimeout(() => {
       setHistory((prev) => {
-        const last = prev[0];
+        const last = prev.find(item => item.symbol === activePred.symbol && item.model_type === activePred.model_type && item.data_date === (activePred.data_as_of_date || activePred.date));
         const dataDate = activePred.data_as_of_date || activePred.date;
         // Tránh ghi lặp nếu vừa ghi cùng mã, cùng mô hình và cùng phiên căn cứ
         if (
@@ -238,7 +255,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
 
         const updated = [newItem, ...prev].slice(0, 50); // Giới hạn 50 bản ghi gần nhất
         try {
-          localStorage.setItem("vn_stock_prediction_history", JSON.stringify(updated));
+          localStorage.setItem(historyKey, JSON.stringify(updated));
         } catch (err) {
           console.warn("Không thể lưu lịch sử vào localStorage:", err);
         }
@@ -251,12 +268,13 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
     activePred,
     loading,
     modelType,
+    historyKey,
   ]);
 
   const handleClearHistory = () => {
     setHistory([]);
     try {
-      localStorage.removeItem("vn_stock_prediction_history");
+      if (historyKey) localStorage.removeItem(historyKey);
     } catch (err) {
       console.warn("Không thể xóa lịch sử từ localStorage:", err);
     }
@@ -270,6 +288,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
   // Confidence là xác suất cao nhất trong 3 lớp
   const maxProb = Math.max(probUp, probHold, probDown);
   const confidencePct = (maxProb * 100).toFixed(1);
+  const labelThreshold = activePred?.training_info?.threshold;
+  const thresholdPct = typeof labelThreshold === "number" && Number.isFinite(labelThreshold)
+    && labelThreshold > 0 && labelThreshold < 1
+    ? (labelThreshold * 100).toLocaleString("vi-VN") : null;
 
   // Phân màu tín hiệu & chuẩn hóa tiếng Việt đồng bộ
   const rawSignal = activePred?.signal || "ĐANG TÍNH TOÁN";
@@ -291,12 +313,9 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-slate-100 sm:text-lg">
-                Dự báo xu hướng T+3
+                Dự báo xu hướng 3 phiên giao dịch tiếp theo.
               </h2>
             </div>
-            <p className="text-xs text-slate-400">
-              Dự báo xác suất xu hướng giá theo chu kỳ T+3 cho nhà đầu tư cá nhân
-            </p>
             {/* Huy hiệu Trạng thái Vận hành Tự trị (Autonomous Quantitative Architecture Badge) */}
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <div
@@ -309,14 +328,18 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 </span>
                 <Bot className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
                 <span>
-                  Thông tin mô hình | Phiên chốt:{" "}
+                  Thông tin mô hình | Phiên mục tiêu:{" "}
                   <strong className="text-emerald-200">
-                    {predictStatus?.last_atc_session_date || "..."}
+                    {predictStatus?.last_atc_session_date || (statusError ? "Không khả dụng" : "Đang tải…")}
                   </strong>
                 </span>
-                <span className="text-emerald-400/70 text-[10px]">
-                  (Cập nhật: {formatRetrainTime(predictStatus?.last_retrain_at)})
-                </span>
+                {predictStatus && <span className="text-emerald-400/70 text-[10px]">
+                  (Cập nhật: {formatRetrainTime(predictStatus.last_retrain_at)})
+                </span>}
+                {statusError && <span role="alert" className="text-amber-300">
+                  {statusError}{" "}
+                  <button type="button" onClick={() => setStatusAttempt(value => value + 1)} className="underline">Thử tải lại trạng thái</button>
+                </span>}
               </div>
             </div>
           </div>
@@ -329,14 +352,14 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           {/* Bộ chọn Mô hình kèm Cơ chế Hover 3 Giây Thả Đặc Tả */}
           <div className="relative flex items-center gap-1 rounded-md border border-slate-800 bg-slate-950 p-1">
             <button
+              aria-pressed={modelType === "lightgbm"}
               onClick={() => {
-                setLocalPrediction(null);
                 onChangeModelType("lightgbm");
               }}
               onMouseEnter={() => startHoverTimer("lightgbm")}
               onMouseLeave={cancelHoverTimer}
               className={`relative flex items-center gap-1.5 overflow-hidden rounded px-2.5 py-1 text-xs font-semibold transition-colors ${modelType === "lightgbm"
-                ? "bg-emerald-600 text-white shadow-sm"
+                ? "bg-emerald-700 text-white shadow-sm"
                 : "text-slate-400 hover:text-slate-200"
                 }`}
               title="Giữ chuột 3 giây để xem cửa sổ đặc tả mô hình LightGBM"
@@ -354,14 +377,14 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               )}
             </button>
             <button
+              aria-pressed={modelType === "lstm"}
               onClick={() => {
-                setLocalPrediction(null);
                 onChangeModelType("lstm");
               }}
               onMouseEnter={() => startHoverTimer("lstm")}
               onMouseLeave={cancelHoverTimer}
               className={`relative flex items-center gap-1.5 overflow-hidden rounded px-2.5 py-1 text-xs font-semibold transition-colors ${modelType === "lstm"
-                ? "bg-emerald-600 text-white shadow-sm"
+                ? "bg-emerald-700 text-white shadow-sm"
                 : "text-slate-400 hover:text-slate-200"
                 }`}
               title="Giữ chuột 3 giây để xem cửa sổ đặc tả mô hình PyTorch LSTM"
@@ -379,6 +402,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
               )}
             </button>
 
+            <button type="button" onClick={() => { cancelHoverTimer(); setActiveTooltipModel(modelType); }}
+              aria-label="Thông tin mô hình đang chọn" className="min-h-9 min-w-9 rounded px-2 text-slate-300 hover:bg-slate-800 focus-visible:outline focus-visible:outline-emerald-400">
+              <HelpCircle className="h-4 w-4" />
+            </button>
             <style>{`
               @keyframes fillProgress {
                 from { width: 0%; opacity: 0.7; }
@@ -389,6 +416,17 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
         </div>
       </div>
 
+      {activePred?.training_info?.serving_status === "degraded_cached_generation" && (
+        <p role="status" className="rounded border border-amber-700 bg-amber-950/30 p-3 text-sm text-amber-200">
+          Chưa tải được bản mô hình mới. Dự báo đang dùng bản đã xác minh trước đó
+          {activePred.training_info.artifact_generation ? ` (${activePred.training_info.artifact_generation})` : ""}.
+        </p>
+      )}
+      {activePred?.data_quality?.historical_adjustment_status === "unverified" && (
+        <p className="text-xs leading-relaxed text-slate-400">
+          Dữ liệu lịch sử chưa được xác minh đầy đủ về điều chỉnh cổ tức và chia tách cổ phiếu.
+        </p>
+      )}
       {/* 2. Thẻ Khuyến nghị Tín hiệu & Thanh Phân phối Xác suất */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         {/* Cột trái: Thẻ Tín hiệu AI Hành động (5 cột) */}
@@ -405,16 +443,14 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                     LIVE SSI
                   </span>
                 )}
-                <span className="rounded bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-300 font-mono">
-                  {activePred?.horizon || "T+3"}
-                </span>
               </div>
             </div>
 
             {loading || !activePred ? (
               <div className="my-8 flex flex-col items-center justify-center gap-2">
+                {!loading && onRetry && <button onClick={onRetry} className="min-h-9 rounded border border-slate-600 px-3 text-slate-100">Thử lại</button>}
                 {loading && <div className="h-7 w-7 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />}
-                <span className="text-xs text-slate-400">{loading ? "Mô hình đang suy luận..." : "Chưa có dự báo hợp lệ cho mã và mô hình này. Hãy thử tải lại."}</span>
+                <span className="text-xs text-slate-400">{loading ? "Mô hình đang suy luận..." : error || "Chưa có dự báo hợp lệ cho mã và mô hình này."}</span>
               </div>
             ) : (
               <div className="my-4">
@@ -496,7 +532,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 </span>
                 <button
                   onClick={() => setShowInfo(!showInfo)}
-                  className="text-slate-400 hover:text-slate-200"
+                  aria-label="Giải thích xác suất và ngưỡng phân loại"
+                  aria-expanded={showInfo}
+                  aria-controls="prediction-probability-help"
+                  className="flex min-h-9 min-w-9 items-center justify-center rounded text-slate-400 hover:text-slate-200 focus-visible:outline focus-visible:outline-emerald-400"
                 >
                   <HelpCircle className="h-3.5 w-3.5" />
                 </button>
@@ -504,9 +543,14 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
             </div>
 
             {showInfo && (
-              <div className="mb-4 rounded-md bg-slate-950 p-3 text-xs text-slate-300 border border-slate-800 leading-relaxed">
+              <div id="prediction-probability-help" className="mb-4 rounded-md bg-slate-950 p-3 text-xs text-slate-300 border border-slate-800 leading-relaxed">
                 <p>
-                  Mô hình AI dự báo xác suất 3 kịch bản trong chu kỳ T+3: <strong>TĂNG</strong> (kỳ vọng lãi &gt; 1.5%), <strong>GIẢM</strong> (nguy cơ lỗ &gt; 1.5%) hoặc <strong>ĐI NGANG</strong>. Tổng xác suất bằng 100%. Kịch bản có xác suất cao nhất sẽ đưa ra khuyến nghị Mua, Bán hoặc Nắm giữ an toàn cho nhà đầu tư cá nhân.
+                  Mô hình ước tính xác suất của ba lớp xu hướng trong chu kỳ {activePred?.horizon || "T+3"}.
+                  Tổng xác suất ba lớp bằng 100%. Xác suất này không phải độ chính xác đã đo trên dữ liệu kiểm thử.
+                </p>
+                <p className="mt-2">
+                  {thresholdPct ? `Ngưỡng phân loại: ±${thresholdPct}% so với giá căn cứ. TĂNG khi mức thay đổi ≥ +${thresholdPct}%; GIẢM khi ≤ −${thresholdPct}%; ĐI NGANG nằm giữa hai ngưỡng.`
+                    : "Chưa có thông tin ngưỡng phân loại từ artifact mô hình."}
                 </p>
               </div>
             )}
@@ -526,7 +570,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 <div className="h-2 w-full rounded bg-slate-800 overflow-hidden">
                   <div
                     className="h-full bg-emerald-500 transition-all duration-300"
-                    style={{ width: `${Math.max(probUp * 100, 2)}%` }}
+                    style={{ width: `${probUp * 100}%` }}
                   />
                 </div>
               </div>
@@ -544,7 +588,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 <div className="h-2 w-full rounded bg-slate-800 overflow-hidden">
                   <div
                     className="h-full bg-amber-500 transition-all duration-300"
-                    style={{ width: `${Math.max(probHold * 100, 2)}%` }}
+                    style={{ width: `${probHold * 100}%` }}
                   />
                 </div>
               </div>
@@ -562,7 +606,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 <div className="h-2 w-full rounded bg-slate-800 overflow-hidden">
                   <div
                     className="h-full bg-rose-500 transition-all duration-300"
-                    style={{ width: `${Math.max(probDown * 100, 2)}%` }}
+                    style={{ width: `${probDown * 100}%` }}
                   />
                 </div>
               </div>
@@ -571,12 +615,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
 
           <div className="mt-6 border-t border-slate-800/80 pt-3 flex items-center justify-between text-xs text-slate-400">
             <span>Mô hình đang chạy: <strong className="text-slate-200">{modelType.toUpperCase()}</strong></span>
-            <span className="text-[11px] text-slate-500">Kết quả nghiên cứu; chưa xác nhận hiệu quả đầu tư</span>
           </div>
         </div>
       </div>
 
-      <p className="text-xs text-slate-400" role="note">Mô hình phân loại xu hướng T+3. Xác suất lớp chưa được hiệu chỉnh và không phải tỷ lệ dự báo đúng. Kết quả kiểm thử tài chính còn phụ thuộc dữ liệu quyền cổ đông.</p>
       {/* 2.5. Biểu đồ Nến Kỹ thuật & Quỹ đạo Dự phóng Xu hướng T+1 -> T+3 chuẩn FireAnt */}
       <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
         <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -660,11 +702,17 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                   return (
                     <tr
                       key={item.id}
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.target === event.currentTarget && ["Enter", " "].includes(event.key)) {
+                          event.preventDefault(); event.currentTarget.click();
+                        }
+                      }}
                       onClick={() => {
                         onSelectSymbol(item.symbol);
                         setDetailModalItem({
                           symbol: item.symbol,
-                          currentValue: item.current_price,
+
                           isIndex: item.symbol.includes("VNINDEX") || item.symbol.includes("VN30"),
                         });
                         setIsDetailModalOpen(true);
@@ -677,7 +725,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                     >
                       <td className="px-3 py-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
-                          <Clock className="h-3 w-3 text-slate-500" />
+                          <Clock className="h-3 w-3 text-slate-400" />
                           <span>{item.timestamp}</span>
                         </div>
                       </td>
@@ -760,13 +808,13 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 })
               ) : (
                 <tr>
-                  <td colSpan={10} className="px-3 py-8 text-center text-slate-500">
+                  <td colSpan={10} className="px-3 py-8 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-1.5">
                       <Clock className="h-5 w-5 text-slate-600" />
                       <p className="text-xs font-medium text-slate-400">
                         Chưa có lịch sử phân tích
                       </p>
-                      <p className="text-[11px] text-slate-500">
+                      <p className="text-[11px] text-slate-400">
                         Mỗi khi bạn chọn một mã cổ phiếu hoặc thay đổi mô hình, kết quả dự báo sẽ tự động được ghi lại tại đây.
                       </p>
                     </div>
@@ -788,6 +836,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
           }}
         >
           <div
+            ref={modelDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="model-dialog-title"
             onClick={(e) => e.stopPropagation()}
             className="relative w-full max-w-xl max-h-[90vh] flex flex-col rounded-lg border border-slate-700 bg-slate-900 shadow-xl overflow-hidden"
           >
@@ -807,7 +859,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                   )}
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-100 text-base leading-tight">
+                  <h3 id="model-dialog-title" className="font-bold text-slate-100 text-base leading-tight">
                     {MODEL_SPECIFICATIONS[activeTooltipModel].title}
                   </h3>
                   <span className="inline-block mt-1 rounded px-2.5 py-0.5 text-[11px] font-semibold border border-slate-700 bg-slate-800 text-slate-300">
@@ -891,16 +943,16 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
 
               {/* Quick Tip Footer Box */}
               <div className="rounded-md border border-blue-500/20 bg-slate-950 p-3 text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
-                <span className="font-semibold text-blue-200">💡 Quy tắc ghi nhớ nhanh:</span>
+                <span className="font-semibold text-blue-200">Cách chọn mô hình:</span>
                 <span className="font-medium text-slate-300">
-                  Thị trường Sideway / Lướt ngắn ➔ <strong className="text-blue-300">LightGBM</strong> | Vào Sóng mạnh / Trend ➔ <strong className="text-sky-300">LSTM</strong>
+                  So sánh kết quả ngoài mẫu trên cùng mã và giai đoạn. Chưa có bằng chứng xác nhận mỗi mô hình phù hợp riêng với một trạng thái thị trường.
                 </span>
               </div>
             </div>
 
             {/* Footer Modal với các nút hành động */}
             <div className="border-t border-slate-800 bg-slate-950/80 px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
-              <span className="text-[11px] text-slate-500 italic">
+              <span className="text-[11px] text-slate-400 italic">
                 Bấm phím Esc hoặc bấm ra ngoài màn hình để đóng
               </span>
               <div className="flex items-center gap-2">
@@ -916,8 +968,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
                 {modelType !== activeTooltipModel ? (
                   <button
                     onClick={() => {
-                      setLocalPrediction(null);
-                      onChangeModelType(activeTooltipModel);
+                            onChangeModelType(activeTooltipModel);
                       setActiveTooltipModel(null);
                       setHoveredModel(null);
                     }}

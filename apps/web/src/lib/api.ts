@@ -54,7 +54,12 @@ export function getAuthToken(): string | null {
   return inMemoryToken;
 }
 
-async function fetchJson<T>(endpoint: string, options?: RequestInit): Promise<T> {
+async function fetchJson<T>(endpoint: string, options?: RequestInit, timeoutMs?: number): Promise<T> {
+  const controller = timeoutMs ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  const abortFromCaller = () => controller?.abort();
+  if (controller && options?.signal?.aborted) controller.abort();
+  options?.signal?.addEventListener("abort", abortFromCaller, { once: true });
   const url = `${API_BASE_URL}${endpoint}`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -69,12 +74,18 @@ async function fetchJson<T>(endpoint: string, options?: RequestInit): Promise<T>
     const res = await fetch(url, {
       credentials: "include",
       ...options,
+      ...(controller ? { signal: controller.signal } : {}),
       headers,
     });
 
     if (!res.ok) {
       const errorText = await res.text();
-      throw new Error(`API error (${res.status}): ${errorText}`);
+      let detail: string | undefined;
+      try {
+        const payload = JSON.parse(errorText);
+        if (typeof payload.detail === "string") detail = payload.detail;
+      } catch { /* Non-JSON upstream errors keep the generic presentation. */ }
+      throw Object.assign(new Error(`API error (${res.status}): ${errorText}`), { status: res.status, detail });
     }
 
     if (res.status === 204) {
@@ -85,6 +96,9 @@ async function fetchJson<T>(endpoint: string, options?: RequestInit): Promise<T>
   } catch (error) {
     console.warn(`Fetch failed for ${endpoint}:`, error);
     throw error;
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+    options?.signal?.removeEventListener("abort", abortFromCaller);
   }
 }
 
@@ -118,7 +132,7 @@ export async function getStockHistory(
   params.set("symbol", symbol);
   if (startDate) params.set("start_date", startDate);
   if (limit) params.set("limit", limit.toString());
-  return fetchJson<StockHistoryResponse>(`/api/stocks/history?${params.toString()}`);
+  return fetchJson<StockHistoryResponse>(`/api/stocks/history?${params.toString()}`, undefined, 30_000);
 }
 
 export async function getStockIndicators(
@@ -126,13 +140,13 @@ export async function getStockIndicators(
   limit = 1500
 ): Promise<StockIndicatorsResponse> {
   return fetchJson<StockIndicatorsResponse>(
-    `/api/stocks/indicators?symbol=${encodeURIComponent(symbol)}&limit=${limit}`
+    `/api/stocks/indicators?symbol=${encodeURIComponent(symbol)}&limit=${limit}`, undefined, 30_000
   );
 }
 
 export async function getStockSummary(symbol: string): Promise<StockSummaryResponse> {
   return fetchJson<StockSummaryResponse>(
-    `/api/stocks/summary?symbol=${encodeURIComponent(symbol)}`
+    `/api/stocks/summary?symbol=${encodeURIComponent(symbol)}`, undefined, 30_000
   );
 }
 
@@ -166,7 +180,7 @@ export async function getPredictionSignal(
   modelType: "lightgbm" | "lstm" = "lightgbm"
 ): Promise<PredictionResponse> {
   return fetchJson<PredictionResponse>(
-    `/api/predict/signal?symbol=${encodeURIComponent(symbol)}&model_type=${encodeURIComponent(modelType)}`
+    `/api/predict/signal?symbol=${encodeURIComponent(symbol)}&model_type=${encodeURIComponent(modelType)}`, undefined, 30_000
   );
 }
 
@@ -174,7 +188,7 @@ export async function getBatchPrediction(
   modelType: "lightgbm" | "lstm" = "lightgbm"
 ): Promise<BatchPredictionResponse> {
   return fetchJson<BatchPredictionResponse>(
-    `/api/predict/batch?model_type=${encodeURIComponent(modelType)}`
+    `/api/predict/batch?model_type=${encodeURIComponent(modelType)}`, undefined, 30_000
   );
 }
 

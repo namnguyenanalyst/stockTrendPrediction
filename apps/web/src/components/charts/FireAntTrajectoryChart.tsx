@@ -1,5 +1,6 @@
 "use client";
-import { matchesPrediction, formatPriceVnd } from "@/lib/predictionPresentation";
+import { buildTrajectory, trajectoryProblem } from "@/lib/predictionTrajectory";
+import { formatPriceVnd } from "@/lib/predictionPresentation";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -10,6 +11,7 @@ import {
   HistogramSeries,
   IChartApi,
   ISeriesApi,
+  IPriceLine,
   LineSeries,
   LineStyle,
   LineType,
@@ -20,7 +22,7 @@ import {
   Minus,
   Sparkles,
 } from "lucide-react";
-import { DayForecast, PredictionResponse, StockBar } from "@/lib/types";
+import { PredictionResponse, StockBar } from "@/lib/types";
 
 interface FireAntTrajectoryChartProps {
   symbol: string;
@@ -28,16 +30,6 @@ interface FireAntTrajectoryChartProps {
   prediction: PredictionResponse | null;
   modelType: "lightgbm" | "lstm";
   height?: number;
-}
-
-interface TrajectoryStepPoint {
-  date: string;
-  dayName: string;
-  price: number;
-  changePct: number;
-  trend: "TĂNG" | "ĐI NGANG" | "GIẢM";
-  confidence: number;
-  signal: string;
 }
 
 // Hàm tính SMA (Simple Moving Average)
@@ -61,19 +53,6 @@ function calculateSMA(
   return result;
 }
 
-// Hàm tìm ngày giao dịch kế tiếp (bỏ qua Thứ 7, Chủ Nhật)
-function getNextTradingDay(dateStr: string): string {
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() + 1);
-  while (d.getDay() === 0 || d.getDay() === 6) {
-    d.setDate(d.getDate() + 1);
-  }
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
   symbol,
   bars,
@@ -91,6 +70,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
   const sma50SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const trajectorySeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const trajectoryAreaSeriesRef = useRef<ISeriesApi<"Area"> | null>(null);
+  const targetPriceLineRef = useRef<IPriceLine | null>(null);
 
   // Tùy chọn hiển thị
   const [showTrajectory, setShowTrajectory] = useState<boolean>(true);
@@ -123,74 +103,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
   const lastBar = sortedBars[sortedBars.length - 1];
 
   // Tính toán các điểm giá cho Quỹ đạo dự phóng 3 phiên (T+1 -> T+3)
-  const trajectoryPoints: TrajectoryStepPoint[] = useMemo(() => {
-    if (!lastBar || !matchesPrediction(prediction, symbol, modelType) || !prediction?.trajectory?.length || (prediction.data_as_of_date || prediction.date) !== lastBar.date) return [];
-
-    const basePrice = lastBar.close;
-    const baseDate = lastBar.date;
-
-    const trajectory = prediction?.trajectory || [];
-    const points: TrajectoryStepPoint[] = [];
-
-    // Điểm gốc: Phiên T (Nến hiện tại)
-    points.push({
-      date: baseDate,
-      dayName: "Phiên T (Hiện tại)",
-      price: basePrice,
-      changePct: 0,
-      trend: "ĐI NGANG",
-      confidence: 1.0,
-      signal: "CHỐT PHIÊN",
-    });
-
-    let currentPrice = basePrice;
-    let prevDate = baseDate;
-
-    // Duyệt qua 3 bước T+1, T+2, T+3
-    for (let i = 0; i < 3; i++) {
-      const step: DayForecast | undefined = trajectory[i];
-      const dayName = step?.day_name || `T+${i + 1}`;
-      const trend = step?.predicted_trend || (prediction?.class_name as "TĂNG" | "ĐI NGANG" | "GIẢM") || "ĐI NGANG";
-      const confidence = step?.confidence ?? 0;
-      const signal = step?.signal || "NẮM GIỮ (HOLD)";
-
-      // Xác định ngày tương lai hợp lệ (phải lớn hơn ngày trước đó)
-      let stepDate = step?.date;
-      if (!stepDate || new Date(stepDate) <= new Date(prevDate)) {
-        stepDate = getNextTradingDay(prevDate);
-      }
-      prevDate = stepDate;
-
-      // Tính toán tỷ lệ biến động giá dự kiến dựa trên xu hướng và xác suất
-      let driftPct = 0;
-      if (trend === "TĂNG") {
-        driftPct = 0.012 + (confidence - 0.33) * 0.02; // Tăng +1.4% đến +2.2%
-      } else if (trend === "GIẢM") {
-        driftPct = -(0.012 + (confidence - 0.33) * 0.02); // Giảm -1.4% đến -2.2%
-      } else {
-        const pUp = step?.probabilities?.["TĂNG"] ?? 0.33;
-        const pDown = step?.probabilities?.["GIẢM"] ?? 0.33;
-        driftPct = (pUp - pDown) * 0.008; // Đi ngang giằng co quanh biên hẹp
-      }
-
-      currentPrice = parseFloat((currentPrice * (1 + driftPct)).toFixed(2));
-      const totalChangePct = parseFloat(
-        (((currentPrice - basePrice) / basePrice) * 100).toFixed(2)
-      );
-
-      points.push({
-        date: stepDate,
-        dayName,
-        price: currentPrice,
-        changePct: totalChangePct,
-        trend,
-        confidence,
-        signal,
-      });
-    }
-
-    return points;
-  }, [lastBar, prediction, symbol, modelType]);
+  const trajectoryError = trajectoryProblem(prediction, symbol, modelType, lastBar);
+  const trajectoryPoints = useMemo(() => buildTrajectory(prediction, symbol, modelType, lastBar), [lastBar, prediction, symbol, modelType]);
 
   // Khởi tạo Lightweight Chart
   useEffect(() => {
@@ -248,7 +162,9 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
       priceFormat: {
         type: "price",
         precision: 2,
-        minMove: 0.05,
+        // Shared price-scale formatter also formats the illustration. Preserve
+        // its two decimals instead of rounding a value such as 232.07 to 232.05.
+        minMove: 0.01,
       },
     });
     candleSeriesRef.current = candleSeries;
@@ -295,6 +211,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
       lineColor: "transparent",
       lineWidth: 1,
       priceLineVisible: false,
+      lastValueVisible: false,
       crosshairMarkerVisible: false,
     });
     trajectoryAreaSeriesRef.current = trajectoryAreaSeries;
@@ -306,11 +223,12 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
       lineType: LineType.Curved, // Đường cong uốn lượn mượt mà chuẩn FireAnt
       pointMarkersVisible: true, // Hiển thị các chấm tròn tại các mốc T+1, T+2, T+3
       pointMarkersRadius: 5,
-      priceLineVisible: true, // Đường gióng ngang chỉ giá mục tiêu T+3 trên trục phải
+      priceLineVisible: false,
+      lastValueVisible: false,
       priceLineWidth: 1,
       priceLineStyle: LineStyle.Dashed,
       priceLineColor: "#38bdf8",
-      title: "Forecast",
+      title: "",
     });
     trajectorySeriesRef.current = trajectorySeries;
 
@@ -352,6 +270,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
     return () => {
       window.removeEventListener("resize", handleResize);
       chart.remove();
+      targetPriceLineRef.current = null;
       chartRef.current = null;
     };
   }, [height]);
@@ -363,7 +282,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
     volumeSeriesRef.current?.applyOptions({ visible: showVolume });
     trajectorySeriesRef.current?.applyOptions({ visible: showTrajectory });
     trajectoryAreaSeriesRef.current?.applyOptions({ visible: showTrajectory });
-  }, [showSMA20, showSMA50, showVolume, showTrajectory]);
+  }, [showSMA20, showSMA50, showVolume, showTrajectory, height]);
 
   // Cập nhật dữ liệu Candlestick, Volume & Quỹ đạo AI vào Chart
   useEffect(() => {
@@ -433,7 +352,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
       trajectorySeriesRef.current.applyOptions({
         color: trajectoryColor,
         priceLineColor: trajectoryColor,
-        title: "Forecast",
+        title: "",
       });
       trajectoryAreaSeriesRef.current.applyOptions({
         topColor: areaColorTop,
@@ -441,13 +360,29 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
 
       trajectorySeriesRef.current.setData(trajectoryData);
       trajectoryAreaSeriesRef.current.setData(trajectoryData);
+      if (targetPriceLineRef.current) {
+        trajectorySeriesRef.current.removePriceLine(targetPriceLineRef.current);
+        targetPriceLineRef.current = null;
+      }
+      // The library's last-value label follows the last *visible* point when
+      // panning. A dedicated price line keeps the T+3 label tied to T+3.
+      if (targetPoint) {
+        targetPriceLineRef.current = trajectorySeriesRef.current.createPriceLine({
+          price: targetPoint.price,
+          color: trajectoryColor,
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: "Minh hoạ T+3",
+        });
+      }
 
       // Tự động căn chỉnh vừa khung nhìn, tạo khoảng thoáng bên phải cho Quỹ đạo AI
       chartRef.current?.timeScale().fitContent();
     } catch (err) {
       console.warn("Lỗi cập nhật biểu đồ nến Quỹ đạo FireAnt:", err);
     }
-  }, [displayBars, sortedBars, trajectoryPoints]);
+  }, [displayBars, sortedBars, trajectoryPoints, height]);
 
   // Thông tin thanh nến hiển thị trên Header (khi hover hoặc mặc định là nến cuối cùng)
   const currentInspectBar = hoveredBar || lastBar;
@@ -466,6 +401,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
 
   return (
     <div className="mt-4 flex flex-col rounded-xl border border-slate-800 bg-slate-950 shadow-2xl overflow-hidden">
+      {trajectoryError && <p role="status" className="border-b border-slate-800 px-4 py-3 text-sm text-amber-300">{trajectoryError}</p>}
       {/* 1. Header Biểu đồ Phong cách FireAnt / TradingView */}
       <div className="flex flex-wrap items-center justify-between border-b border-slate-800/80 bg-slate-900/80 px-4 py-2.5 gap-2 text-xs">
         {/* Nhãn Ticker & Chỉ số Giá tức thời */}
@@ -475,7 +411,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
               {symbol}
             </span>
             <span className="font-semibold text-slate-200">1D</span>
-            <span className="text-[11px] text-slate-500">• HOSE</span>
+            <span className="text-[11px] text-slate-400">• HOSE</span>
           </div>
 
           {currentInspectBar && (
@@ -503,7 +439,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
                 {inspectChange.toFixed(1)} ({isUp ? "+" : ""}
                 {inspectChangePct.toFixed(2)}%)
               </span>
-              <span className="text-slate-500">
+              <span className="text-slate-400">
                 Vol: {(currentInspectBar.volume / 1_000_000).toFixed(2)}M
               </span>
             </div>
@@ -518,7 +454,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
               <button
                 key={r}
                 onClick={() => setTimeRange(r)}
-                className={`rounded px-2 py-0.5 transition-all ${timeRange === r
+                aria-pressed={timeRange === r}
+                className={`min-h-9 min-w-9 rounded px-2 py-0.5 transition-all ${timeRange === r
                     ? "bg-purple-600 text-white shadow-sm"
                     : "text-slate-400 hover:text-slate-200"
                   }`}
@@ -536,7 +473,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
           {/* Toggle Quỹ đạo AI FireAnt */}
           <button
             onClick={() => setShowTrajectory(!showTrajectory)}
-            className={`flex items-center gap-1.5 font-bold transition-opacity ${showTrajectory ? "text-sky-300" : "text-slate-500 line-through opacity-60"
+            aria-pressed={showTrajectory}
+            className={`flex min-h-9 items-center gap-1.5 font-bold transition-opacity ${showTrajectory ? "text-sky-300" : "text-slate-400 line-through"
               }`}
             title="Bật/Tắt đường đi xu hướng dự báo AI của các phiên tiếp theo"
           >
@@ -547,7 +485,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
           {/* Toggle SMA 20 */}
           <button
             onClick={() => setShowSMA20(!showSMA20)}
-            className={`flex items-center gap-1.5 font-medium transition-opacity ${showSMA20 ? "text-blue-400" : "text-slate-500 line-through opacity-60"
+            aria-pressed={showSMA20}
+            className={`flex min-h-9 items-center gap-1.5 font-medium transition-opacity ${showSMA20 ? "text-blue-400" : "text-slate-400 line-through"
               }`}
           >
             <span className="h-0.5 w-3 bg-blue-500"></span>
@@ -557,7 +496,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
           {/* Toggle SMA 50 */}
           <button
             onClick={() => setShowSMA50(!showSMA50)}
-            className={`flex items-center gap-1.5 font-medium transition-opacity ${showSMA50 ? "text-amber-400" : "text-slate-500 line-through opacity-60"
+            aria-pressed={showSMA50}
+            className={`flex min-h-9 items-center gap-1.5 font-medium transition-opacity ${showSMA50 ? "text-amber-400" : "text-slate-400 line-through"
               }`}
           >
             <span className="h-0.5 w-3 bg-amber-400"></span>
@@ -567,7 +507,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
           {/* Toggle Khối lượng Volume */}
           <button
             onClick={() => setShowVolume(!showVolume)}
-            className={`flex items-center gap-1.5 font-medium transition-opacity ${showVolume ? "text-slate-300" : "text-slate-500 line-through opacity-60"
+            aria-pressed={showVolume}
+            className={`flex min-h-9 items-center gap-1.5 font-medium transition-opacity ${showVolume ? "text-slate-300" : "text-slate-400 line-through"
               }`}
           >
             <span className="h-2 w-2 rounded-sm bg-slate-600"></span>
@@ -603,7 +544,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
             <span>Chi tiết Tọa độ Quỹ đạo Đường đi Xu hướng ({modelType.toUpperCase()})</span>
           </div>
           <span className="text-[11px] text-slate-400">
-            Trục giá: nghìn VNĐ. Đường giá do quy tắc minh họa tạo ra, không phải dự báo giá hoặc khoảng tin cậy. Ngày tương lai chưa đối chiếu lịch nghỉ lễ.
+            Trục giá: nghìn VNĐ. Đường giá do quy tắc minh họa tạo ra, không phải dự báo giá hoặc khoảng tin cậy. {prediction?.trajectory?.length === 3 && prediction.trajectory.every(step => step.holiday_calendar_verified) ? "Ngày tương lai đã đối chiếu lịch nghỉ giao dịch 2026." : "Lịch nghỉ lễ của các ngày tương lai chưa được xác minh đầy đủ."}
           </span>
         </div>
 
