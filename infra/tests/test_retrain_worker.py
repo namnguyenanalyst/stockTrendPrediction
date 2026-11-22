@@ -72,3 +72,20 @@ def test_trigger_retrain_success():
         payload = json.loads(req.data.decode("utf-8"))
         assert payload["scope"] == "VN30"
         assert payload["horizon"] == 3
+
+
+def test_trigger_retrain_connection_failure_is_explicit():
+    from urllib.error import URLError
+    with patch('urllib.request.urlopen',side_effect=URLError('isolated offline')):
+        with pytest.raises(RuntimeError,match='Connection Error'):
+            trigger_retrain(api_base_url='http://isolated-api:8001',secret='test-only-key')
+
+
+def test_worker_retries_failure_and_does_not_repeat_successful_day():
+    scheduled=datetime(2026,11,8,2,5,tzinfo=ICT)
+    with patch.object(retrain_worker,'get_current_ict_time',return_value=scheduled), \
+         patch.object(retrain_worker,'trigger_retrain',side_effect=[RuntimeError('API unavailable'),{'status':'success'}]) as trigger, \
+         patch.object(retrain_worker.time,'sleep',side_effect=[None,None,StopIteration]):
+        with pytest.raises(StopIteration):
+            retrain_worker.run_worker_loop('http://isolated-api:8001','test-only-key')
+    assert trigger.call_count == 2
