@@ -33,6 +33,21 @@ VN_TIMEZONE = zoneinfo.ZoneInfo("Asia/Ho_Chi_Minh")
 MARKET_CLOSE_TIME = dtime(15, 0, 0)
 
 
+# HOSE 2026 notice, including the 25/12/2025 New Year amendment.
+# https://www.hsx.vn/vi/tin-tuc/hose-thong-bao-lich-nghi-giao-dich-nam-2026/2437411
+# Only this published year is verified; other years retain weekday fallback.
+VERIFIED_CALENDAR_YEARS = frozenset({2026})
+MARKET_HOLIDAYS = frozenset({
+    "2026-01-01", "2026-01-02", "2026-02-16", "2026-02-17",
+    "2026-02-18", "2026-02-19", "2026-02-20", "2026-04-27",
+    "2026-04-30", "2026-05-01", "2026-08-31", "2026-09-01", "2026-09-02",
+})
+
+
+def is_trading_day(day: datetime) -> bool:
+    return day.weekday() < 5 and day.strftime("%Y-%m-%d") not in MARKET_HOLIDAYS
+
+
 def get_current_vn_time() -> datetime:
     """Lấy thời gian hiện tại theo múi giờ Việt Nam (UTC+7)."""
     try:
@@ -53,33 +68,13 @@ def get_target_market_date(as_of: datetime | None = None) -> str:
         Chuỗi ngày định dạng 'YYYY-MM-DD'.
     """
     now = as_of or get_current_vn_time()
-    weekday = now.weekday()  # 0: Thứ Hai, 4: Thứ Sáu, 5: Thứ Bảy, 6: Chủ Nhật
-
-    # 1. Nếu là Chủ Nhật (weekday 6) -> lùi 2 ngày về Thứ Sáu
-    if weekday == 6:
-        target_dt = now - timedelta(days=2)
-        return target_dt.strftime("%Y-%m-%d")
-
-    # 2. Nếu là Thứ Bảy (weekday 5) -> lùi 1 ngày về Thứ Sáu
-    if weekday == 5:
-        target_dt = now - timedelta(days=1)
-        return target_dt.strftime("%Y-%m-%d")
-
-    # 3. Nếu là ngày trong tuần (Thứ Hai -> Thứ Sáu)
-    # Kiểm tra xem đã qua 15:00 (kết thúc phiên ATC) hay chưa
-    current_time = now.time()
-    if current_time >= MARKET_CLOSE_TIME:
-        # Đã kết thúc phiên T hôm nay
-        return now.strftime("%Y-%m-%d")
-    else:
-        # Chưa kết thúc phiên T -> lấy phiên giao dịch liền trước
-        if weekday == 0:
-            # Thứ Hai trước 15:00 -> lấy Thứ Sáu tuần trước (lùi 3 ngày)
-            target_dt = now - timedelta(days=3)
-        else:
-            # Thứ Ba đến Thứ Sáu trước 15:00 -> lấy ngày hôm qua (lùi 1 ngày)
-            target_dt = now - timedelta(days=1)
-        return target_dt.strftime("%Y-%m-%d")
+    # Naive caller inputs follow the documented VN-local convention;
+    # aware inputs must be normalized before weekday and ATC comparisons.
+    now = now.replace(tzinfo=VN_TIMEZONE) if now.tzinfo is None else now.astimezone(VN_TIMEZONE)
+    target = now if now.time() >= MARKET_CLOSE_TIME else now - timedelta(days=1)
+    while not is_trading_day(target):
+        target -= timedelta(days=1)
+    return target.strftime("%Y-%m-%d")
 
 
 def get_target_market_session_info(as_of: datetime | None = None) -> dict[str, Any]:
@@ -87,21 +82,25 @@ def get_target_market_session_info(as_of: datetime | None = None) -> dict[str, A
     Trả về thông tin chi tiết về phiên giao dịch hiện tại phục vụ hiển thị UI và suy luận.
     """
     now = as_of or get_current_vn_time()
+    # Naive caller inputs follow the documented VN-local convention;
+    # aware inputs must be normalized before weekday and ATC comparisons.
+    now = now.replace(tzinfo=VN_TIMEZONE) if now.tzinfo is None else now.astimezone(VN_TIMEZONE)
     weekday = now.weekday()
     target_date = get_target_market_date(now)
 
     is_weekend = weekday in (5, 6)
-    is_after_close = (now.time() >= MARKET_CLOSE_TIME) and not is_weekend
+    is_holiday = now.strftime("%Y-%m-%d") in MARKET_HOLIDAYS
+    is_after_close = (now.time() >= MARKET_CLOSE_TIME) and not is_weekend and not is_holiday
 
     if is_after_close:
         session_name = "Phiên T (Đã chốt)"
         session_type = "T"
         status_label = f"Đã chốt phiên T ({now.strftime('%d/%m/%Y')})"
         prediction_horizon_desc = "Dự phóng 3 phiên tiếp theo (T+1 → T+3)"
-    elif is_weekend:
-        session_name = "Nghỉ cuối tuần"
+    elif is_weekend or is_holiday:
+        session_name = "Nghỉ lễ" if is_holiday else "Nghỉ cuối tuần"
         session_type = "T-1"
-        status_label = f"Thị trường nghỉ • Chốt phiên Thứ Sáu ({target_date})"
+        status_label = f"Thị trường nghỉ • Căn cứ phiên chốt ({target_date})"
         prediction_horizon_desc = "Dự phóng 3 phiên tuần tới (T+1 → T+3)"
     else:
         session_name = "Đang trong phiên T"
@@ -116,7 +115,9 @@ def get_target_market_session_info(as_of: datetime | None = None) -> dict[str, A
         "session_type": session_type,
         "session_name": session_name,
         "status_label": status_label,
-        "is_market_closed": is_after_close or is_weekend,
+        "is_market_closed": is_after_close or is_weekend or is_holiday,
+        "is_holiday": is_holiday,
+        "holiday_calendar_verified": now.year in VERIFIED_CALENDAR_YEARS,
         "is_weekend": is_weekend,
         "prediction_horizon_desc": prediction_horizon_desc,
     }
@@ -140,11 +141,12 @@ def get_future_trading_days(base_date: str, count: int = 3) -> list[dict[str, An
 
     while len(trading_days) < count:
         curr += timedelta(days=1)
-        if curr.weekday() in (5, 6):
+        if not is_trading_day(curr):
             continue  # Bỏ qua Thứ Bảy & Chủ Nhật
 
         trading_days.append({
             "day_offset": offset,
+            "holiday_calendar_verified": curr.year in VERIFIED_CALENDAR_YEARS,
             "day_name": f"T+{offset}",
             "date": curr.strftime("%Y-%m-%d"),
             "formatted_date": curr.strftime("%d/%m/%Y"),

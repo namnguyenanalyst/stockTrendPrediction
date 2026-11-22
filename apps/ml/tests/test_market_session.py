@@ -139,3 +139,13 @@ def test_get_current_vn_time_fallback():
         res = get_current_vn_time()
         assert res is not None
 
+
+
+def test_aware_utc_input_is_converted_to_vietnam_before_atc_boundary():
+    from datetime import timezone
+    assert get_target_market_date(datetime(2026,11,20,7,59,tzinfo=timezone.utc)) == '2026-11-19'
+    assert get_target_market_date(datetime(2026,11,20,8,0,tzinfo=timezone.utc)) == '2026-11-20'
+    info=get_target_market_session_info(datetime(2026,11,20,8,0,tzinfo=timezone.utc))
+    assert info['target_date']=='2026-11-20'
+    assert info['is_market_closed'] is True
+    assert info['current_time'].startswith('15:00:00')
