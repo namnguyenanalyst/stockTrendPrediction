@@ -1,0 +1,98 @@
+{
+  "results": {
+    "lightgbm": {
+      "first_request": {
+        "ok": true,
+        "seconds": 3.025331458000437
+      },
+      "levels": [
+        {
+          "concurrency": 1,
+          "requests": 2,
+          "errors": 0,
+          "p50_seconds": 0.03718637549991399,
+          "p95_seconds": 0.03774186315031329,
+          "cpu_seconds": 0.523,
+          "wall_seconds": 0.07462683300036588,
+          "peak_sampled_rss_mib": 259.203125,
+          "resource_samples": 2,
+          "average_cpu_cores": 7.008203068156944
+        },
+        {
+          "concurrency": 5,
+          "requests": 10,
+          "errors": 0,
+          "p50_seconds": 0.26762016649990983,
+          "p95_seconds": 0.3313743143997726,
+          "cpu_seconds": 2.6214,
+          "wall_seconds": 0.5376698750005744,
+          "peak_sampled_rss_mib": 270.203125,
+          "resource_samples": 11,
+          "average_cpu_cores": 4.875482376611112
+        },
+        {
+          "concurrency": 10,
+          "requests": 20,
+          "errors": 0,
+          "p50_seconds": 0.6033110204998593,
+          "p95_seconds": 0.8301890089504468,
+          "cpu_seconds": 4.3201,
+          "wall_seconds": 1.2831000830001358,
+          "peak_sampled_rss_mib": 284.109375,
+          "resource_samples": 24,
+          "average_cpu_cores": 3.366923638488723
+        }
+      ]
+    },
+    "lstm": {
+      "first_request": {
+        "ok": true,
+        "seconds": 6.899187209000047
+      },
+      "levels": [
+        {
+          "concurrency": 1,
+          "requests": 2,
+          "errors": 0,
+          "p50_seconds": 0.03482504150042587,
+          "p95_seconds": 0.03498531665004521,
+          "cpu_seconds": 0.0762,
+          "wall_seconds": 0.06987558399941918,
+          "peak_sampled_rss_mib": 416.671875,
+          "resource_samples": 2,
+          "average_cpu_cores": 1.0905096693092884
+        },
+        {
+          "concurrency": 5,
+          "requests": 10,
+          "errors": 0,
+          "p50_seconds": 0.23519445849979093,
+          "p95_seconds": 0.2791314895501273,
+          "cpu_seconds": 0.7375,
+          "wall_seconds": 0.4900118329996985,
+          "peak_sampled_rss_mib": 421.03125,
+          "resource_samples": 10,
+          "average_cpu_cores": 1.5050656950164993
+        },
+        {
+          "concurrency": 10,
+          "requests": 20,
+          "errors": 0,
+          "p50_seconds": 0.4738255209995259,
+          "p95_seconds": 0.5004523535001226,
+          "cpu_seconds": 1.4977,
+          "wall_seconds": 0.9663052079995396,
+          "peak_sampled_rss_mib": 422.890625,
+          "resource_samples": 19,
+          "average_cpu_cores": 1.5499243795866138
+        }
+      ]
+    }
+  },
+  "environment": "Isolated uvicorn/SQLite on 8001, same production artifacts, auto-sync disabled",
+  "limitations": [
+    "LSTM first request follows LightGBM first request; imports and OS file cache partly warm.",
+    "Bounded request counts; no SLA or sustained-load claim.",
+    "RSS sampled every 50ms; CPU is process user+system time delta, divided by wall time for average cores; no GPU measurement."
+  ]
+}

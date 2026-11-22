@@ -1,0 +1,80 @@
+FFFFFFF                                                                  [100%]
+=================================== FAILURES ===================================
+__________ test_live_snapshot_fetches_stock_and_market_without_writes __________
+
+    def test_live_snapshot_fetches_stock_and_market_without_writes():
+>       from vn_stock.data_ingestion import fetch_live_prediction_panel
+E       ImportError: cannot import name 'fetch_live_prediction_panel' from 'vn_stock.data_ingestion' (/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/vn_stock/data_ingestion.py)
+
+apps/ml/tests/test_live_prediction_snapshot.py:16: ImportError
+____ test_live_snapshot_never_substitutes_missing_market_data[missing_day] _____
+
+fault = 'missing_day'
+
+    @pytest.mark.parametrize('fault',['missing_day','duplicate_day','nonfinite_close','offline'])
+    def test_live_snapshot_never_substitutes_missing_market_data(fault):
+>       from vn_stock.data_ingestion import fetch_live_prediction_panel
+E       ImportError: cannot import name 'fetch_live_prediction_panel' from 'vn_stock.data_ingestion' (/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/vn_stock/data_ingestion.py)
+
+apps/ml/tests/test_live_prediction_snapshot.py:34: ImportError
+___ test_live_snapshot_never_substitutes_missing_market_data[duplicate_day] ____
+
+fault = 'duplicate_day'
+
+    @pytest.mark.parametrize('fault',['missing_day','duplicate_day','nonfinite_close','offline'])
+    def test_live_snapshot_never_substitutes_missing_market_data(fault):
+>       from vn_stock.data_ingestion import fetch_live_prediction_panel
+E       ImportError: cannot import name 'fetch_live_prediction_panel' from 'vn_stock.data_ingestion' (/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/vn_stock/data_ingestion.py)
+
+apps/ml/tests/test_live_prediction_snapshot.py:34: ImportError
+__ test_live_snapshot_never_substitutes_missing_market_data[nonfinite_close] ___
+
+fault = 'nonfinite_close'
+
+    @pytest.mark.parametrize('fault',['missing_day','duplicate_day','nonfinite_close','offline'])
+    def test_live_snapshot_never_substitutes_missing_market_data(fault):
+>       from vn_stock.data_ingestion import fetch_live_prediction_panel
+E       ImportError: cannot import name 'fetch_live_prediction_panel' from 'vn_stock.data_ingestion' (/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/vn_stock/data_ingestion.py)
+
+apps/ml/tests/test_live_prediction_snapshot.py:34: ImportError
+______ test_live_snapshot_never_substitutes_missing_market_data[offline] _______
+
+fault = 'offline'
+
+    @pytest.mark.parametrize('fault',['missing_day','duplicate_day','nonfinite_close','offline'])
+    def test_live_snapshot_never_substitutes_missing_market_data(fault):
+>       from vn_stock.data_ingestion import fetch_live_prediction_panel
+E       ImportError: cannot import name 'fetch_live_prediction_panel' from 'vn_stock.data_ingestion' (/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/vn_stock/data_ingestion.py)
+
+apps/ml/tests/test_live_prediction_snapshot.py:34: ImportError
+___ test_explicit_inference_snapshot_does_not_read_old_panel_or_fetch_again ____
+
+    def test_explicit_inference_snapshot_does_not_read_old_panel_or_fetch_again():
+        from vn_stock.modeling.predict import prepare_inference_features
+        stock = stock_history().assign(VNINDEX_Return_1d=0.)
+        original = stock.copy(deep=True)
+        with patch('vn_stock.modeling.predict.get_target_market_date',return_value=str(stock.Date.max().date())), \
+             patch('vn_stock.modeling.predict.load_panel_dataset',side_effect=AssertionError('old panel read')), \
+             patch('vn_stock.modeling.predict.fetch_stock_data',side_effect=AssertionError('second fetch')):
+>           frame, price, date = prepare_inference_features('VIC', raw_snapshot=stock)
+E           TypeError: prepare_inference_features() got an unexpected keyword argument 'raw_snapshot'
+
+apps/ml/tests/test_live_prediction_snapshot.py:54: TypeError
+_____ test_explicit_snapshot_for_wrong_symbol_is_rejected_without_fallback _____
+
+    def test_explicit_snapshot_for_wrong_symbol_is_rejected_without_fallback():
+        from vn_stock.modeling.predict import prepare_inference_features
+        with pytest.raises(ValueError,match='symbol'):
+>           prepare_inference_features('HPG',raw_snapshot=stock_history().assign(VNINDEX_Return_1d=0.))
+E           TypeError: prepare_inference_features() got an unexpected keyword argument 'raw_snapshot'
+
+apps/ml/tests/test_live_prediction_snapshot.py:64: TypeError
+=========================== short test summary info ============================
+FAILED apps/ml/tests/test_live_prediction_snapshot.py::test_live_snapshot_fetches_stock_and_market_without_writes
+FAILED apps/ml/tests/test_live_prediction_snapshot.py::test_live_snapshot_never_substitutes_missing_market_data[missing_day]
+FAILED apps/ml/tests/test_live_prediction_snapshot.py::test_live_snapshot_never_substitutes_missing_market_data[duplicate_day]
+FAILED apps/ml/tests/test_live_prediction_snapshot.py::test_live_snapshot_never_substitutes_missing_market_data[nonfinite_close]
+FAILED apps/ml/tests/test_live_prediction_snapshot.py::test_live_snapshot_never_substitutes_missing_market_data[offline]
+FAILED apps/ml/tests/test_live_prediction_snapshot.py::test_explicit_inference_snapshot_does_not_read_old_panel_or_fetch_again
+FAILED apps/ml/tests/test_live_prediction_snapshot.py::test_explicit_snapshot_for_wrong_symbol_is_rejected_without_fallback
+7 failed in 1.31s

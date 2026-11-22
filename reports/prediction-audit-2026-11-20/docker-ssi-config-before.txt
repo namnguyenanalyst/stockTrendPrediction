@@ -1,0 +1,36 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_______ test_api_receives_ssi_runtime_configuration[docker-compose.yml] ________
+
+relative = 'docker-compose.yml'
+
+    @pytest.mark.parametrize('relative',['docker-compose.yml','infra/docker-compose.yml'])
+    def test_api_receives_ssi_runtime_configuration(relative):
+        config = yaml.safe_load((ROOT / relative).read_text())
+        api = config['services']['vn_stock_api']
+        environment = api['environment']
+>       assert environment.get('SSI_CONSUMER_ID') == '${SSI_CONSUMER_ID:-}'
+E       AssertionError: assert None == '${SSI_CONSUMER_ID:-}'
+E        +  where None = <built-in method get of dict object at 0x10217a880>('SSI_CONSUMER_ID')
+E        +    where <built-in method get of dict object at 0x10217a880> = {'SOLE_ADMIN_EMAIL': '${SOLE_ADMIN_EMAIL:-admin@vnstock}', 'DATABASE_URL': 'postgresql+asyncpg://${POSTGRES_USER:-post...cret_jwt_key_must_be_changed_in_prod_32chars}', 'JWT_SECRET_KEY': '${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}', ...}.get
+
+infra/tests/test_docker_ssi_runtime.py:14: AssertionError
+____ test_api_receives_ssi_runtime_configuration[infra/docker-compose.yml] _____
+
+relative = 'infra/docker-compose.yml'
+
+    @pytest.mark.parametrize('relative',['docker-compose.yml','infra/docker-compose.yml'])
+    def test_api_receives_ssi_runtime_configuration(relative):
+        config = yaml.safe_load((ROOT / relative).read_text())
+        api = config['services']['vn_stock_api']
+        environment = api['environment']
+>       assert environment.get('SSI_CONSUMER_ID') == '${SSI_CONSUMER_ID:-}'
+E       AssertionError: assert None == '${SSI_CONSUMER_ID:-}'
+E        +  where None = <built-in method get of dict object at 0x1021a23c0>('SSI_CONSUMER_ID')
+E        +    where <built-in method get of dict object at 0x1021a23c0> = {'SOLE_ADMIN_EMAIL': '${SOLE_ADMIN_EMAIL:-admin@vnstock}', 'DATABASE_URL': 'postgresql+asyncpg://${POSTGRES_USER:-post...hanged_in_prod_32chars}', 'JWT_SECRET_KEY': '${SECRET_KEY:-super_secret_jwt_key_must_be_changed_in_prod_32chars}', ...}.get
+
+infra/tests/test_docker_ssi_runtime.py:14: AssertionError
+=========================== short test summary info ============================
+FAILED infra/tests/test_docker_ssi_runtime.py::test_api_receives_ssi_runtime_configuration[docker-compose.yml]
+FAILED infra/tests/test_docker_ssi_runtime.py::test_api_receives_ssi_runtime_configuration[infra/docker-compose.yml]
+2 failed in 0.08s

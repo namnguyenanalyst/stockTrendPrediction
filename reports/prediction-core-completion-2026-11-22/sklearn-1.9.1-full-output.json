@@ -1,0 +1,23 @@
+{
+  "python": "3.11.18",
+  "platform": "Linux-7.0.14-linuxkit-aarch64-with-glibc2.41",
+  "versions": {
+    "scikit-learn": "1.9.1",
+    "numpy": "1.26.4",
+    "pandas": "2.3.3",
+    "lightgbm": "4.7.0",
+    "torch": "2.14.1+cpu"
+  },
+  "rows": 30450,
+  "artifact_generation": "78b54b04ae9c3fee",
+  "warnings": [
+    {
+      "type": "InconsistentVersionWarning",
+      "message": "Trying to unpickle estimator StandardScaler from version 1.7.2 when using version 1.9.1. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:\nhttps://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations"
+    },
+    {
+      "type": "InconsistentVersionWarning",
+      "message": "Trying to unpickle estimator StandardScaler from version 1.7.2 when using version 1.9.1. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:\nhttps://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations"
+    }
+  ]
+}

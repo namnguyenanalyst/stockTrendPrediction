@@ -1,0 +1,94 @@
+{
+  "status": "success",
+  "timestamp": "2026-11-14T14:25:10.655894",
+  "scope": "VN30",
+  "symbols_count": 30,
+  "symbols": [
+    "ACB",
+    "BCM",
+    "BID",
+    "BVH",
+    "CTG",
+    "FPT",
+    "GAS",
+    "GVR",
+    "HDB",
+    "HPG",
+    "MBB",
+    "MSN",
+    "MWG",
+    "PLX",
+    "POW",
+    "SAB",
+    "SHB",
+    "SSB",
+    "SSI",
+    "STB",
+    "TCB",
+    "TPB",
+    "VCB",
+    "VHM",
+    "VIB",
+    "VIC",
+    "VJC",
+    "VNM",
+    "VPB",
+    "VRE"
+  ],
+  "horizon": "T+3",
+  "horizon_days": 3,
+  "threshold": 0.02,
+  "val_buffer_days": 40,
+  "latest_market_date": "2026-11-13",
+  "train_samples": 25800,
+  "val_samples": 1200,
+  "total_samples": 27000,
+  "lightgbm_metrics": {
+    "accuracy": 0.4791666666666667,
+    "macro_f1": 0.4066055529653782,
+    "weighted_f1": 0.4950481330465905,
+    "precision_macro": 0.40787069004733795,
+    "recall_macro": 0.4139753818074132,
+    "confusion_matrix": [
+      [
+        117,
+        104,
+        81
+      ],
+      [
+        179,
+        405,
+        129
+      ],
+      [
+        40,
+        92,
+        53
+      ]
+    ]
+  },
+  "lstm_metrics": {
+    "accuracy": 0.415,
+    "macro_f1": 0.35596085540358363,
+    "weighted_f1": 0.4325544916057914,
+    "precision_macro": 0.3775191707381505,
+    "recall_macro": 0.3741961842395603,
+    "confusion_matrix": [
+      [
+        153,
+        93,
+        56
+      ],
+      [
+        313,
+        312,
+        88
+      ],
+      [
+        93,
+        59,
+        33
+      ]
+    ]
+  }
+}

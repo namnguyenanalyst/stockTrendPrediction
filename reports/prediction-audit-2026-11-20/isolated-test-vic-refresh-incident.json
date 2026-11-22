@@ -1,0 +1,46 @@
+{
+  "incident": "An initially unisolated live-service test refreshed raw/VIC.parquet from SSI; test interrupted and cache path then mocked to raise. No guessed rollback applied.",
+  "raw_rows": 1216,
+  "raw_max_date": "2026-11-20",
+  "frozen_rows": 1214,
+  "frozen_max_date": "2026-11-18",
+  "overlap_rows": 1214,
+  "max_abs_difference": {
+    "Open": 0.0,
+    "High": 0.0,
+    "Low": 0.0,
+    "Close": 0.0,
+    "Volume": 0.0
+  },
+  "current_last_rows": [
+    {
+      "Date": "2026-11-18",
+      "Open": 247.4,
+      "High": 248.5,
+      "Low": 244.9,
+      "Close": 245.0,
+      "Volume": 1799100
+    },
+    {
+      "Date": "2026-11-19",
+      "Open": 244.5,
+      "High": 244.5,
+      "Low": 239.5,
+      "Close": 240.0,
+      "Volume": 1778600
+    },
+    {
+      "Date": "2026-11-20",
+      "Open": 236.0,
+      "High": 241.9,
+      "Low": 236.0,
+      "Close": 241.9,
+      "Volume": 1006600
+    }
+  ],
+  "limitations": [
+    "Frozen comparison ends 2026-11-18, so it is not an exact pre-test copy of the whole raw file.",
+    "The pre-test raw-file hash was not recorded. Modification time confirms refresh, not whether every value changed.",
+    "Production model/scaler artifacts are checked separately; no training was run."
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "worker_exit_code": 1,
+  "models_unchanged": true,
+  "model_files_checked": 12,
+  "sandbox_container": "vn-stock-core-training-audit-20261122",
+  "network": "shared sandbox loopback only"
+}

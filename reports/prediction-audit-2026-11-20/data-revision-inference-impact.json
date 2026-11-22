@@ -1,0 +1,211 @@
+{
+  "data_as_of_date": "2026-11-18",
+  "snapshot_hashes": {
+    "original": "47eb774e563b5d4fdb9a72f28ad7f3d453bb1aede349437a7d9e7144ccd932a8",
+    "reconciled": "4fff4905de35ea7d2ef4821f7a1974acfc3df404d55f607c5dd303699bda9e49"
+  },
+  "results": [
+    {
+      "symbol": "GVR",
+      "model": "lightgbm",
+      "predictions": {
+        "original": {
+          "data_as_of_date": "2026-11-18",
+          "current_price": 27.2,
+          "class_name": "T\u0102NG",
+          "signal": "MUA (BUY)",
+          "probabilities": {
+            "GI\u1ea2M": 0.2671,
+            "\u0110I NGANG": 0.1905,
+            "T\u0102NG": 0.5424
+          },
+          "generation": "78b54b04ae9c3fee"
+        },
+        "reconciled": {
+          "data_as_of_date": "2026-11-18",
+          "current_price": 27.2,
+          "class_name": "T\u0102NG",
+          "signal": "MUA (BUY)",
+          "probabilities": {
+            "GI\u1ea2M": 0.2652,
+            "\u0110I NGANG": 0.1939,
+            "T\u0102NG": 0.5409
+          },
+          "generation": "78b54b04ae9c3fee"
+        }
+      },
+      "class_changed": false,
+      "signal_changed": false,
+      "max_probability_delta": 0.0033999999999999864
+    },
+    {
+      "symbol": "GVR",
+      "model": "lstm",
+      "predictions": {
+        "original": {
+          "data_as_of_date": "2026-11-18",
+          "current_price": 27.2,
+          "class_name": "T\u0102NG",
+          "signal": "MUA (BUY)",
+          "probabilities": {
+            "GI\u1ea2M": 0.3197,
+            "\u0110I NGANG": 0.2436,
+            "T\u0102NG": 0.4367
+          },
+          "generation": "71d398842a1f2650"
+        },
+        "reconciled": {
+          "data_as_of_date": "2026-11-18",
+          "current_price": 27.2,
+          "class_name": "T\u0102NG",
+          "signal": "MUA (BUY)",
+          "probabilities": {
+            "GI\u1ea2M": 0.3221,
+            "\u0110I NGANG": 0.2467,
+            "T\u0102NG": 0.4312
+          },
+          "generation": "71d398842a1f2650"
+        }
+      },
+      "class_changed": false,
+      "signal_changed": false,
+      "max_probability_delta": 0.005499999999999949
+    },
+    {
+      "symbol": "TCB",
+      "model": "lightgbm",
+      "predictions": {
+        "original": {
+          "data_as_of_date": "2026-11-18",
+          "current_price": 20.75,
+          "class_name": "T\u0102NG",
+          "signal": "MUA (BUY)",
+          "probabilities": {
+            "GI\u1ea2M": 0.3377,
+            "\u0110I NGANG": 0.2464,
+            "T\u0102NG": 0.4159
+          },
+          "generation": "78b54b04ae9c3fee"
+        },
+        "reconciled": {
+          "data_as_of_date": "2026-11-18",
+          "current_price": 20.75,
+          "class_name": "\u0110I NGANG",
+          "signal": "N\u1eaeM GI\u1eee (HOLD)",
+          "probabilities": {
+            "GI\u1ea2M": 0.3156,
+            "\u0110I NGANG": 0.3994,
+            "T\u0102NG": 0.285
+          },
+          "generation": "78b54b04ae9c3fee"
+        }
+      },
+      "class_changed": true,
+      "signal_changed": true,
+      "max_probability_delta": 0.15299999999999997
+    },
+    {
+      "symbol": "TCB",
+      "model": "lstm",
+      "predictions": {
+        "original": {
+          "data_as_of_date": "2026-11-18",
+          "current_price": 20.75,
+          "class_name": "\u0110I NGANG",
+          "signal": "N\u1eaeM GI\u1eee (HOLD)",
+          "probabilities": {
+            "GI\u1ea2M": 0.2974,
+            "\u0110I NGANG": 0.3819,
+            "T\u0102NG": 0.3208
+          },
+          "generation": "71d398842a1f2650"
+        },
+        "reconciled": {
+          "data_as_of_date": "2026-11-18",
+          "current_price": 20.75,
+          "class_name": "\u0110I NGANG",
+          "signal": "N\u1eaeM GI\u1eee (HOLD)",
+          "probabilities": {
+            "GI\u1ea2M": 0.3032,
+            "\u0110I NGANG": 0.4155,
+            "T\u0102NG": 0.2812
+          },
+          "generation": "71d398842a1f2650"
+        }
+      },
+      "class_changed": false,
+      "signal_changed": false,
+      "max_probability_delta": 0.03959999999999997
+    },
+    {
+      "symbol": "VNM",
+      "model": "lightgbm",
+      "predictions": {
+        "original": {
+          "data_as_of_date": "2026-11-18",
+          "current_price": 52.0,
+          "class_name": "T\u0102NG",
+          "signal": "MUA (BUY)",
+          "probabilities": {
+            "GI\u1ea2M": 0.2786,
+            "\u0110I NGANG": 0.3006,
+            "T\u0102NG": 0.4207
+          },
+          "generation": "78b54b04ae9c3fee"
+        },
+        "reconciled": {
+          "data_as_of_date": "2026-11-18",
+          "current_price": 52.0,
+          "class_name": "\u0110I NGANG",
+          "signal": "N\u1eaeM GI\u1eee (HOLD)",
+          "probabilities": {
+            "GI\u1ea2M": 0.312,
+            "\u0110I NGANG": 0.3842,
+            "T\u0102NG": 0.3038
+          },
+          "generation": "78b54b04ae9c3fee"
+        }
+      },
+      "class_changed": true,
+      "signal_changed": true,
+      "max_probability_delta": 0.1169
+    },
+    {
+      "symbol": "VNM",
+      "model": "lstm",
+      "predictions": {
+        "original": {
+          "data_as_of_date": "2026-11-18",
+          "current_price": 52.0,
+          "class_name": "\u0110I NGANG",
+          "signal": "N\u1eaeM GI\u1eee (HOLD)",
+          "probabilities": {
+            "GI\u1ea2M": 0.1922,
+            "\u0110I NGANG": 0.5533,
+            "T\u0102NG": 0.2545
+          },
+          "generation": "71d398842a1f2650"
+        },
+        "reconciled": {
+          "data_as_of_date": "2026-11-18",
+          "current_price": 52.0,
+          "class_name": "\u0110I NGANG",
+          "signal": "N\u1eaeM GI\u1eee (HOLD)",
+          "probabilities": {
+            "GI\u1ea2M": 0.194,
+            "\u0110I NGANG": 0.549,
+            "T\u0102NG": 0.257
+          },
+          "generation": "71d398842a1f2650"
+        }
+      },
+      "class_changed": false,
+      "signal_changed": false,
+      "max_probability_delta": 0.0042999999999999705
+    }
+  ],
+  "limitations": [
+    "Same legacy serving artifacts; this isolates input revision impact, not model quality.",
+    "No source datasets or serving artifacts are modified."
+  ]
+}

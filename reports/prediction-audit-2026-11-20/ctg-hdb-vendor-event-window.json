@@ -1,0 +1,132 @@
+[
+  {
+    "symbol": "CTG",
+    "rows": [
+      {
+        "Symbol": "CTG",
+        "TradingDate": "19/12/2025",
+        "RefPrice": "34350",
+        "ClosePrice": "34450",
+        "ClosePriceAdjusted": "33926.36",
+        "PerPriceChange": "0.30",
+        "OpenPrice": "34350",
+        "HighestPrice": "34600",
+        "LowestPrice": "34050",
+        "TotalMatchVol": "7234100"
+      },
+      {
+        "Symbol": "CTG",
+        "TradingDate": "18/12/2025",
+        "RefPrice": "34700",
+        "ClosePrice": "34350",
+        "ClosePriceAdjusted": "33827.88",
+        "PerPriceChange": "-1",
+        "OpenPrice": "34700",
+        "HighestPrice": "34750",
+        "LowestPrice": "33950",
+        "TotalMatchVol": "5822900"
+      },
+      {
+        "Symbol": "CTG",
+        "TradingDate": "17/12/2025",
+        "RefPrice": "51000",
+        "ClosePrice": "34700",
+        "ClosePriceAdjusted": "34172.56",
+        "PerPriceChange": "-32",
+        "OpenPrice": "35500",
+        "HighestPrice": "35550",
+        "LowestPrice": "34350",
+        "TotalMatchVol": "10665100"
+      },
+      {
+        "Symbol": "CTG",
+        "TradingDate": "16/12/2025",
+        "RefPrice": "49700",
+        "ClosePrice": "51000",
+        "ClosePriceAdjusted": "50224.80",
+        "PerPriceChange": "2.60",
+        "OpenPrice": "50000",
+        "HighestPrice": "51000",
+        "LowestPrice": "49050",
+        "TotalMatchVol": "15094400"
+      },
+      {
+        "Symbol": "CTG",
+        "TradingDate": "15/12/2025",
+        "RefPrice": "49500",
+        "ClosePrice": "49700",
+        "ClosePriceAdjusted": "48944.56",
+        "PerPriceChange": "0.40",
+        "OpenPrice": "49600",
+        "HighestPrice": "49750",
+        "LowestPrice": "49050",
+        "TotalMatchVol": "5440100"
+      }
+    ]
+  },
+  {
+    "symbol": "HDB",
+    "rows": [
+      {
+        "Symbol": "HDB",
+        "TradingDate": "19/12/2025",
+        "RefPrice": "25600",
+        "ClosePrice": "25950",
+        "ClosePriceAdjusted": "19960.74",
+        "PerPriceChange": "1.40",
+        "OpenPrice": "25600",
+        "HighestPrice": "26000",
+        "LowestPrice": "25450",
+        "TotalMatchVol": "21301200"
+      },
+      {
+        "Symbol": "HDB",
+        "TradingDate": "18/12/2025",
+        "RefPrice": "32100",
+        "ClosePrice": "25600",
+        "ClosePriceAdjusted": "19691.52",
+        "PerPriceChange": "-20.20",
+        "OpenPrice": "25000",
+        "HighestPrice": "26000",
+        "LowestPrice": "24750",
+        "TotalMatchVol": "27159300"
+      },
+      {
+        "Symbol": "HDB",
+        "TradingDate": "17/12/2025",
+        "RefPrice": "32100",
+        "ClosePrice": "32100",
+        "ClosePriceAdjusted": "24691.32",
+        "PerPriceChange": "0",
+        "OpenPrice": "32000",
+        "HighestPrice": "32550",
+        "LowestPrice": "31700",
+        "TotalMatchVol": "23353800"
+      },
+      {
+        "Symbol": "HDB",
+        "TradingDate": "16/12/2025",
+        "RefPrice": "30000",
+        "ClosePrice": "32100",
+        "ClosePriceAdjusted": "24691.32",
+        "PerPriceChange": "7",
+        "OpenPrice": "30050",
+        "HighestPrice": "32100",
+        "LowestPrice": "29850",
+        "TotalMatchVol": "17054100"
+      },
+      {
+        "Symbol": "HDB",
+        "TradingDate": "15/12/2025",
+        "RefPrice": "30200",
+        "ClosePrice": "30000",
+        "ClosePriceAdjusted": "23076",
+        "PerPriceChange": "-0.70",
+        "OpenPrice": "30250",
+        "HighestPrice": "30400",
+        "LowestPrice": "29900",
+        "TotalMatchVol": "11805900"
+      }
+    ]
+  }
+]

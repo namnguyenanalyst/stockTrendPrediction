@@ -1,0 +1,18 @@
+{
+  "state": {
+    "Status": "exited",
+    "Running": false,
+    "Paused": false,
+    "Restarting": false,
+    "OOMKilled": false,
+    "Dead": false,
+    "Pid": 0,
+    "ExitCode": 0,
+    "Error": "",
+    "StartedAt": "2026-11-22T09:23:11.630779342Z",
+    "FinishedAt": "2026-11-22T09:23:11.901064801Z"
+  },
+  "logs": "writer preflight passed uid501\n",
+  "uid": "501:20",
+  "bind_mount_write": true
+}

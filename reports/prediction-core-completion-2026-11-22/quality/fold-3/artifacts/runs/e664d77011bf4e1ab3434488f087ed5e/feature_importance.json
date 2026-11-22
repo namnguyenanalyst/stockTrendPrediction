@@ -1,0 +1,16 @@
+{
+  "Open_Close_Ratio": 48,
+  "High_Close_Ratio": 76,
+  "Low_Close_Ratio": 86,
+  "HL_Ratio": 165,
+  "SMA_20_Dev": 162,
+  "SMA_50_Dev": 171,
+  "SMA_200_Dev": 301,
+  "CV_50": 341,
+  "CV_200": 284,
+  "RSI": 140,
+  "Return_1d": 93,
+  "Vol_Ratio": 118,
+  "VNINDEX_Return_1d": 342,
+  "Symbol_Code": 124
+}

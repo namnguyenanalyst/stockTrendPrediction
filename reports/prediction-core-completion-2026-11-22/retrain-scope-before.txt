@@ -1,0 +1,18 @@
+F.                                                                       [100%]
+=================================== FAILURES ===================================
+_ test_retrain_scope_reaches_training_pipeline_without_expanding_universe[CORE] _
+
+scope = 'CORE'
+
+    @pytest.mark.parametrize('scope',['CORE','VN30'])
+    def test_retrain_scope_reaches_training_pipeline_without_expanding_universe(scope):
+        from app.services.prediction_service import retrain_production_system
+        with patch('vn_stock.modeling.train.train_production_model',return_value={'status':'success'}) as train:
+            retrain_production_system(scope=scope)
+>       assert train.call_args.kwargs['symbols']==scope
+E       AssertionError: assert None == 'CORE'
+
+apps/api/tests/test_prediction_audit.py:162: AssertionError
+=========================== short test summary info ============================
+FAILED apps/api/tests/test_prediction_audit.py::test_retrain_scope_reaches_training_pipeline_without_expanding_universe[CORE]
+1 failed, 1 passed in 3.04s

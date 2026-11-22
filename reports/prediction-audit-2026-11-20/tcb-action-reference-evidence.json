@@ -1,0 +1,72 @@
+[
+  {
+    "TradingDate": "21/06/2024",
+    "PerPriceChange": "-1.20",
+    "RefPrice": "24800",
+    "ClosePrice": "24500",
+    "ClosePriceAdjusted": "16334.15",
+    "TotalMatchVol": "11686300",
+    "TotalTradedVol": "11686300",
+    "Symbol": "TCB"
+  },
+  {
+    "TradingDate": "20/06/2024",
+    "PerPriceChange": "2.70",
+    "RefPrice": "24150",
+    "ClosePrice": "24800",
+    "ClosePriceAdjusted": "16534.16",
+    "TotalMatchVol": "34583800",
+    "TotalTradedVol": "36583800",
+    "Symbol": "TCB"
+  },
+  {
+    "TradingDate": "19/06/2024",
+    "PerPriceChange": "-1",
+    "RefPrice": "48800",
+    "ClosePrice": "48300",
+    "ClosePriceAdjusted": "32201.61",
+    "TotalMatchVol": "17027300",
+    "TotalTradedVol": "32262300",
+    "Symbol": "TCB"
+  },
+  {
+    "TradingDate": "18/06/2024",
+    "PerPriceChange": "0.40",
+    "RefPrice": "48600",
+    "ClosePrice": "48800",
+    "ClosePriceAdjusted": "32534.96",
+    "TotalMatchVol": "10243100",
+    "TotalTradedVol": "44387300",
+    "Symbol": "TCB"
+  },
+  {
+    "TradingDate": "30/10/2026",
+    "PerPriceChange": "-3.40",
+    "RefPrice": "22350",
+    "ClosePrice": "21600",
+    "ClosePriceAdjusted": "21600",
+    "TotalMatchVol": "17644300",
+    "TotalTradedVol": "17644300",
+    "Symbol": "TCB"
+  },
+  {
+    "TradingDate": "29/10/2026",
+    "PerPriceChange": "-33.30",
+    "RefPrice": "33500",
+    "ClosePrice": "22350",
+    "ClosePriceAdjusted": "22350",
+    "TotalMatchVol": "23642700",
+    "TotalTradedVol": "23642700",
+    "Symbol": "TCB"
+  },
+  {
+    "TradingDate": "28/10/2026",
+    "PerPriceChange": "-0.10",
+    "RefPrice": "33550",
+    "ClosePrice": "33500",
+    "ClosePriceAdjusted": "22334.45",
+    "TotalMatchVol": "25101000",
+    "TotalTradedVol": "25101000",
+    "Symbol": "TCB"
+  }
+]

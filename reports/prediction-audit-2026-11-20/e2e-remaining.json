@@ -1,0 +1,39 @@
+{
+  "environment": "isolated API 8001 + frontend copy 3001 + SQLite test.db",
+  "observations": [
+    {
+      "case": "signal HTTP 503",
+      "observed": "Không thể tải dự báo; Thử lại; three probabilities are —; candle OHLC remains visible; no trajectory target"
+    },
+    {
+      "case": "retry after clearing injected fault",
+      "observed": "VIC signal BÁN, probabilities 31.1/27.3/41.6, T+3 illustration restored"
+    },
+    {
+      "case": "account change",
+      "observed": "Audit Test had two records (LightGBM, LSTM). Logout clears visible history. Audit Two signs in and has exactly one new LightGBM record dated 15:29:41 21/11/2026; no old LSTM record"
+    },
+    {
+      "case": "trajectory toggle",
+      "observed": "T+3 target isVisible false after toggle off, returns after toggle on"
+    },
+    {
+      "case": "6M timeframe",
+      "observed": "future illustration and T+3 price remain visible"
+    },
+    {
+      "case": "390px stable layout",
+      "observed": {
+        "viewport": 390,
+        "main": 304,
+        "pageWidth": 384,
+        "sidebar": 80
+      }
+    },
+    {
+      "case": "768/1280/1920 width scan",
+      "observed": "no document horizontal overflow; canvas count 7 stable; illustration text retained",
+      "limitation": "not a full visual/accessibility verdict; transitions require stable measurement"
+    }
+  ]
+}

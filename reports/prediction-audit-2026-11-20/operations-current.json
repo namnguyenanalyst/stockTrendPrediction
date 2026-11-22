@@ -1,0 +1,22 @@
+{
+  "observed_at": "2026-11-21T21:16:57.970645+07:00",
+  "health": {
+    "status": "healthy",
+    "service": "vn-stock-api",
+    "version": "0.1.0",
+    "environment": "development"
+  },
+  "target_date": "2026-11-20",
+  "max_model_age_days": 8,
+  "worker_running": false,
+  "findings": [
+    {
+      "code": "worker_not_running"
+    }
+  ],
+  "limitations": [
+    "Worker container presence does not prove a successful scheduled run.",
+    "Legacy naive training timestamps are interpreted as Vietnam time.",
+    "Eight-day age policy is an operational threshold, not model quality evidence."
+  ]
+}

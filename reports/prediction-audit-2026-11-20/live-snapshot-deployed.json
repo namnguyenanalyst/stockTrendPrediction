@@ -1,0 +1,24 @@
+{
+  "image": "sha256:c014f3f658c54f46790f502954e5abb82909f208b906399f87ebccb3e53cec5d",
+  "health": {
+    "status": "healthy",
+    "service": "vn-stock-api",
+    "version": "0.1.0",
+    "environment": "development"
+  },
+  "ml_mounts": [
+    {
+      "destination": "/app/apps/ml/data",
+      "writable": false
+    },
+    {
+      "destination": "/app/apps/ml/models",
+      "writable": false
+    }
+  ],
+  "baseline_artifacts_changed": [],
+  "real_ssi_service_smoke": "live-snapshot-real-ssi.json",
+  "raw_data_incident": "isolated-test-vic-refresh-incident.json",
+  "http_contract_tests": "live-snapshot-api-http.txt",
+  "ssi_credentials_exposed": false
+}

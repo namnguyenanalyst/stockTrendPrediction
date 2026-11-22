@@ -1,0 +1,1413 @@
+{
+  "container": "vn-stock-core-training-audit-20261122-v2",
+  "before": {
+    "lightgbm": {
+      "data_quality": {
+        "historical_adjustment_status": "unverified",
+        "source_provenance": "local_dataset_not_independently_verified"
+      },
+      "symbol": "VIC",
+      "date": "2026-11-20",
+      "data_as_of_date": "2026-11-20",
+      "current_price": 241.9,
+      "model_type": "lightgbm",
+      "predicted_label": 0,
+      "class_name": "GIẢM",
+      "signal": "BÁN (SELL)",
+      "probabilities": {
+        "GIẢM": 0.4166,
+        "ĐI NGANG": 0.2695,
+        "TĂNG": 0.3139
+      },
+      "horizon": "T+3",
+      "horizon_days": 3,
+      "is_live_synced": false,
+      "market_session_label": "Thị trường nghỉ • Căn cứ phiên chốt (2026-11-20)",
+      "session_info": {
+        "current_time": "16:15:10 22/11/2026",
+        "current_date": "2026-11-22",
+        "target_date": "2026-11-20",
+        "session_type": "T-1",
+        "session_name": "Nghỉ cuối tuần",
+        "status_label": "Thị trường nghỉ • Căn cứ phiên chốt (2026-11-20)",
+        "is_market_closed": true,
+        "is_holiday": false,
+        "holiday_calendar_verified": true,
+        "is_weekend": true,
+        "prediction_horizon_desc": "Dự phóng 3 phiên tuần tới (T+1 → T+3)"
+      },
+      "trajectory": [
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 1,
+          "day_name": "T+1",
+          "date": "2026-11-23",
+          "predicted_trend": "GIẢM",
+          "signal": "BÁN (SELL)",
+          "confidence": 0.4166,
+          "probabilities": {
+            "GIẢM": 0.4166,
+            "ĐI NGANG": 0.2695,
+            "TĂNG": 0.3139
+          },
+          "note": "Khớp lệnh mở vị thế tại giá Open phiên 23/11/2026 kèm trượt giá 0.05% nếu có tín hiệu MUA."
+        },
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 2,
+          "day_name": "T+2",
+          "date": "2026-11-24",
+          "predicted_trend": "GIẢM",
+          "signal": "NẮM GIỮ (HOLD)",
+          "confidence": 0.4166,
+          "probabilities": {
+            "GIẢM": 0.4166,
+            "ĐI NGANG": 0.2695,
+            "TĂNG": 0.3139
+          },
+          "note": "Cổ phiếu đang về tài khoản trong phiên 24/11/2026 (khóa vị thế bán theo quy chế VSDC)."
+        },
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 3,
+          "day_name": "T+3",
+          "date": "2026-11-25",
+          "predicted_trend": "GIẢM",
+          "signal": "BÁN (SELL)",
+          "confidence": 0.4166,
+          "probabilities": {
+            "GIẢM": 0.4166,
+            "ĐI NGANG": 0.2695,
+            "TĂNG": 0.3139
+          },
+          "note": "Cổ phiếu khả dụng phiên 25/11/2026. Sẵn sàng hiện thực hóa lợi nhuận hoặc quản trị rủi ro."
+        }
+      ],
+      "summary_guidance": "Cảnh báo GIẢM: Rủi ro điều chỉnh trong chu kỳ nắm giữ T+3. Không mở vị thế mua mới; ưu tiên bảo toàn vốn.",
+      "training_info": {
+        "status": "success",
+        "timestamp": "2026-11-22T05:57:26.819702+00:00",
+        "scope": "VN30",
+        "symbols_count": 30,
+        "symbols": [
+          "ACB",
+          "BCM",
+          "BID",
+          "BVH",
+          "CTG",
+          "FPT",
+          "GAS",
+          "GVR",
+          "HDB",
+          "HPG",
+          "MBB",
+          "MSN",
+          "MWG",
+          "PLX",
+          "POW",
+          "SAB",
+          "SHB",
+          "SSB",
+          "SSI",
+          "STB",
+          "TCB",
+          "TPB",
+          "VCB",
+          "VHM",
+          "VIB",
+          "VIC",
+          "VJC",
+          "VNM",
+          "VPB",
+          "VRE"
+        ],
+        "horizon": "T+3",
+        "horizon_days": 3,
+        "threshold": 0.02,
+        "val_buffer_days": 40,
+        "latest_market_date": "2026-11-20",
+        "train_samples": 25950,
+        "val_samples": 1200,
+        "total_samples": 27150,
+        "evaluation_role": "model_selection_validation_not_independent_test",
+        "train_fit_samples": {
+          "lightgbm": 25860,
+          "lstm": 25290
+        },
+        "purged_samples": 90,
+        "train_end_date": "2026-09-22",
+        "validation_start_date": "2026-09-23",
+        "validation_end_date": "2026-11-17",
+        "seq_length": 20,
+        "hidden_size": 64,
+        "num_layers": 2,
+        "optimizer": "Adam",
+        "runtime_versions": {
+          "scikit-learn": "1.7.2",
+          "numpy": "1.26.4",
+          "pandas": "2.3.3",
+          "lightgbm": "4.7.0",
+          "torch": "2.14.1+cpu"
+        },
+        "seed": 42,
+        "epochs_requested": 40,
+        "epochs_completed": 11,
+        "lstm_early_stopping_patience": 10,
+        "best_lstm_epoch": 1,
+        "best_lstm_validation_loss": 1.0920859934456377,
+        "lightgbm_best_iteration": 76,
+        "lightgbm_parameters": {
+          "boosting_type": "gbdt",
+          "class_weight": "balanced",
+          "colsample_bytree": 0.8,
+          "importance_type": "split",
+          "learning_rate": 0.03,
+          "max_depth": 5,
+          "min_child_samples": 20,
+          "min_child_weight": 0.001,
+          "min_split_gain": 0.0,
+          "n_estimators": 300,
+          "n_jobs": 1,
+          "num_leaves": 20,
+          "objective": null,
+          "random_state": 42,
+          "reg_alpha": 0.0,
+          "reg_lambda": 0.0,
+          "subsample": 0.8,
+          "subsample_for_bin": 200000,
+          "subsample_freq": 0,
+          "verbose": -1
+        },
+        "train_class_counts": [
+          5084,
+          15115,
+          5661
+        ],
+        "lightgbm_metrics": {
+          "accuracy": 0.4675,
+          "macro_f1": 0.399909654002572,
+          "weighted_f1": 0.4799668289917927,
+          "precision_macro": 0.40308454482376915,
+          "recall_macro": 0.40830544143275077,
+          "confusion_matrix": [
+            [
+              113,
+              136,
+              89
+            ],
+            [
+              157,
+              392,
+              138
+            ],
+            [
+              33,
+              86,
+              56
+            ]
+          ]
+        },
+        "lstm_metrics": {
+          "accuracy": 0.43833333333333335,
+          "macro_f1": 0.37262593115166426,
+          "weighted_f1": 0.4535145971504274,
+          "precision_macro": 0.37934492855712315,
+          "recall_macro": 0.38121813840994223,
+          "confusion_matrix": [
+            [
+              158,
+              120,
+              60
+            ],
+            [
+              229,
+              335,
+              123
+            ],
+            [
+              78,
+              64,
+              33
+            ]
+          ]
+        },
+        "artifact_generation": "2da17faa147b4b1e9ac59c8313f5eae1",
+        "serving_status": "healthy"
+      }
+    },
+    "lstm": {
+      "data_quality": {
+        "historical_adjustment_status": "unverified",
+        "source_provenance": "local_dataset_not_independently_verified"
+      },
+      "symbol": "VIC",
+      "date": "2026-11-20",
+      "data_as_of_date": "2026-11-20",
+      "current_price": 241.9,
+      "model_type": "lstm",
+      "predicted_label": 0,
+      "class_name": "GIẢM",
+      "signal": "BÁN (SELL)",
+      "probabilities": {
+        "GIẢM": 0.3645,
+        "ĐI NGANG": 0.2809,
+        "TĂNG": 0.3546
+      },
+      "horizon": "T+3",
+      "horizon_days": 3,
+      "is_live_synced": false,
+      "market_session_label": "Thị trường nghỉ • Căn cứ phiên chốt (2026-11-20)",
+      "session_info": {
+        "current_time": "16:15:10 22/11/2026",
+        "current_date": "2026-11-22",
+        "target_date": "2026-11-20",
+        "session_type": "T-1",
+        "session_name": "Nghỉ cuối tuần",
+        "status_label": "Thị trường nghỉ • Căn cứ phiên chốt (2026-11-20)",
+        "is_market_closed": true,
+        "is_holiday": false,
+        "holiday_calendar_verified": true,
+        "is_weekend": true,
+        "prediction_horizon_desc": "Dự phóng 3 phiên tuần tới (T+1 → T+3)"
+      },
+      "trajectory": [
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 1,
+          "day_name": "T+1",
+          "date": "2026-11-23",
+          "predicted_trend": "GIẢM",
+          "signal": "BÁN (SELL)",
+          "confidence": 0.3645,
+          "probabilities": {
+            "GIẢM": 0.3645,
+            "ĐI NGANG": 0.2809,
+            "TĂNG": 0.3546
+          },
+          "note": "Khớp lệnh mở vị thế tại giá Open phiên 23/11/2026 kèm trượt giá 0.05% nếu có tín hiệu MUA."
+        },
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 2,
+          "day_name": "T+2",
+          "date": "2026-11-24",
+          "predicted_trend": "GIẢM",
+          "signal": "NẮM GIỮ (HOLD)",
+          "confidence": 0.3645,
+          "probabilities": {
+            "GIẢM": 0.3645,
+            "ĐI NGANG": 0.2809,
+            "TĂNG": 0.3546
+          },
+          "note": "Cổ phiếu đang về tài khoản trong phiên 24/11/2026 (khóa vị thế bán theo quy chế VSDC)."
+        },
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 3,
+          "day_name": "T+3",
+          "date": "2026-11-25",
+          "predicted_trend": "GIẢM",
+          "signal": "BÁN (SELL)",
+          "confidence": 0.3645,
+          "probabilities": {
+            "GIẢM": 0.3645,
+            "ĐI NGANG": 0.2809,
+            "TĂNG": 0.3546
+          },
+          "note": "Cổ phiếu khả dụng phiên 25/11/2026. Sẵn sàng hiện thực hóa lợi nhuận hoặc quản trị rủi ro."
+        }
+      ],
+      "summary_guidance": "Cảnh báo GIẢM: Rủi ro điều chỉnh trong chu kỳ nắm giữ T+3. Không mở vị thế mua mới; ưu tiên bảo toàn vốn.",
+      "training_info": {
+        "status": "success",
+        "timestamp": "2026-11-22T05:57:26.819702+00:00",
+        "scope": "VN30",
+        "symbols_count": 30,
+        "symbols": [
+          "ACB",
+          "BCM",
+          "BID",
+          "BVH",
+          "CTG",
+          "FPT",
+          "GAS",
+          "GVR",
+          "HDB",
+          "HPG",
+          "MBB",
+          "MSN",
+          "MWG",
+          "PLX",
+          "POW",
+          "SAB",
+          "SHB",
+          "SSB",
+          "SSI",
+          "STB",
+          "TCB",
+          "TPB",
+          "VCB",
+          "VHM",
+          "VIB",
+          "VIC",
+          "VJC",
+          "VNM",
+          "VPB",
+          "VRE"
+        ],
+        "horizon": "T+3",
+        "horizon_days": 3,
+        "threshold": 0.02,
+        "val_buffer_days": 40,
+        "latest_market_date": "2026-11-20",
+        "train_samples": 25950,
+        "val_samples": 1200,
+        "total_samples": 27150,
+        "evaluation_role": "model_selection_validation_not_independent_test",
+        "train_fit_samples": {
+          "lightgbm": 25860,
+          "lstm": 25290
+        },
+        "purged_samples": 90,
+        "train_end_date": "2026-09-22",
+        "validation_start_date": "2026-09-23",
+        "validation_end_date": "2026-11-17",
+        "seq_length": 20,
+        "hidden_size": 64,
+        "num_layers": 2,
+        "optimizer": "Adam",
+        "runtime_versions": {
+          "scikit-learn": "1.7.2",
+          "numpy": "1.26.4",
+          "pandas": "2.3.3",
+          "lightgbm": "4.7.0",
+          "torch": "2.14.1+cpu"
+        },
+        "seed": 42,
+        "epochs_requested": 40,
+        "epochs_completed": 11,
+        "lstm_early_stopping_patience": 10,
+        "best_lstm_epoch": 1,
+        "best_lstm_validation_loss": 1.0920859934456377,
+        "lightgbm_best_iteration": 76,
+        "lightgbm_parameters": {
+          "boosting_type": "gbdt",
+          "class_weight": "balanced",
+          "colsample_bytree": 0.8,
+          "importance_type": "split",
+          "learning_rate": 0.03,
+          "max_depth": 5,
+          "min_child_samples": 20,
+          "min_child_weight": 0.001,
+          "min_split_gain": 0.0,
+          "n_estimators": 300,
+          "n_jobs": 1,
+          "num_leaves": 20,
+          "objective": null,
+          "random_state": 42,
+          "reg_alpha": 0.0,
+          "reg_lambda": 0.0,
+          "subsample": 0.8,
+          "subsample_for_bin": 200000,
+          "subsample_freq": 0,
+          "verbose": -1
+        },
+        "train_class_counts": [
+          5084,
+          15115,
+          5661
+        ],
+        "lightgbm_metrics": {
+          "accuracy": 0.4675,
+          "macro_f1": 0.399909654002572,
+          "weighted_f1": 0.4799668289917927,
+          "precision_macro": 0.40308454482376915,
+          "recall_macro": 0.40830544143275077,
+          "confusion_matrix": [
+            [
+              113,
+              136,
+              89
+            ],
+            [
+              157,
+              392,
+              138
+            ],
+            [
+              33,
+              86,
+              56
+            ]
+          ]
+        },
+        "lstm_metrics": {
+          "accuracy": 0.43833333333333335,
+          "macro_f1": 0.37262593115166426,
+          "weighted_f1": 0.4535145971504274,
+          "precision_macro": 0.37934492855712315,
+          "recall_macro": 0.38121813840994223,
+          "confusion_matrix": [
+            [
+              158,
+              120,
+              60
+            ],
+            [
+              229,
+              335,
+              123
+            ],
+            [
+              78,
+              64,
+              33
+            ]
+          ]
+        },
+        "artifact_generation": "2da17faa147b4b1e9ac59c8313f5eae1",
+        "serving_status": "healthy"
+      }
+    }
+  },
+  "fault": {
+    "lightgbm": {
+      "data_quality": {
+        "historical_adjustment_status": "unverified",
+        "source_provenance": "local_dataset_not_independently_verified"
+      },
+      "symbol": "VIC",
+      "date": "2026-11-20",
+      "data_as_of_date": "2026-11-20",
+      "current_price": 241.9,
+      "model_type": "lightgbm",
+      "predicted_label": 0,
+      "class_name": "GIẢM",
+      "signal": "BÁN (SELL)",
+      "probabilities": {
+        "GIẢM": 0.4166,
+        "ĐI NGANG": 0.2695,
+        "TĂNG": 0.3139
+      },
+      "horizon": "T+3",
+      "horizon_days": 3,
+      "is_live_synced": false,
+      "market_session_label": "Thị trường nghỉ • Căn cứ phiên chốt (2026-11-20)",
+      "session_info": {
+        "current_time": "16:15:11 22/11/2026",
+        "current_date": "2026-11-22",
+        "target_date": "2026-11-20",
+        "session_type": "T-1",
+        "session_name": "Nghỉ cuối tuần",
+        "status_label": "Thị trường nghỉ • Căn cứ phiên chốt (2026-11-20)",
+        "is_market_closed": true,
+        "is_holiday": false,
+        "holiday_calendar_verified": true,
+        "is_weekend": true,
+        "prediction_horizon_desc": "Dự phóng 3 phiên tuần tới (T+1 → T+3)"
+      },
+      "trajectory": [
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 1,
+          "day_name": "T+1",
+          "date": "2026-11-23",
+          "predicted_trend": "GIẢM",
+          "signal": "BÁN (SELL)",
+          "confidence": 0.4166,
+          "probabilities": {
+            "GIẢM": 0.4166,
+            "ĐI NGANG": 0.2695,
+            "TĂNG": 0.3139
+          },
+          "note": "Khớp lệnh mở vị thế tại giá Open phiên 23/11/2026 kèm trượt giá 0.05% nếu có tín hiệu MUA."
+        },
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 2,
+          "day_name": "T+2",
+          "date": "2026-11-24",
+          "predicted_trend": "GIẢM",
+          "signal": "NẮM GIỮ (HOLD)",
+          "confidence": 0.4166,
+          "probabilities": {
+            "GIẢM": 0.4166,
+            "ĐI NGANG": 0.2695,
+            "TĂNG": 0.3139
+          },
+          "note": "Cổ phiếu đang về tài khoản trong phiên 24/11/2026 (khóa vị thế bán theo quy chế VSDC)."
+        },
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 3,
+          "day_name": "T+3",
+          "date": "2026-11-25",
+          "predicted_trend": "GIẢM",
+          "signal": "BÁN (SELL)",
+          "confidence": 0.4166,
+          "probabilities": {
+            "GIẢM": 0.4166,
+            "ĐI NGANG": 0.2695,
+            "TĂNG": 0.3139
+          },
+          "note": "Cổ phiếu khả dụng phiên 25/11/2026. Sẵn sàng hiện thực hóa lợi nhuận hoặc quản trị rủi ro."
+        }
+      ],
+      "summary_guidance": "Cảnh báo GIẢM: Rủi ro điều chỉnh trong chu kỳ nắm giữ T+3. Không mở vị thế mua mới; ưu tiên bảo toàn vốn.",
+      "training_info": {
+        "status": "success",
+        "timestamp": "2026-11-22T05:57:26.819702+00:00",
+        "scope": "VN30",
+        "symbols_count": 30,
+        "symbols": [
+          "ACB",
+          "BCM",
+          "BID",
+          "BVH",
+          "CTG",
+          "FPT",
+          "GAS",
+          "GVR",
+          "HDB",
+          "HPG",
+          "MBB",
+          "MSN",
+          "MWG",
+          "PLX",
+          "POW",
+          "SAB",
+          "SHB",
+          "SSB",
+          "SSI",
+          "STB",
+          "TCB",
+          "TPB",
+          "VCB",
+          "VHM",
+          "VIB",
+          "VIC",
+          "VJC",
+          "VNM",
+          "VPB",
+          "VRE"
+        ],
+        "horizon": "T+3",
+        "horizon_days": 3,
+        "threshold": 0.02,
+        "val_buffer_days": 40,
+        "latest_market_date": "2026-11-20",
+        "train_samples": 25950,
+        "val_samples": 1200,
+        "total_samples": 27150,
+        "evaluation_role": "model_selection_validation_not_independent_test",
+        "train_fit_samples": {
+          "lightgbm": 25860,
+          "lstm": 25290
+        },
+        "purged_samples": 90,
+        "train_end_date": "2026-09-22",
+        "validation_start_date": "2026-09-23",
+        "validation_end_date": "2026-11-17",
+        "seq_length": 20,
+        "hidden_size": 64,
+        "num_layers": 2,
+        "optimizer": "Adam",
+        "runtime_versions": {
+          "scikit-learn": "1.7.2",
+          "numpy": "1.26.4",
+          "pandas": "2.3.3",
+          "lightgbm": "4.7.0",
+          "torch": "2.14.1+cpu"
+        },
+        "seed": 42,
+        "epochs_requested": 40,
+        "epochs_completed": 11,
+        "lstm_early_stopping_patience": 10,
+        "best_lstm_epoch": 1,
+        "best_lstm_validation_loss": 1.0920859934456377,
+        "lightgbm_best_iteration": 76,
+        "lightgbm_parameters": {
+          "boosting_type": "gbdt",
+          "class_weight": "balanced",
+          "colsample_bytree": 0.8,
+          "importance_type": "split",
+          "learning_rate": 0.03,
+          "max_depth": 5,
+          "min_child_samples": 20,
+          "min_child_weight": 0.001,
+          "min_split_gain": 0.0,
+          "n_estimators": 300,
+          "n_jobs": 1,
+          "num_leaves": 20,
+          "objective": null,
+          "random_state": 42,
+          "reg_alpha": 0.0,
+          "reg_lambda": 0.0,
+          "subsample": 0.8,
+          "subsample_for_bin": 200000,
+          "subsample_freq": 0,
+          "verbose": -1
+        },
+        "train_class_counts": [
+          5084,
+          15115,
+          5661
+        ],
+        "lightgbm_metrics": {
+          "accuracy": 0.4675,
+          "macro_f1": 0.399909654002572,
+          "weighted_f1": 0.4799668289917927,
+          "precision_macro": 0.40308454482376915,
+          "recall_macro": 0.40830544143275077,
+          "confusion_matrix": [
+            [
+              113,
+              136,
+              89
+            ],
+            [
+              157,
+              392,
+              138
+            ],
+            [
+              33,
+              86,
+              56
+            ]
+          ]
+        },
+        "lstm_metrics": {
+          "accuracy": 0.43833333333333335,
+          "macro_f1": 0.37262593115166426,
+          "weighted_f1": 0.4535145971504274,
+          "precision_macro": 0.37934492855712315,
+          "recall_macro": 0.38121813840994223,
+          "confusion_matrix": [
+            [
+              158,
+              120,
+              60
+            ],
+            [
+              229,
+              335,
+              123
+            ],
+            [
+              78,
+              64,
+              33
+            ]
+          ]
+        },
+        "artifact_generation": "2da17faa147b4b1e9ac59c8313f5eae1",
+        "serving_status": "degraded_cached_generation"
+      }
+    },
+    "lstm": {
+      "data_quality": {
+        "historical_adjustment_status": "unverified",
+        "source_provenance": "local_dataset_not_independently_verified"
+      },
+      "symbol": "VIC",
+      "date": "2026-11-20",
+      "data_as_of_date": "2026-11-20",
+      "current_price": 241.9,
+      "model_type": "lstm",
+      "predicted_label": 0,
+      "class_name": "GIẢM",
+      "signal": "BÁN (SELL)",
+      "probabilities": {
+        "GIẢM": 0.3645,
+        "ĐI NGANG": 0.2809,
+        "TĂNG": 0.3546
+      },
+      "horizon": "T+3",
+      "horizon_days": 3,
+      "is_live_synced": false,
+      "market_session_label": "Thị trường nghỉ • Căn cứ phiên chốt (2026-11-20)",
+      "session_info": {
+        "current_time": "16:15:11 22/11/2026",
+        "current_date": "2026-11-22",
+        "target_date": "2026-11-20",
+        "session_type": "T-1",
+        "session_name": "Nghỉ cuối tuần",
+        "status_label": "Thị trường nghỉ • Căn cứ phiên chốt (2026-11-20)",
+        "is_market_closed": true,
+        "is_holiday": false,
+        "holiday_calendar_verified": true,
+        "is_weekend": true,
+        "prediction_horizon_desc": "Dự phóng 3 phiên tuần tới (T+1 → T+3)"
+      },
+      "trajectory": [
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 1,
+          "day_name": "T+1",
+          "date": "2026-11-23",
+          "predicted_trend": "GIẢM",
+          "signal": "BÁN (SELL)",
+          "confidence": 0.3645,
+          "probabilities": {
+            "GIẢM": 0.3645,
+            "ĐI NGANG": 0.2809,
+            "TĂNG": 0.3546
+          },
+          "note": "Khớp lệnh mở vị thế tại giá Open phiên 23/11/2026 kèm trượt giá 0.05% nếu có tín hiệu MUA."
+        },
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 2,
+          "day_name": "T+2",
+          "date": "2026-11-24",
+          "predicted_trend": "GIẢM",
+          "signal": "NẮM GIỮ (HOLD)",
+          "confidence": 0.3645,
+          "probabilities": {
+            "GIẢM": 0.3645,
+            "ĐI NGANG": 0.2809,
+            "TĂNG": 0.3546
+          },
+          "note": "Cổ phiếu đang về tài khoản trong phiên 24/11/2026 (khóa vị thế bán theo quy chế VSDC)."
+        },
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 3,
+          "day_name": "T+3",
+          "date": "2026-11-25",
+          "predicted_trend": "GIẢM",
+          "signal": "BÁN (SELL)",
+          "confidence": 0.3645,
+          "probabilities": {
+            "GIẢM": 0.3645,
+            "ĐI NGANG": 0.2809,
+            "TĂNG": 0.3546
+          },
+          "note": "Cổ phiếu khả dụng phiên 25/11/2026. Sẵn sàng hiện thực hóa lợi nhuận hoặc quản trị rủi ro."
+        }
+      ],
+      "summary_guidance": "Cảnh báo GIẢM: Rủi ro điều chỉnh trong chu kỳ nắm giữ T+3. Không mở vị thế mua mới; ưu tiên bảo toàn vốn.",
+      "training_info": {
+        "status": "success",
+        "timestamp": "2026-11-22T05:57:26.819702+00:00",
+        "scope": "VN30",
+        "symbols_count": 30,
+        "symbols": [
+          "ACB",
+          "BCM",
+          "BID",
+          "BVH",
+          "CTG",
+          "FPT",
+          "GAS",
+          "GVR",
+          "HDB",
+          "HPG",
+          "MBB",
+          "MSN",
+          "MWG",
+          "PLX",
+          "POW",
+          "SAB",
+          "SHB",
+          "SSB",
+          "SSI",
+          "STB",
+          "TCB",
+          "TPB",
+          "VCB",
+          "VHM",
+          "VIB",
+          "VIC",
+          "VJC",
+          "VNM",
+          "VPB",
+          "VRE"
+        ],
+        "horizon": "T+3",
+        "horizon_days": 3,
+        "threshold": 0.02,
+        "val_buffer_days": 40,
+        "latest_market_date": "2026-11-20",
+        "train_samples": 25950,
+        "val_samples": 1200,
+        "total_samples": 27150,
+        "evaluation_role": "model_selection_validation_not_independent_test",
+        "train_fit_samples": {
+          "lightgbm": 25860,
+          "lstm": 25290
+        },
+        "purged_samples": 90,
+        "train_end_date": "2026-09-22",
+        "validation_start_date": "2026-09-23",
+        "validation_end_date": "2026-11-17",
+        "seq_length": 20,
+        "hidden_size": 64,
+        "num_layers": 2,
+        "optimizer": "Adam",
+        "runtime_versions": {
+          "scikit-learn": "1.7.2",
+          "numpy": "1.26.4",
+          "pandas": "2.3.3",
+          "lightgbm": "4.7.0",
+          "torch": "2.14.1+cpu"
+        },
+        "seed": 42,
+        "epochs_requested": 40,
+        "epochs_completed": 11,
+        "lstm_early_stopping_patience": 10,
+        "best_lstm_epoch": 1,
+        "best_lstm_validation_loss": 1.0920859934456377,
+        "lightgbm_best_iteration": 76,
+        "lightgbm_parameters": {
+          "boosting_type": "gbdt",
+          "class_weight": "balanced",
+          "colsample_bytree": 0.8,
+          "importance_type": "split",
+          "learning_rate": 0.03,
+          "max_depth": 5,
+          "min_child_samples": 20,
+          "min_child_weight": 0.001,
+          "min_split_gain": 0.0,
+          "n_estimators": 300,
+          "n_jobs": 1,
+          "num_leaves": 20,
+          "objective": null,
+          "random_state": 42,
+          "reg_alpha": 0.0,
+          "reg_lambda": 0.0,
+          "subsample": 0.8,
+          "subsample_for_bin": 200000,
+          "subsample_freq": 0,
+          "verbose": -1
+        },
+        "train_class_counts": [
+          5084,
+          15115,
+          5661
+        ],
+        "lightgbm_metrics": {
+          "accuracy": 0.4675,
+          "macro_f1": 0.399909654002572,
+          "weighted_f1": 0.4799668289917927,
+          "precision_macro": 0.40308454482376915,
+          "recall_macro": 0.40830544143275077,
+          "confusion_matrix": [
+            [
+              113,
+              136,
+              89
+            ],
+            [
+              157,
+              392,
+              138
+            ],
+            [
+              33,
+              86,
+              56
+            ]
+          ]
+        },
+        "lstm_metrics": {
+          "accuracy": 0.43833333333333335,
+          "macro_f1": 0.37262593115166426,
+          "weighted_f1": 0.4535145971504274,
+          "precision_macro": 0.37934492855712315,
+          "recall_macro": 0.38121813840994223,
+          "confusion_matrix": [
+            [
+              158,
+              120,
+              60
+            ],
+            [
+              229,
+              335,
+              123
+            ],
+            [
+              78,
+              64,
+              33
+            ]
+          ]
+        },
+        "artifact_generation": "2da17faa147b4b1e9ac59c8313f5eae1",
+        "serving_status": "degraded_cached_generation"
+      }
+    }
+  },
+  "restored": {
+    "lightgbm": {
+      "data_quality": {
+        "historical_adjustment_status": "unverified",
+        "source_provenance": "local_dataset_not_independently_verified"
+      },
+      "symbol": "VIC",
+      "date": "2026-11-20",
+      "data_as_of_date": "2026-11-20",
+      "current_price": 241.9,
+      "model_type": "lightgbm",
+      "predicted_label": 0,
+      "class_name": "GIẢM",
+      "signal": "BÁN (SELL)",
+      "probabilities": {
+        "GIẢM": 0.4166,
+        "ĐI NGANG": 0.2695,
+        "TĂNG": 0.3139
+      },
+      "horizon": "T+3",
+      "horizon_days": 3,
+      "is_live_synced": false,
+      "market_session_label": "Thị trường nghỉ • Căn cứ phiên chốt (2026-11-20)",
+      "session_info": {
+        "current_time": "16:15:11 22/11/2026",
+        "current_date": "2026-11-22",
+        "target_date": "2026-11-20",
+        "session_type": "T-1",
+        "session_name": "Nghỉ cuối tuần",
+        "status_label": "Thị trường nghỉ • Căn cứ phiên chốt (2026-11-20)",
+        "is_market_closed": true,
+        "is_holiday": false,
+        "holiday_calendar_verified": true,
+        "is_weekend": true,
+        "prediction_horizon_desc": "Dự phóng 3 phiên tuần tới (T+1 → T+3)"
+      },
+      "trajectory": [
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 1,
+          "day_name": "T+1",
+          "date": "2026-11-23",
+          "predicted_trend": "GIẢM",
+          "signal": "BÁN (SELL)",
+          "confidence": 0.4166,
+          "probabilities": {
+            "GIẢM": 0.4166,
+            "ĐI NGANG": 0.2695,
+            "TĂNG": 0.3139
+          },
+          "note": "Khớp lệnh mở vị thế tại giá Open phiên 23/11/2026 kèm trượt giá 0.05% nếu có tín hiệu MUA."
+        },
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 2,
+          "day_name": "T+2",
+          "date": "2026-11-24",
+          "predicted_trend": "GIẢM",
+          "signal": "NẮM GIỮ (HOLD)",
+          "confidence": 0.4166,
+          "probabilities": {
+            "GIẢM": 0.4166,
+            "ĐI NGANG": 0.2695,
+            "TĂNG": 0.3139
+          },
+          "note": "Cổ phiếu đang về tài khoản trong phiên 24/11/2026 (khóa vị thế bán theo quy chế VSDC)."
+        },
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 3,
+          "day_name": "T+3",
+          "date": "2026-11-25",
+          "predicted_trend": "GIẢM",
+          "signal": "BÁN (SELL)",
+          "confidence": 0.4166,
+          "probabilities": {
+            "GIẢM": 0.4166,
+            "ĐI NGANG": 0.2695,
+            "TĂNG": 0.3139
+          },
+          "note": "Cổ phiếu khả dụng phiên 25/11/2026. Sẵn sàng hiện thực hóa lợi nhuận hoặc quản trị rủi ro."
+        }
+      ],
+      "summary_guidance": "Cảnh báo GIẢM: Rủi ro điều chỉnh trong chu kỳ nắm giữ T+3. Không mở vị thế mua mới; ưu tiên bảo toàn vốn.",
+      "training_info": {
+        "status": "success",
+        "timestamp": "2026-11-22T05:57:26.819702+00:00",
+        "scope": "VN30",
+        "symbols_count": 30,
+        "symbols": [
+          "ACB",
+          "BCM",
+          "BID",
+          "BVH",
+          "CTG",
+          "FPT",
+          "GAS",
+          "GVR",
+          "HDB",
+          "HPG",
+          "MBB",
+          "MSN",
+          "MWG",
+          "PLX",
+          "POW",
+          "SAB",
+          "SHB",
+          "SSB",
+          "SSI",
+          "STB",
+          "TCB",
+          "TPB",
+          "VCB",
+          "VHM",
+          "VIB",
+          "VIC",
+          "VJC",
+          "VNM",
+          "VPB",
+          "VRE"
+        ],
+        "horizon": "T+3",
+        "horizon_days": 3,
+        "threshold": 0.02,
+        "val_buffer_days": 40,
+        "latest_market_date": "2026-11-20",
+        "train_samples": 25950,
+        "val_samples": 1200,
+        "total_samples": 27150,
+        "evaluation_role": "model_selection_validation_not_independent_test",
+        "train_fit_samples": {
+          "lightgbm": 25860,
+          "lstm": 25290
+        },
+        "purged_samples": 90,
+        "train_end_date": "2026-09-22",
+        "validation_start_date": "2026-09-23",
+        "validation_end_date": "2026-11-17",
+        "seq_length": 20,
+        "hidden_size": 64,
+        "num_layers": 2,
+        "optimizer": "Adam",
+        "runtime_versions": {
+          "scikit-learn": "1.7.2",
+          "numpy": "1.26.4",
+          "pandas": "2.3.3",
+          "lightgbm": "4.7.0",
+          "torch": "2.14.1+cpu"
+        },
+        "seed": 42,
+        "epochs_requested": 40,
+        "epochs_completed": 11,
+        "lstm_early_stopping_patience": 10,
+        "best_lstm_epoch": 1,
+        "best_lstm_validation_loss": 1.0920859934456377,
+        "lightgbm_best_iteration": 76,
+        "lightgbm_parameters": {
+          "boosting_type": "gbdt",
+          "class_weight": "balanced",
+          "colsample_bytree": 0.8,
+          "importance_type": "split",
+          "learning_rate": 0.03,
+          "max_depth": 5,
+          "min_child_samples": 20,
+          "min_child_weight": 0.001,
+          "min_split_gain": 0.0,
+          "n_estimators": 300,
+          "n_jobs": 1,
+          "num_leaves": 20,
+          "objective": null,
+          "random_state": 42,
+          "reg_alpha": 0.0,
+          "reg_lambda": 0.0,
+          "subsample": 0.8,
+          "subsample_for_bin": 200000,
+          "subsample_freq": 0,
+          "verbose": -1
+        },
+        "train_class_counts": [
+          5084,
+          15115,
+          5661
+        ],
+        "lightgbm_metrics": {
+          "accuracy": 0.4675,
+          "macro_f1": 0.399909654002572,
+          "weighted_f1": 0.4799668289917927,
+          "precision_macro": 0.40308454482376915,
+          "recall_macro": 0.40830544143275077,
+          "confusion_matrix": [
+            [
+              113,
+              136,
+              89
+            ],
+            [
+              157,
+              392,
+              138
+            ],
+            [
+              33,
+              86,
+              56
+            ]
+          ]
+        },
+        "lstm_metrics": {
+          "accuracy": 0.43833333333333335,
+          "macro_f1": 0.37262593115166426,
+          "weighted_f1": 0.4535145971504274,
+          "precision_macro": 0.37934492855712315,
+          "recall_macro": 0.38121813840994223,
+          "confusion_matrix": [
+            [
+              158,
+              120,
+              60
+            ],
+            [
+              229,
+              335,
+              123
+            ],
+            [
+              78,
+              64,
+              33
+            ]
+          ]
+        },
+        "artifact_generation": "2da17faa147b4b1e9ac59c8313f5eae1",
+        "serving_status": "healthy"
+      }
+    },
+    "lstm": {
+      "data_quality": {
+        "historical_adjustment_status": "unverified",
+        "source_provenance": "local_dataset_not_independently_verified"
+      },
+      "symbol": "VIC",
+      "date": "2026-11-20",
+      "data_as_of_date": "2026-11-20",
+      "current_price": 241.9,
+      "model_type": "lstm",
+      "predicted_label": 0,
+      "class_name": "GIẢM",
+      "signal": "BÁN (SELL)",
+      "probabilities": {
+        "GIẢM": 0.3645,
+        "ĐI NGANG": 0.2809,
+        "TĂNG": 0.3546
+      },
+      "horizon": "T+3",
+      "horizon_days": 3,
+      "is_live_synced": false,
+      "market_session_label": "Thị trường nghỉ • Căn cứ phiên chốt (2026-11-20)",
+      "session_info": {
+        "current_time": "16:15:11 22/11/2026",
+        "current_date": "2026-11-22",
+        "target_date": "2026-11-20",
+        "session_type": "T-1",
+        "session_name": "Nghỉ cuối tuần",
+        "status_label": "Thị trường nghỉ • Căn cứ phiên chốt (2026-11-20)",
+        "is_market_closed": true,
+        "is_holiday": false,
+        "holiday_calendar_verified": true,
+        "is_weekend": true,
+        "prediction_horizon_desc": "Dự phóng 3 phiên tuần tới (T+1 → T+3)"
+      },
+      "trajectory": [
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 1,
+          "day_name": "T+1",
+          "date": "2026-11-23",
+          "predicted_trend": "GIẢM",
+          "signal": "BÁN (SELL)",
+          "confidence": 0.3645,
+          "probabilities": {
+            "GIẢM": 0.3645,
+            "ĐI NGANG": 0.2809,
+            "TĂNG": 0.3546
+          },
+          "note": "Khớp lệnh mở vị thế tại giá Open phiên 23/11/2026 kèm trượt giá 0.05% nếu có tín hiệu MUA."
+        },
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 2,
+          "day_name": "T+2",
+          "date": "2026-11-24",
+          "predicted_trend": "GIẢM",
+          "signal": "NẮM GIỮ (HOLD)",
+          "confidence": 0.3645,
+          "probabilities": {
+            "GIẢM": 0.3645,
+            "ĐI NGANG": 0.2809,
+            "TĂNG": 0.3546
+          },
+          "note": "Cổ phiếu đang về tài khoản trong phiên 24/11/2026 (khóa vị thế bán theo quy chế VSDC)."
+        },
+        {
+          "holiday_calendar_verified": true,
+          "day_offset": 3,
+          "day_name": "T+3",
+          "date": "2026-11-25",
+          "predicted_trend": "GIẢM",
+          "signal": "BÁN (SELL)",
+          "confidence": 0.3645,
+          "probabilities": {
+            "GIẢM": 0.3645,
+            "ĐI NGANG": 0.2809,
+            "TĂNG": 0.3546
+          },
+          "note": "Cổ phiếu khả dụng phiên 25/11/2026. Sẵn sàng hiện thực hóa lợi nhuận hoặc quản trị rủi ro."
+        }
+      ],
+      "summary_guidance": "Cảnh báo GIẢM: Rủi ro điều chỉnh trong chu kỳ nắm giữ T+3. Không mở vị thế mua mới; ưu tiên bảo toàn vốn.",
+      "training_info": {
+        "status": "success",
+        "timestamp": "2026-11-22T05:57:26.819702+00:00",
+        "scope": "VN30",
+        "symbols_count": 30,
+        "symbols": [
+          "ACB",
+          "BCM",
+          "BID",
+          "BVH",
+          "CTG",
+          "FPT",
+          "GAS",
+          "GVR",
+          "HDB",
+          "HPG",
+          "MBB",
+          "MSN",
+          "MWG",
+          "PLX",
+          "POW",
+          "SAB",
+          "SHB",
+          "SSB",
+          "SSI",
+          "STB",
+          "TCB",
+          "TPB",
+          "VCB",
+          "VHM",
+          "VIB",
+          "VIC",
+          "VJC",
+          "VNM",
+          "VPB",
+          "VRE"
+        ],
+        "horizon": "T+3",
+        "horizon_days": 3,
+        "threshold": 0.02,
+        "val_buffer_days": 40,
+        "latest_market_date": "2026-11-20",
+        "train_samples": 25950,
+        "val_samples": 1200,
+        "total_samples": 27150,
+        "evaluation_role": "model_selection_validation_not_independent_test",
+        "train_fit_samples": {
+          "lightgbm": 25860,
+          "lstm": 25290
+        },
+        "purged_samples": 90,
+        "train_end_date": "2026-09-22",
+        "validation_start_date": "2026-09-23",
+        "validation_end_date": "2026-11-17",
+        "seq_length": 20,
+        "hidden_size": 64,
+        "num_layers": 2,
+        "optimizer": "Adam",
+        "runtime_versions": {
+          "scikit-learn": "1.7.2",
+          "numpy": "1.26.4",
+          "pandas": "2.3.3",
+          "lightgbm": "4.7.0",
+          "torch": "2.14.1+cpu"
+        },
+        "seed": 42,
+        "epochs_requested": 40,
+        "epochs_completed": 11,
+        "lstm_early_stopping_patience": 10,
+        "best_lstm_epoch": 1,
+        "best_lstm_validation_loss": 1.0920859934456377,
+        "lightgbm_best_iteration": 76,
+        "lightgbm_parameters": {
+          "boosting_type": "gbdt",
+          "class_weight": "balanced",
+          "colsample_bytree": 0.8,
+          "importance_type": "split",
+          "learning_rate": 0.03,
+          "max_depth": 5,
+          "min_child_samples": 20,
+          "min_child_weight": 0.001,
+          "min_split_gain": 0.0,
+          "n_estimators": 300,
+          "n_jobs": 1,
+          "num_leaves": 20,
+          "objective": null,
+          "random_state": 42,
+          "reg_alpha": 0.0,
+          "reg_lambda": 0.0,
+          "subsample": 0.8,
+          "subsample_for_bin": 200000,
+          "subsample_freq": 0,
+          "verbose": -1
+        },
+        "train_class_counts": [
+          5084,
+          15115,
+          5661
+        ],
+        "lightgbm_metrics": {
+          "accuracy": 0.4675,
+          "macro_f1": 0.399909654002572,
+          "weighted_f1": 0.4799668289917927,
+          "precision_macro": 0.40308454482376915,
+          "recall_macro": 0.40830544143275077,
+          "confusion_matrix": [
+            [
+              113,
+              136,
+              89
+            ],
+            [
+              157,
+              392,
+              138
+            ],
+            [
+              33,
+              86,
+              56
+            ]
+          ]
+        },
+        "lstm_metrics": {
+          "accuracy": 0.43833333333333335,
+          "macro_f1": 0.37262593115166426,
+          "weighted_f1": 0.4535145971504274,
+          "precision_macro": 0.37934492855712315,
+          "recall_macro": 0.38121813840994223,
+          "confusion_matrix": [
+            [
+              158,
+              120,
+              60
+            ],
+            [
+              229,
+              335,
+              123
+            ],
+            [
+              78,
+              64,
+              33
+            ]
+          ]
+        },
+        "artifact_generation": "2da17faa147b4b1e9ac59c8313f5eae1",
+        "serving_status": "healthy"
+      }
+    }
+  }
+}

@@ -1,0 +1,447 @@
+{
+  "symbols": {
+    "ACB": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.18487834005075388
+    },
+    "BCM": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.07000303386052131
+    },
+    "BID": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.1690042686645178
+    },
+    "BVH": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.06988352745424287
+    },
+    "CTG": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.3196017919362867
+    },
+    "FPT": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.07391910739191065
+    },
+    "GAS": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.14647767568142067
+    },
+    "GVR": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.07002917882451021
+    },
+    "HDB": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.20246243570531763
+    },
+    "HPG": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.07001330770368175
+    },
+    "MBB": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.2037126236614918
+    },
+    "MSN": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.06992865113448077
+    },
+    "MWG": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.4651320754716981
+    },
+    "PLX": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.06990672557682864
+    },
+    "POW": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.07001129214389423
+    },
+    "SAB": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.48920914019146733
+    },
+    "SHB": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.06996668253212768
+    },
+    "SSB": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.06994317117342153
+    },
+    "SSI": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.19183673469387752
+    },
+    "STB": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.07000000000000006
+    },
+    "TCB": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.3328358208955223
+    },
+    "TPB": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.2714877379124203
+    },
+    "VCB": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.310957634092732
+    },
+    "VHM": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.07222222222222219
+    },
+    "VIB": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.3106164587933402
+    },
+    "VIC": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.06999999999999995
+    },
+    "VJC": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.069869577899079
+    },
+    "VNM": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.06951854208474062
+    },
+    "VPB": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.32480794884769304
+    },
+    "VRE": {
+      "rows": 1214,
+      "last_date": "2026-11-18 00:00:00",
+      "duplicate_dates": 0,
+      "invalid_ohlcv": 0,
+      "missing_ohlcv": 0,
+      "largest_absolute_daily_return": 0.06999378753365071
+    }
+  },
+  "past_features_unchanged_by_future": true,
+  "artifacts": {
+    "lightgbm": {
+      "metadata": {
+        "status": "success",
+        "timestamp": "2026-11-14T14:25:10.655894",
+        "scope": "VN30",
+        "symbols_count": 30,
+        "symbols": [
+          "ACB",
+          "BCM",
+          "BID",
+          "BVH",
+          "CTG",
+          "FPT",
+          "GAS",
+          "GVR",
+          "HDB",
+          "HPG",
+          "MBB",
+          "MSN",
+          "MWG",
+          "PLX",
+          "POW",
+          "SAB",
+          "SHB",
+          "SSB",
+          "SSI",
+          "STB",
+          "TCB",
+          "TPB",
+          "VCB",
+          "VHM",
+          "VIB",
+          "VIC",
+          "VJC",
+          "VNM",
+          "VPB",
+          "VRE"
+        ],
+        "horizon": "T+3",
+        "horizon_days": 3,
+        "threshold": 0.02,
+        "val_buffer_days": 40,
+        "latest_market_date": "2026-11-13",
+        "train_samples": 25800,
+        "val_samples": 1200,
+        "total_samples": 27000,
+        "lightgbm_metrics": {
+          "accuracy": 0.4791666666666667,
+          "macro_f1": 0.4066055529653782,
+          "weighted_f1": 0.4950481330465905,
+          "precision_macro": 0.40787069004733795,
+          "recall_macro": 0.4139753818074132,
+          "confusion_matrix": [
+            [
+              117,
+              104,
+              81
+            ],
+            [
+              179,
+              405,
+              129
+            ],
+            [
+              40,
+              92,
+              53
+            ]
+          ]
+        },
+        "lstm_metrics": {
+          "accuracy": 0.415,
+          "macro_f1": 0.35596085540358363,
+          "weighted_f1": 0.4325544916057914,
+          "precision_macro": 0.3775191707381505,
+          "recall_macro": 0.3741961842395603,
+          "confusion_matrix": [
+            [
+              153,
+              93,
+              56
+            ],
+            [
+              313,
+              312,
+              88
+            ],
+            [
+              93,
+              59,
+              33
+            ]
+          ]
+        }
+      },
+      "scaler_features": 13,
+      "nonnumeric_feature_values": 0
+    },
+    "lstm": {
+      "metadata": {
+        "status": "success",
+        "timestamp": "2026-11-14T14:25:10.655894",
+        "scope": "VN30",
+        "symbols_count": 30,
+        "symbols": [
+          "ACB",
+          "BCM",
+          "BID",
+          "BVH",
+          "CTG",
+          "FPT",
+          "GAS",
+          "GVR",
+          "HDB",
+          "HPG",
+          "MBB",
+          "MSN",
+          "MWG",
+          "PLX",
+          "POW",
+          "SAB",
+          "SHB",
+          "SSB",
+          "SSI",
+          "STB",
+          "TCB",
+          "TPB",
+          "VCB",
+          "VHM",
+          "VIB",
+          "VIC",
+          "VJC",
+          "VNM",
+          "VPB",
+          "VRE"
+        ],
+        "horizon": "T+3",
+        "horizon_days": 3,
+        "threshold": 0.02,
+        "val_buffer_days": 40,
+        "latest_market_date": "2026-11-13",
+        "train_samples": 25800,
+        "val_samples": 1200,
+        "total_samples": 27000,
+        "lightgbm_metrics": {
+          "accuracy": 0.4791666666666667,
+          "macro_f1": 0.4066055529653782,
+          "weighted_f1": 0.4950481330465905,
+          "precision_macro": 0.40787069004733795,
+          "recall_macro": 0.4139753818074132,
+          "confusion_matrix": [
+            [
+              117,
+              104,
+              81
+            ],
+            [
+              179,
+              405,
+              129
+            ],
+            [
+              40,
+              92,
+              53
+            ]
+          ]
+        },
+        "lstm_metrics": {
+          "accuracy": 0.415,
+          "macro_f1": 0.35596085540358363,
+          "weighted_f1": 0.4325544916057914,
+          "precision_macro": 0.3775191707381505,
+          "recall_macro": 0.3741961842395603,
+          "confusion_matrix": [
+            [
+              153,
+              93,
+              56
+            ],
+            [
+              313,
+              312,
+              88
+            ],
+            [
+              93,
+              59,
+              33
+            ]
+          ]
+        }
+      },
+      "scaler_features": 13,
+      "nonnumeric_feature_values": 0
+    }
+  },
+  "limitations": [
+    "No verified corporate-action provenance found: largest returns are flags, not proof of corrupt data.",
+    "Production legacy artifact metadata may not prove exact train/validation provenance."
+  ]
+}

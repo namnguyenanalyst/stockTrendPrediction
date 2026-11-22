@@ -1,0 +1,60 @@
+{
+  "results": {
+    "lightgbm": {
+      "artifact_load_seconds": 1.2451794999999493,
+      "levels": [
+        {
+          "concurrency": 1,
+          "requests": 3,
+          "errors": 0,
+          "p50_seconds": 0.0007253339999806485,
+          "p95_seconds": 0.001069471500045438
+        },
+        {
+          "concurrency": 5,
+          "requests": 15,
+          "errors": 0,
+          "p50_seconds": 0.0017972499999814318,
+          "p95_seconds": 0.007178145600073548
+        },
+        {
+          "concurrency": 10,
+          "requests": 30,
+          "errors": 0,
+          "p50_seconds": 0.0023097499998812054,
+          "p95_seconds": 0.007725471049957376
+        }
+      ]
+    },
+    "lstm": {
+      "artifact_load_seconds": 0.006580458999906114,
+      "levels": [
+        {
+          "concurrency": 1,
+          "requests": 3,
+          "errors": 0,
+          "p50_seconds": 0.0013583329998709814,
+          "p95_seconds": 0.0024519833001249935
+        },
+        {
+          "concurrency": 5,
+          "requests": 15,
+          "errors": 0,
+          "p50_seconds": 0.0034867500000927976,
+          "p95_seconds": 0.004816996199906497
+        },
+        {
+          "concurrency": 10,
+          "requests": 30,
+          "errors": 0,
+          "p50_seconds": 0.005162229500001558,
+          "p95_seconds": 0.012480102750123479
+        }
+      ]
+    }
+  },
+  "limitations": [
+    "Offline inference with a fixed feature snapshot; excludes HTTP, DB and SSI.",
+    "Bounded 1/5/10 concurrency, not a capacity/SLA guarantee."
+  ]
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "path": "/api/predict/live",
+    "status": 401
+  },
+  {
+    "path": "/api/v1/predict/live",
+    "status": 401
+  },
+  {
+    "path": "/api/predict/signal?symbol=VIC&model_type=lightgbm",
+    "status": 200,
+    "date": "2026-11-20",
+    "model": "lightgbm",
+    "generation": "78b54b04ae9c3fee",
+    "serving": "healthy"
+  },
+  {
+    "path": "/api/predict/signal?symbol=HPG&model_type=lstm",
+    "status": 200,
+    "date": "2026-11-20",
+    "model": "lstm",
+    "generation": "71d398842a1f2650",
+    "serving": "healthy"
+  }
+]

@@ -1,0 +1,2 @@
+{"reject_before_raw_cache_write": "passed", "live_preserves_quality_reason": "passed", "vendor_requests_made": false, "production_artifacts_written": false}
+live_prediction_rejected symbol=TCB model=lightgbm reason=Dữ liệu giá của TCB có biến động lớn chưa được xác minh tại 2026-10-29. Chưa thể tạo dự báo; cần đối chiếu điều chỉnh cổ tức/chia tách.

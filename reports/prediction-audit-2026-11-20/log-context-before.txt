@@ -1,0 +1,24 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________ test_prediction_logs_link_symbol_model_date_and_generation __________
+
+caplog = <_pytest.logging.LogCaptureFixture object at 0x127a10220>
+
+    def test_prediction_logs_link_symbol_model_date_and_generation(caplog):
+        import logging
+        from app.services.prediction_service import predict_stock_signal
+        result = dict(symbol='VIC', date='2026-11-20', current_price=241.9,
+                      model_type='lightgbm', predicted_label=0, class_name='GIẢM',
+                      signal='BÁN (SELL)', probabilities={'GIẢM':.6,'ĐI NGANG':.3,'TĂNG':.1},
+                      training_info={'artifact_generation':'audit-generation','serving_status':'healthy'})
+        with caplog.at_level(logging.INFO), patch('vn_stock.modeling.predict_trend',return_value=result):
+            predict_stock_signal(' vic ', 'lightgbm')
+        records=[r for r in caplog.records if getattr(r,'event',None)=='prediction_completed']
+>       assert len(records)==1
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tests/test_prediction_audit.py:17: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_prediction_audit.py::test_prediction_logs_link_symbol_model_date_and_generation
+1 failed, 16 deselected in 0.29s

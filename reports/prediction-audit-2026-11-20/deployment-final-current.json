@@ -1,0 +1,76 @@
+{
+  "image": "sha256:29271c814668609d3ff44bb9f2ab6f1ad900559ec5570c68eb8a93fbd145ed16",
+  "health": {
+    "status": "healthy",
+    "service": "vn-stock-api",
+    "version": "0.1.0",
+    "environment": "development"
+  },
+  "data_as_of_date": "2026-11-20",
+  "data_quality": {
+    "historical_adjustment_status": "unverified",
+    "source_provenance": "local_dataset_not_independently_verified"
+  },
+  "generation": "78b54b04ae9c3fee",
+  "serving_status": "healthy",
+  "trajectory": [
+    {
+      "holiday_calendar_verified": true,
+      "day_offset": 1,
+      "day_name": "T+1",
+      "date": "2026-11-23",
+      "predicted_trend": "GI\u1ea2M",
+      "signal": "B\u00c1N (SELL)",
+      "confidence": 0.4165,
+      "probabilities": {
+        "GI\u1ea2M": 0.4165,
+        "\u0110I NGANG": 0.2728,
+        "T\u0102NG": 0.3107
+      },
+      "note": "Kh\u1edbp l\u1ec7nh m\u1edf v\u1ecb th\u1ebf t\u1ea1i gi\u00e1 Open phi\u00ean 23/11/2026 k\u00e8m tr\u01b0\u1ee3t gi\u00e1 0.05% n\u1ebfu c\u00f3 t\u00edn hi\u1ec7u MUA."
+    },
+    {
+      "holiday_calendar_verified": true,
+      "day_offset": 2,
+      "day_name": "T+2",
+      "date": "2026-11-24",
+      "predicted_trend": "GI\u1ea2M",
+      "signal": "N\u1eaeM GI\u1eee (HOLD)",
+      "confidence": 0.4165,
+      "probabilities": {
+        "GI\u1ea2M": 0.4165,
+        "\u0110I NGANG": 0.2728,
+        "T\u0102NG": 0.3107
+      },
+      "note": "C\u1ed5 phi\u1ebfu \u0111ang v\u1ec1 t\u00e0i kho\u1ea3n trong phi\u00ean 24/11/2026 (kh\u00f3a v\u1ecb th\u1ebf b\u00e1n theo quy ch\u1ebf VSDC)."
+    },
+    {
+      "holiday_calendar_verified": true,
+      "day_offset": 3,
+      "day_name": "T+3",
+      "date": "2026-11-25",
+      "predicted_trend": "GI\u1ea2M",
+      "signal": "B\u00c1N (SELL)",
+      "confidence": 0.4165,
+      "probabilities": {
+        "GI\u1ea2M": 0.4165,
+        "\u0110I NGANG": 0.2728,
+        "T\u0102NG": 0.3107
+      },
+      "note": "C\u1ed5 phi\u1ebfu kh\u1ea3 d\u1ee5ng phi\u00ean 25/11/2026. S\u1eb5n s\u00e0ng hi\u1ec7n th\u1ef1c h\u00f3a l\u1ee3i nhu\u1eadn ho\u1eb7c qu\u1ea3n tr\u1ecb r\u1ee7i ro."
+    }
+  ],
+  "openapi_prediction_paths": [
+    "/api/predict/batch",
+    "/api/predict/live",
+    "/api/predict/retrain",
+    "/api/predict/signal",
+    "/api/predict/status",
+    "/api/v1/predict/batch",
+    "/api/v1/predict/live",
+    "/api/v1/predict/retrain",
+    "/api/v1/predict/signal",
+    "/api/v1/predict/status"
+  ],
+  "production_artifacts_changed": []
+}

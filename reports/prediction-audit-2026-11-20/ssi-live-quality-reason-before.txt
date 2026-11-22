@@ -1,0 +1,57 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_________ test_live_refresh_preserves_quality_reason_before_inference __________
+
+    def test_live_refresh_preserves_quality_reason_before_inference():
+        from app.services.prediction_service import sync_live_and_predict
+        from app.core.errors import PublicServiceUnavailable
+        from vn_stock.prediction_data_quality import UnverifiedPriceHistoryError
+        with patch('vn_stock.data_ingestion.fetch_stock_data',
+                   side_effect=UnverifiedPriceHistoryError('TCB','2026-10-29')), \
+             patch('vn_stock.modeling.predict_trend') as predict:
+            with pytest.raises(PublicServiceUnavailable) as caught:
+>               sync_live_and_predict('TCB')
+
+apps/api/tests/test_prediction_audit.py:143: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+symbol = 'TCB', model_type = 'lightgbm'
+
+    def sync_live_and_predict(
+        symbol: str = "VIC",
+        model_type: str = "lightgbm",
+    ) -> PredictionResponse:
+        """
+        Thực hiện đồng bộ dữ liệu phiên giao dịch gần nhất từ SSI FastConnect và suy luận tín hiệu Live.
+        """
+        clean_sym = normalize_symbol(symbol)
+        model_clean = model_type.strip().lower()
+        if model_clean not in ["lightgbm", "lstm"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Mô hình '{model_type}' không hợp lệ. Chỉ hỗ trợ 'lightgbm' hoặc 'lstm'.",
+            )
+    
+        started = perf_counter()
+        try:
+            from vn_stock.data_ingestion import fetch_stock_data
+            from vn_stock.market_session import get_target_market_date
+            from vn_stock.modeling import predict_trend
+    
+            # Do not label a fallback cache prediction as a successful live sync.
+            target_date = get_target_market_date()
+            try:
+                synced = fetch_stock_data(clean_sym, require_fresh=True)
+            except Exception as sync_err:
+                logger.warning("Không thể kéo SSI trực tiếp cho %s: %s", clean_sym, sync_err)
+>               raise HTTPException(503, "Không thể đồng bộ dữ liệu live; hãy dùng dự báo từ cache.") from None
+E               fastapi.exceptions.HTTPException: 503: Không thể đồng bộ dữ liệu live; hãy dùng dự báo từ cache.
+
+apps/api/app/services/prediction_service.py:141: HTTPException
+----------------------------- Captured stderr call -----------------------------
+2026-11-22 11:20:40,137 - app.services.prediction_service - WARNING - Không thể kéo SSI trực tiếp cho TCB: Dữ liệu giá của TCB có biến động lớn chưa được xác minh tại 2026-10-29. Chưa thể tạo dự báo; cần đối chiếu điều chỉnh cổ tức/chia tách.
+------------------------------ Captured log call -------------------------------
+WARNING  app.services.prediction_service:prediction_service.py:140 Không thể kéo SSI trực tiếp cho TCB: Dữ liệu giá của TCB có biến động lớn chưa được xác minh tại 2026-10-29. Chưa thể tạo dự báo; cần đối chiếu điều chỉnh cổ tức/chia tách.
+=========================== short test summary info ============================
+FAILED apps/api/tests/test_prediction_audit.py::test_live_refresh_preserves_quality_reason_before_inference
+1 failed in 0.24s

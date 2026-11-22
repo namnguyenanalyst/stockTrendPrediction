@@ -1,0 +1,2833 @@
+diff --git a/DESIGN.md b/DESIGN.md
+index 0503afb..b34fd59 100644
+--- a/DESIGN.md
++++ b/DESIGN.md
+@@ -155,3 +155,7 @@ Bảng màu tuân thủ nghiêm ngặt nguyên tắc **Restrained Semantic Palet
+ - **KHÔNG dùng bóng đổ phát sáng lòe loẹt** (`shadow-emerald-500/20`, `shadow-rose-500/20`).
+ - **KHÔNG viết tắt thuật ngữ mà không có chú thích** (người dùng phổ thông không thể tự hiểu Sharpe, Sortino hay Purged Horizon nếu không có tooltip/phụ đề).
+ 
++
++### Chỉ báo trong cửa sổ chi tiết
++
++Cửa sổ chi tiết dùng ô tìm kiếm đa lựa chọn và nhãn có thể gỡ. Danh sách giới hạn ở SMA, EMA, Bollinger Bands, khối lượng, MA khối lượng, RSI, MACD và ADX được tính bởi module dùng chung với backtest. Lựa chọn lưu trên trình duyệt. Biểu đồ chi tiết dùng các pane trên cùng một trục thời gian để đồng bộ kéo/phóng to; trang tổng quan giữ component hiện có.
+diff --git a/apps/api/alembic/env.py b/apps/api/alembic/env.py
+index 0ec9aed..918886e 100644
+--- a/apps/api/alembic/env.py
++++ b/apps/api/alembic/env.py
+@@ -17,7 +17,7 @@ config = context.config
+ 
+ # Cấu hình logging
+ if config.config_file_name is not None:
+-    fileConfig(config.config_file_name)
++    fileConfig(config.config_file_name, disable_existing_loggers=False)
+ 
+ # Metadata của toàn bộ 5 models
+ target_metadata = Base.metadata
+diff --git a/apps/api/app/models/schemas.py b/apps/api/app/models/schemas.py
+index c4bcf42..3f62be8 100644
+--- a/apps/api/app/models/schemas.py
++++ b/apps/api/app/models/schemas.py
+@@ -152,6 +152,7 @@ class MarketBoardResponse(BaseModel):
+ # 3. AI PREDICTION SCHEMAS
+ # ============================================================================
+ class DayForecast(BaseModel):
++    holiday_calendar_verified: bool = False
+     day_offset: int = Field(..., description="Chỉ số ngày (1: T+1, 2: T+2, 3: T+3)")
+     day_name: str = Field(..., description="Tên phiên ('T+1', 'T+2', 'T+3')")
+     date: str = Field(default="", description="Ngày giao dịch dương lịch tương ứng")
+@@ -165,6 +166,7 @@ class DayForecast(BaseModel):
+ 
+ 
+ class PredictionResponse(BaseModel):
++    data_quality: dict[str, str] | None = None
+     symbol: str = Field(..., description="Mã cổ phiếu dự báo")
+     date: str = Field(..., description="Ngày của phiên giao dịch căn cứ")
+     data_as_of_date: str = Field(default="", description="Ngày chốt dữ liệu căn cứ")
+@@ -197,7 +199,15 @@ class LiveSyncRequest(BaseModel):
+     model_type: str = Field(default="lightgbm", description="Loại mô hình ('lightgbm' hoặc 'lstm')")
+ 
+ 
++class PredictionFailure(BaseModel):
++    symbol: str
++    status_code: int
++    detail: str
++
++
+ class BatchPredictionResponse(BaseModel):
++    requested_symbols: int = 0
++    errors: list[PredictionFailure] = Field(default_factory=list)
+     model_type: str = Field(..., description="Loại mô hình sử dụng")
+     total_symbols: int = Field(..., description="Tổng số mã đã phân tích")
+     predictions: list[PredictionResponse] = Field(..., description="Danh sách kết quả dự báo")
+diff --git a/apps/api/app/routers/prediction.py b/apps/api/app/routers/prediction.py
+index 8f71cec..fe5245d 100644
+--- a/apps/api/app/routers/prediction.py
++++ b/apps/api/app/routers/prediction.py
+@@ -89,6 +89,7 @@ def predict_batch_post(
+ 
+ @router.post(
+     "/live",
++    dependencies=[Depends(get_current_active_user)],
+     response_model=PredictionResponse,
+     summary="Đồng bộ dữ liệu phiên gần nhất và dự báo Live chu kỳ T+3 (POST)",
+     description="Kết nối dữ liệu mới nhất (Near-realtime) và xuất tín hiệu khuyến nghị cho chu kỳ T+3 cùng Quỹ đạo 3 phiên.",
+@@ -103,6 +104,7 @@ def predict_live_post(request: LiveSyncRequest) -> PredictionResponse:
+ 
+ @router.get(
+     "/live",
++    dependencies=[Depends(get_current_active_user)],
+     response_model=PredictionResponse,
+     summary="Đồng bộ dữ liệu phiên gần nhất và dự báo Live chu kỳ T+3 (GET)",
+     description="Kết nối dữ liệu mới nhất (Near-realtime) và xuất tín hiệu khuyến nghị cho chu kỳ T+3 cùng Quỹ đạo 3 phiên qua GET query.",
+diff --git a/apps/api/app/routers/stocks.py b/apps/api/app/routers/stocks.py
+index d7e9836..c49cdb7 100644
+--- a/apps/api/app/routers/stocks.py
++++ b/apps/api/app/routers/stocks.py
+@@ -119,3 +119,11 @@ def trigger_sync() -> dict:
+     from app.services.prediction_service import trigger_market_sync
+ 
+     return trigger_market_sync()
++
++
++@router.get("/chart-indicators", summary="Chỉ báo cho biểu đồ chi tiết")
++def get_chart_indicators(
++    symbol: str = Query("VIC"),
++    limit: int = Query(1500, ge=1, le=5000),
++) -> dict[str, Any]:
++    return stock_service.get_chart_indicators(symbol, limit)
+diff --git a/apps/api/app/services/prediction_service.py b/apps/api/app/services/prediction_service.py
+index 5889e49..84f1a9e 100644
+--- a/apps/api/app/services/prediction_service.py
++++ b/apps/api/app/services/prediction_service.py
+@@ -3,6 +3,7 @@
+ import logging
+ import os
+ import sys
++from time import perf_counter
+ 
+ os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+ from fastapi import HTTPException
+@@ -14,6 +15,18 @@ from app.models.schemas import BatchPredictionResponse, PredictionResponse
+ 
+ logger = logging.getLogger(__name__)
+ 
++
++def _log_prediction(response: PredictionResponse, started: float) -> None:
++    info = response.training_info or {}
++    context = dict(event='prediction_completed', symbol=response.symbol,
++                   model_type=response.model_type, data_as_of_date=response.data_as_of_date,
++                   artifact_generation=info.get('artifact_generation', 'unknown'),
++                   serving_status=info.get('serving_status', 'unknown'),
++                   elapsed_ms=round((perf_counter() - started) * 1000, 2))
++    logger.info('prediction_completed symbol=%s model=%s data_as_of=%s generation=%s status=%s elapsed_ms=%s',
++                context['symbol'], context['model_type'], context['data_as_of_date'],
++                context['artifact_generation'], context['serving_status'], context['elapsed_ms'], extra=context)
++
+ # Đảm bảo đường dẫn apps/ml nằm trong sys.path để có thể nạp vn_stock
+ if str(settings.ML_APP_DIR) not in sys.path:
+     sys.path.insert(0, str(settings.ML_APP_DIR))
+@@ -34,13 +47,14 @@ def predict_stock_signal(
+         PredictionResponse chứa nhãn, tên xu hướng, khuyến nghị Mua/Bán, xác suất 3 lớp và Quỹ đạo 3 phiên (T+1 -> T+3).
+     """
+     clean_sym = normalize_symbol(symbol)
+-    model_clean = model_type.lower()
++    model_clean = model_type.strip().lower()
+     if model_clean not in ["lightgbm", "lstm"]:
+         raise HTTPException(
+             status_code=400,
+             detail=f"Mô hình '{model_type}' không hợp lệ. Hệ thống chỉ hỗ trợ 'lightgbm' hoặc 'lstm'.",
+         )
+ 
++    started = perf_counter()
+     try:
+         from vn_stock.modeling import predict_trend
+ 
+@@ -53,7 +67,7 @@ def predict_stock_signal(
+         session_info = get_market_sync_status()
+         session_label = session_info.get("status_label", "")
+ 
+-        return PredictionResponse(
++        response = PredictionResponse(
+             symbol=res["symbol"],
+             date=res["date"],
+             data_as_of_date=res.get("data_as_of_date", res["date"]),
+@@ -71,7 +85,10 @@ def predict_stock_signal(
+             trajectory=res.get("trajectory", []),
+             summary_guidance=res.get("summary_guidance", ""),
+             training_info=res.get("training_info"),
++            data_quality=res.get("data_quality"),
+         )
++        _log_prediction(response, started)
++        return response
+     except FileNotFoundError as fnf_err:
+         logger.error("Không tìm thấy model artifact: %s", fnf_err)
+         raise HTTPException(
+@@ -81,7 +98,7 @@ def predict_stock_signal(
+     except HTTPException:
+         raise
+     except Exception:
+-        logger.exception("Lỗi suy luận dự báo cho %s", clean_sym)
++        logger.exception("Lỗi suy luận dự báo symbol=%s model=%s", clean_sym, model_clean)
+         raise HTTPException(
+             status_code=500,
+             detail="Lỗi khi thực hiện suy luận dự báo.",
+@@ -96,13 +113,14 @@ def sync_live_and_predict(
+     Thực hiện đồng bộ dữ liệu phiên giao dịch gần nhất từ SSI FastConnect và suy luận tín hiệu Live.
+     """
+     clean_sym = normalize_symbol(symbol)
+-    model_clean = model_type.lower()
++    model_clean = model_type.strip().lower()
+     if model_clean not in ["lightgbm", "lstm"]:
+         raise HTTPException(
+             status_code=400,
+             detail=f"Mô hình '{model_type}' không hợp lệ. Chỉ hỗ trợ 'lightgbm' hoặc 'lstm'.",
+         )
+ 
++    started = perf_counter()
+     try:
+         from vn_stock.data_ingestion import fetch_stock_data
+         from vn_stock.market_session import get_target_market_date
+@@ -111,7 +129,7 @@ def sync_live_and_predict(
+         # Do not label a fallback cache prediction as a successful live sync.
+         target_date = get_target_market_date()
+         try:
+-            synced = fetch_stock_data(clean_sym)
++            synced = fetch_stock_data(clean_sym, require_fresh=True)
+         except Exception as sync_err:
+             logger.warning("Không thể kéo SSI trực tiếp cho %s: %s", clean_sym, sync_err)
+             raise HTTPException(503, "Không thể đồng bộ dữ liệu live; hãy dùng dự báo từ cache.") from None
+@@ -131,7 +149,7 @@ def sync_live_and_predict(
+         session_info = get_market_sync_status()
+         session_label = session_info.get("status_label", "")
+ 
+-        return PredictionResponse(
++        response = PredictionResponse(
+             symbol=res["symbol"],
+             date=res["date"],
+             data_as_of_date=res.get("data_as_of_date", res["date"]),
+@@ -149,7 +167,10 @@ def sync_live_and_predict(
+             trajectory=res.get("trajectory", []),
+             summary_guidance=res.get("summary_guidance", ""),
+             training_info=res.get("training_info"),
++            data_quality=res.get("data_quality"),
+         )
++        _log_prediction(response, started)
++        return response
+     except HTTPException:
+         raise
+     except Exception:
+@@ -199,7 +220,7 @@ def predict_batch_signals(
+     scope: str = "VN30",
+ ) -> BatchPredictionResponse:
+     """Thực hiện dự báo đồng loạt cho danh mục cổ phiếu (mặc định toàn bộ 30 mã VN30 hoặc 5 mã CORE)."""
+-    if model_type.lower() not in ("lightgbm", "lstm"):
++    if model_type.strip().lower() not in ("lightgbm", "lstm"):
+         raise HTTPException(400, "Mô hình không hợp lệ.")
+     if scope.upper() not in ("CORE", "VN30"):
+         raise HTTPException(400, "Phạm vi không hợp lệ.")
+@@ -213,16 +234,21 @@ def predict_batch_signals(
+         target_symbols = getattr(settings, "VN30_SYMBOLS", settings.CORE_SYMBOLS)
+ 
+     results = []
++    errors = []
+     for sym in target_symbols:
+         try:
+             pred = predict_stock_signal(symbol=sym, model_type=model_type)
+             results.append(pred)
+         except Exception as e:  # noqa: BLE001
+             logger.warning("Không thể dự báo cho %s: %s", sym, e)
++            errors.append({"symbol": sym, "status_code": e.status_code if isinstance(e, HTTPException) else 500,
++                           "detail": "Không thể tạo dự báo cho mã này."})
+ 
+     return BatchPredictionResponse(
+         model_type=model_type.upper(),
+         total_symbols=len(results),
++        requested_symbols=len(target_symbols),
++        errors=errors,
+         predictions=results,
+     )
+ 
+diff --git a/apps/api/app/services/stock_service.py b/apps/api/app/services/stock_service.py
+index 1ee29d3..f01f0bf 100644
+--- a/apps/api/app/services/stock_service.py
++++ b/apps/api/app/services/stock_service.py
+@@ -246,18 +246,32 @@ def load_stock_dataframe(symbol: str, allow_remote_fetch: bool = True) -> pd.Dat
+             return df_out.sort_values("Date").reset_index(drop=True)
+ 
+     panel_path = settings.DATA_DIR / "interim" / "panel" / f"Symbol={clean_sym}"
+-    if panel_path.exists():
+-        df = pd.read_parquet(panel_path)
+-        if "Symbol" not in df.columns:
+-            df["Symbol"] = clean_sym
+-        return df.sort_values("Date").reset_index(drop=True)
+-
+     raw_path = settings.DATA_DIR / "raw" / f"{clean_sym}.parquet"
+-    if raw_path.exists():
+-        df = pd.read_parquet(raw_path)
+-        if "Symbol" not in df.columns:
+-            df["Symbol"] = clean_sym
+-        return df.sort_values("Date").reset_index(drop=True)
++    frames = []
++    for path in (panel_path, raw_path):
++        if path.exists():
++            frame = pd.read_parquet(path)
++            if not frame.empty:
++                frame["Date"] = pd.to_datetime(frame["Date"])
++                frames.append(frame)
++    if frames:
++        # SSI raw candles may be newer than the periodically rebuilt panel.
++        # Retain panel history, using raw candles for overlapping sessions.
++        df = pd.concat(frames, ignore_index=True)
++        df["Symbol"] = clean_sym
++        df = df.drop_duplicates(subset=["Date"], keep="last").sort_values("Date").reset_index(drop=True)
++        # Recompute the market feature after raw rows replace derived panel rows.
++        index_path = settings.DATA_DIR / "raw" / "VNINDEX.parquet"
++        if index_path.exists():
++            index = pd.read_parquet(index_path).sort_values("Date")
++            index["Date"] = pd.to_datetime(index["Date"])
++            close_col = "VNINDEX_Close" if "VNINDEX_Close" in index else "Close"
++            returns = pd.Series(index[close_col].pct_change().to_numpy(), index=index["Date"])
++            df["VNINDEX_Return_1d"] = df["Date"].map(returns)
++        # Legacy panel helper columns can be NaN on new raw sessions and must
++        # not participate in dropna after recomputing model features.
++        columns = ["Date", "Symbol", "Open", "High", "Low", "Close", "Volume", "VNINDEX_Return_1d"]
++        return df[[col for col in columns if col in df]]
+ 
+     # Hệ số tổng hợp nhanh cho các mã rổ VN30
+     stock_factors = {
+@@ -782,3 +796,38 @@ def get_market_board_data() -> MarketBoardResponse:
+         top_volume=top_volume,
+     )
+ 
++
++
++def get_chart_indicators(symbol: str, limit: int = 1500) -> dict[str, Any]:
++    """Compute on complete history before selecting the response window."""
++    import math
++    from vn_stock.chart_indicators import compute_chart_indicators
++
++    raw = load_stock_dataframe(symbol)
++    if raw.empty:
++        return {"symbol": symbol.upper(), "total_bars": 0, "indicators": []}
++    frame = compute_chart_indicators(raw)
++    columns = (
++        [f"SMA{p}" for p in (5, 10, 20, 50, 100, 200)]
++        + [f"EMA{p}" for p in (5, 10, 12, 20, 26, 50, 100, 200)]
++        + ["BB_Upper", "BB_Lower", "RSI", "MACD", "MACD_Signal", "ADX"]
++        + [f"Vol_SMA{p}" for p in (5, 10, 20)]
++    )
++    records = []
++    for index, row in frame.tail(limit).iterrows():
++        values = {}
++        for column in columns:
++            value = float(row[column])
++            # Chart warmup masks do not change the legacy backtest calculations.
++            if column.startswith("SMA"):
++                warmup = int(column[3:])
++            elif column.startswith("EMA"):
++                warmup = int(column[3:])
++            elif column.startswith("Vol_SMA"):
++                warmup = int(column[7:])
++            else:
++                warmup = {"RSI": 14, "ADX": 28, "BB_Upper": 20,
++                          "BB_Lower": 20, "MACD": 26, "MACD_Signal": 34}[column]
++            values[column] = value if math.isfinite(value) and index >= warmup - 1 else None
++        records.append({"date": pd.Timestamp(row["Date"]).strftime("%Y-%m-%d"), "values": values})
++    return {"symbol": symbol.upper(), "total_bars": len(frame), "indicators": records}
+diff --git a/apps/api/tests/test_api.py b/apps/api/tests/test_api.py
+index adfe1e9..b18a6ab 100644
+--- a/apps/api/tests/test_api.py
++++ b/apps/api/tests/test_api.py
+@@ -310,8 +310,11 @@ def test_stocks_trigger_sync():
+         assert response.status_code == 401
+ 
+ 
+-def test_predict_live_endpoints():
++def test_predict_live_endpoints(monkeypatch):
+     """Kiểm tra endpoint /api/predict/live (GET & POST) với trajectory 3 phiên."""
++    from app.core.deps import get_current_active_user
++    monkeypatch.setitem(app.dependency_overrides, get_current_active_user, lambda: object())
++    # The authorization matrix separately exercises real tokens and DB sessions.
+     # Test GET
+     res_get = client.get("/api/predict/live?symbol=VIC&model_type=lightgbm")
+     assert res_get.status_code == 200
+diff --git a/apps/api/tests/test_phase3_integrity.py b/apps/api/tests/test_phase3_integrity.py
+index 2fca210..d5ba3a9 100644
+--- a/apps/api/tests/test_phase3_integrity.py
++++ b/apps/api/tests/test_phase3_integrity.py
+@@ -290,13 +290,16 @@ async def test_refresh_consumption_is_atomic_across_database_sessions(tmp_path):
+ 
+ def test_refresh_session_migration_round_trip(tmp_path, monkeypatch):
+     import sqlite3
++    import logging
+     from alembic import command
+     from alembic.config import Config
+ 
+     path = tmp_path / "migration.db"
+     monkeypatch.setattr(settings, "ASYNC_DATABASE_URL", f"sqlite+aiosqlite:///{path}")
+     config = Config("alembic.ini")
++    prediction_logger = logging.getLogger("app.services.prediction_service")
+     command.upgrade(config, "003_refresh_sessions")
++    assert not prediction_logger.disabled
+     with sqlite3.connect(path) as db:
+         assert db.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "003_refresh_sessions"
+         assert db.execute("PRAGMA table_info(refresh_sessions)").fetchall()
+diff --git a/apps/ml/tests/test_artifact_bundles.py b/apps/ml/tests/test_artifact_bundles.py
+index 5ae2cfc..5e55502 100644
+--- a/apps/ml/tests/test_artifact_bundles.py
++++ b/apps/ml/tests/test_artifact_bundles.py
+@@ -37,12 +37,20 @@ def test_snapshot_reload_never_pairs_new_model_with_old_scaler(tmp_path, monkeyp
+                         lambda **kw: (pickle.loads(kw["model_path"].read_bytes()),
+                                       pickle.loads(kw["scaler_path"].read_bytes())))
+     publish(tmp_path, 1)
+-    assert load_prediction_snapshot("lightgbm", tmp_path) == (1, 1, {"version": 1, "horizon_days": 3})
++    first = load_prediction_snapshot("lightgbm", tmp_path)
++    assert first[:2] == (1, 1)
++    assert first[2]["serving_status"] == "healthy"
+     publish(tmp_path, 2)
+-    assert load_prediction_snapshot("lightgbm", tmp_path) == (2, 2, {"version": 2, "horizon_days": 3})
++    second = load_prediction_snapshot("lightgbm", tmp_path)
++    assert second[:2] == (2, 2)
++    assert second[2]["version"] == 2
+     files = resolve_bundle(tmp_path, 3)
+     files["production_scaler_t3.pkl"].write_bytes(b"corrupt")
+-    assert load_prediction_snapshot("lightgbm", tmp_path) == (2, 2, {"version": 2, "horizon_days": 3})
++    fallback = load_prediction_snapshot("lightgbm", tmp_path)
++    assert fallback[:2] == (2, 2)
++    assert fallback[2]["artifact_generation"] == second[2]["artifact_generation"]
++    assert fallback[2]["serving_status"] == "degraded_cached_generation"
++    assert second[2]["serving_status"] == "healthy"
+     clear_model_cache()
+     with pytest.raises(ValueError, match="hash"):
+         load_prediction_snapshot("lightgbm", tmp_path)
+@@ -56,3 +64,28 @@ def test_manifest_cannot_escape_generation_directory(tmp_path):
+     path.write_text(json.dumps(data))
+     with pytest.raises(ValueError, match="path"):
+         resolve_bundle(tmp_path, 3)
++
++
++def test_concurrent_requests_observe_complete_generations(tmp_path, monkeypatch):
++    from concurrent.futures import ThreadPoolExecutor
++    clear_model_cache()
++    monkeypatch.setattr('vn_stock.modeling.predict._load_raw_artifacts',
++                        lambda **kw: (pickle.loads(kw['model_path'].read_bytes()),
++                                      pickle.loads(kw['scaler_path'].read_bytes())))
++    publish(tmp_path, 1)
++    def read(_):
++        snapshots = [load_prediction_snapshot('lightgbm', tmp_path) for _ in range(15)]
++        for model, scaler, metadata in snapshots:
++            assert model == scaler == metadata['version']
++            assert metadata['artifact_generation']
++        return len(snapshots)
++    def update():
++        for version in range(2, 7):
++            publish(tmp_path, version)
++    with ThreadPoolExecutor(max_workers=6) as pool:
++        writer_future = pool.submit(update)
++        readers = list(pool.map(read, range(5)))
++        writer_future.result()
++    assert sum(readers) == 75
++    assert load_prediction_snapshot('lightgbm',tmp_path)[:2] == (6,6)
++    clear_model_cache()
+diff --git a/apps/ml/tests/test_market_session.py b/apps/ml/tests/test_market_session.py
+index a2acc82..b9e6b24 100644
+--- a/apps/ml/tests/test_market_session.py
++++ b/apps/ml/tests/test_market_session.py
+@@ -139,3 +139,13 @@ def test_get_current_vn_time_fallback():
+         res = get_current_vn_time()
+         assert res is not None
+ 
++
++
++def test_aware_utc_input_is_converted_to_vietnam_before_atc_boundary():
++    from datetime import timezone
++    assert get_target_market_date(datetime(2026,11,20,7,59,tzinfo=timezone.utc)) == '2026-11-19'
++    assert get_target_market_date(datetime(2026,11,20,8,0,tzinfo=timezone.utc)) == '2026-11-20'
++    info=get_target_market_session_info(datetime(2026,11,20,8,0,tzinfo=timezone.utc))
++    assert info['target_date']=='2026-11-20'
++    assert info['is_market_closed'] is True
++    assert info['current_time'].startswith('15:00:00')
+diff --git a/apps/ml/tests/test_preprocessing_integrity.py b/apps/ml/tests/test_preprocessing_integrity.py
+index 5c0f1cb..1bebedc 100644
+--- a/apps/ml/tests/test_preprocessing_integrity.py
++++ b/apps/ml/tests/test_preprocessing_integrity.py
+@@ -65,3 +65,14 @@ def test_validation_backtest_uses_persisted_scaler_not_refitted_statistics(monke
+                         lambda *a, **kw: (SimpleNamespace(predict=predict), scaler, {}))
+     result = backtest_symbol_oos("VIC", "lightgbm")
+     assert result.strategy_name == "AI_LIGHTGBM_VALIDATION"
++
++
++def test_purge_counts_each_symbols_sessions_when_dates_are_sparse():
++    from vn_stock.splitting_data import prepare_production_training_data
++    dates=pd.bdate_range('2026-03-02',periods=20)
++    dense=pd.DataFrame({'Date':dates,'Symbol':'VIC','Close':50.,'Label':1})
++    sparse=pd.DataFrame({'Date':dates[[0,3,6,9,12,15,18,19]],'Symbol':'HPG','Close':30.,'Label':1})
++    result=prepare_production_training_data(pd.concat([dense,sparse],ignore_index=True),val_buffer_days=4,
++                                            feature_cols=['Close'],seq_length=2,purge_horizon=3)
++    train=result['train'];tail=train[train.Symbol=='HPG'].sort_values('Date').tail(3)
++    assert tail.Label.tolist()==[-1,-1,-1]
+diff --git a/apps/ml/vn_stock/backtest.py b/apps/ml/vn_stock/backtest.py
+index df813f9..8a2b5fa 100644
+--- a/apps/ml/vn_stock/backtest.py
++++ b/apps/ml/vn_stock/backtest.py
+@@ -1118,73 +1118,10 @@ def backtest_all_symbols(
+ 
+ 
+ def prepare_backtest_df(df: pd.DataFrame) -> pd.DataFrame:
+-    """Tính toán các chỉ báo kỹ thuật cơ bản cho một mã phục vụ bộ lọc điều kiện chiến thuật."""
+-    df_clean = df.copy().sort_values("Date").reset_index(drop=True)
+-    if not pd.api.types.is_datetime64_any_dtype(df_clean["Date"]):
+-        df_clean["Date"] = pd.to_datetime(df_clean["Date"])
+-
+-    close = df_clean["Close"].astype(float)
+-    high = df_clean["High"].astype(float) if "High" in df_clean.columns else close
+-    low = df_clean["Low"].astype(float) if "Low" in df_clean.columns else close
+-    volume = (
+-        df_clean["Volume"].astype(float)
+-        if "Volume" in df_clean.columns
+-        else pd.Series(0.0, index=df_clean.index)
+-    )
++    """Prepare indicators using the shared implementation."""
++    from vn_stock.chart_indicators import compute_chart_indicators
+ 
+-    # MA Series đa chu kỳ (SMA 5, 10, 20, 50, 100, 200)
+-    for span in [5, 10, 20, 50, 100, 200]:
+-        df_clean[f"SMA{span}"] = close.rolling(span, min_periods=1).mean()
+-
+-    # EMA Series đa chu kỳ (EMA 5, 10, 12, 20, 26, 50, 100, 200)
+-    for span in [5, 10, 12, 20, 26, 50, 100, 200]:
+-        df_clean[f"EMA{span}"] = close.ewm(span=span, adjust=False).mean()
+-
+-    # MACD (12, 26, 9)
+-    df_clean["MACD"] = df_clean["EMA12"] - df_clean["EMA26"]
+-    df_clean["MACD_Signal"] = df_clean["MACD"].ewm(span=9, adjust=False).mean()
+-
+-    # RSI (14)
+-    delta = close.diff()
+-    gain = delta.where(delta > 0, 0.0).rolling(window=14, min_periods=1).mean()
+-    loss = (-delta.where(delta < 0, 0.0)).rolling(window=14, min_periods=1).mean()
+-    rs = gain / (loss + 1e-9)
+-    df_clean["RSI"] = 100.0 - (100.0 / (1.0 + rs))
+-
+-    # Bollinger Bands (20, 2)
+-    std20 = close.rolling(20, min_periods=1).std().fillna(0.0)
+-    df_clean["BB_Upper"] = df_clean["SMA20"] + 2.0 * std20
+-    df_clean["BB_Lower"] = df_clean["SMA20"] - 2.0 * std20
+-
+-    # Volume SMAs (5, 10, 20)
+-    for span in [5, 10, 20]:
+-        df_clean[f"Vol_SMA{span}"] = volume.rolling(span, min_periods=1).mean()
+-
+-    # GTGD trung bình (Tỷ VNĐ) theo chu kỳ 5, 10, 20 phiên
+-    val_series = (close * volume) / 1e6
+-    for span in [5, 10, 20]:
+-        df_clean[f"Avg_Trading_Val_{span}"] = val_series.rolling(span, min_periods=1).mean()
+-
+-    # ADX (14)
+-    tr1 = high - low
+-    tr2 = (high - close.shift(1)).abs()
+-    tr3 = (low - close.shift(1)).abs()
+-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+-    atr14 = tr.rolling(14, min_periods=1).mean()
+-    up_move = high - high.shift(1)
+-    down_move = low.shift(1) - low
+-    plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+-    minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
+-    plus_di = 100.0 * (pd.Series(plus_dm).rolling(14, min_periods=1).mean() / (atr14 + 1e-9))
+-    minus_di = 100.0 * (pd.Series(minus_dm).rolling(14, min_periods=1).mean() / (atr14 + 1e-9))
+-    dx = 100.0 * (plus_di - minus_di).abs() / (plus_di + minus_di + 1e-9)
+-    df_clean["ADX"] = dx.rolling(14, min_periods=1).mean().fillna(20.0)
+-
+-    # Relative Strength RS (0 - 99.93)
+-    rs_60 = close.pct_change(60).fillna(0.0)
+-    df_clean["RS"] = ((rs_60.expanding().rank(pct=True)) * 99.93).clip(0.0, 99.93)
+-
+-    return df_clean
++    return compute_chart_indicators(df)
+ 
+ 
+ def _get_foreign_buy_val(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
+diff --git a/apps/ml/vn_stock/data_ingestion.py b/apps/ml/vn_stock/data_ingestion.py
+index c2ee105..1b1571d 100644
+--- a/apps/ml/vn_stock/data_ingestion.py
++++ b/apps/ml/vn_stock/data_ingestion.py
+@@ -309,8 +309,12 @@ def fetch_stock_data(
+     save_to_raw: bool = True,
+     force_refresh: bool = False,
+     unit: str = "kVND",
++    require_fresh: bool = False,
+ ) -> pd.DataFrame:
+     """Tải dữ liệu OHLCV đơn mã (Single-flight lock, Double-Checked Cache và error fallback)."""
++    # A live refresh must re-read the complete adjusted history: covering the
++    # latest date does not establish that older corporate-action prices match.
++    force_refresh = force_refresh or require_fresh
+     symbol = symbol.upper()
+     effective_end = end_date or get_default_end_date()
+ 
+@@ -380,6 +384,8 @@ def fetch_stock_data(
+             if df.empty:
+                 raise ValueError(f"SSI không trả về dữ liệu cho mã {symbol}")
+         except Exception as exc:
++            if require_fresh:
++                raise RuntimeError("SSI refresh failed; cached data was not used.") from exc
+             local_df = load_local_data(symbol)
+             if local_df is not None and not local_df.empty:
+                 logger.warning(
+diff --git a/apps/ml/vn_stock/market_session.py b/apps/ml/vn_stock/market_session.py
+index 3ed6c8e..6ea91c9 100644
+--- a/apps/ml/vn_stock/market_session.py
++++ b/apps/ml/vn_stock/market_session.py
+@@ -33,6 +33,21 @@ VN_TIMEZONE = zoneinfo.ZoneInfo("Asia/Ho_Chi_Minh")
+ MARKET_CLOSE_TIME = dtime(15, 0, 0)
+ 
+ 
++# HOSE 2026 notice, including the 25/12/2025 New Year amendment.
++# https://www.hsx.vn/vi/tin-tuc/hose-thong-bao-lich-nghi-giao-dich-nam-2026/2437411
++# Only this published year is verified; other years retain weekday fallback.
++VERIFIED_CALENDAR_YEARS = frozenset({2026})
++MARKET_HOLIDAYS = frozenset({
++    "2026-01-01", "2026-01-02", "2026-02-16", "2026-02-17",
++    "2026-02-18", "2026-02-19", "2026-02-20", "2026-04-27",
++    "2026-04-30", "2026-05-01", "2026-08-31", "2026-09-01", "2026-09-02",
++})
++
++
++def is_trading_day(day: datetime) -> bool:
++    return day.weekday() < 5 and day.strftime("%Y-%m-%d") not in MARKET_HOLIDAYS
++
++
+ def get_current_vn_time() -> datetime:
+     """Lấy thời gian hiện tại theo múi giờ Việt Nam (UTC+7)."""
+     try:
+@@ -53,33 +68,13 @@ def get_target_market_date(as_of: datetime | None = None) -> str:
+         Chuỗi ngày định dạng 'YYYY-MM-DD'.
+     """
+     now = as_of or get_current_vn_time()
+-    weekday = now.weekday()  # 0: Thứ Hai, 4: Thứ Sáu, 5: Thứ Bảy, 6: Chủ Nhật
+-
+-    # 1. Nếu là Chủ Nhật (weekday 6) -> lùi 2 ngày về Thứ Sáu
+-    if weekday == 6:
+-        target_dt = now - timedelta(days=2)
+-        return target_dt.strftime("%Y-%m-%d")
+-
+-    # 2. Nếu là Thứ Bảy (weekday 5) -> lùi 1 ngày về Thứ Sáu
+-    if weekday == 5:
+-        target_dt = now - timedelta(days=1)
+-        return target_dt.strftime("%Y-%m-%d")
+-
+-    # 3. Nếu là ngày trong tuần (Thứ Hai -> Thứ Sáu)
+-    # Kiểm tra xem đã qua 15:00 (kết thúc phiên ATC) hay chưa
+-    current_time = now.time()
+-    if current_time >= MARKET_CLOSE_TIME:
+-        # Đã kết thúc phiên T hôm nay
+-        return now.strftime("%Y-%m-%d")
+-    else:
+-        # Chưa kết thúc phiên T -> lấy phiên giao dịch liền trước
+-        if weekday == 0:
+-            # Thứ Hai trước 15:00 -> lấy Thứ Sáu tuần trước (lùi 3 ngày)
+-            target_dt = now - timedelta(days=3)
+-        else:
+-            # Thứ Ba đến Thứ Sáu trước 15:00 -> lấy ngày hôm qua (lùi 1 ngày)
+-            target_dt = now - timedelta(days=1)
+-        return target_dt.strftime("%Y-%m-%d")
++    # Naive caller inputs follow the documented VN-local convention;
++    # aware inputs must be normalized before weekday and ATC comparisons.
++    now = now.replace(tzinfo=VN_TIMEZONE) if now.tzinfo is None else now.astimezone(VN_TIMEZONE)
++    target = now if now.time() >= MARKET_CLOSE_TIME else now - timedelta(days=1)
++    while not is_trading_day(target):
++        target -= timedelta(days=1)
++    return target.strftime("%Y-%m-%d")
+ 
+ 
+ def get_target_market_session_info(as_of: datetime | None = None) -> dict[str, Any]:
+@@ -87,21 +82,25 @@ def get_target_market_session_info(as_of: datetime | None = None) -> dict[str, A
+     Trả về thông tin chi tiết về phiên giao dịch hiện tại phục vụ hiển thị UI và suy luận.
+     """
+     now = as_of or get_current_vn_time()
++    # Naive caller inputs follow the documented VN-local convention;
++    # aware inputs must be normalized before weekday and ATC comparisons.
++    now = now.replace(tzinfo=VN_TIMEZONE) if now.tzinfo is None else now.astimezone(VN_TIMEZONE)
+     weekday = now.weekday()
+     target_date = get_target_market_date(now)
+ 
+     is_weekend = weekday in (5, 6)
+-    is_after_close = (now.time() >= MARKET_CLOSE_TIME) and not is_weekend
++    is_holiday = now.strftime("%Y-%m-%d") in MARKET_HOLIDAYS
++    is_after_close = (now.time() >= MARKET_CLOSE_TIME) and not is_weekend and not is_holiday
+ 
+     if is_after_close:
+         session_name = "Phiên T (Đã chốt)"
+         session_type = "T"
+         status_label = f"Đã chốt phiên T ({now.strftime('%d/%m/%Y')})"
+         prediction_horizon_desc = "Dự phóng 3 phiên tiếp theo (T+1 → T+3)"
+-    elif is_weekend:
+-        session_name = "Nghỉ cuối tuần"
++    elif is_weekend or is_holiday:
++        session_name = "Nghỉ lễ" if is_holiday else "Nghỉ cuối tuần"
+         session_type = "T-1"
+-        status_label = f"Thị trường nghỉ • Chốt phiên Thứ Sáu ({target_date})"
++        status_label = f"Thị trường nghỉ • Căn cứ phiên chốt ({target_date})"
+         prediction_horizon_desc = "Dự phóng 3 phiên tuần tới (T+1 → T+3)"
+     else:
+         session_name = "Đang trong phiên T"
+@@ -116,7 +115,9 @@ def get_target_market_session_info(as_of: datetime | None = None) -> dict[str, A
+         "session_type": session_type,
+         "session_name": session_name,
+         "status_label": status_label,
+-        "is_market_closed": is_after_close or is_weekend,
++        "is_market_closed": is_after_close or is_weekend or is_holiday,
++        "is_holiday": is_holiday,
++        "holiday_calendar_verified": now.year in VERIFIED_CALENDAR_YEARS,
+         "is_weekend": is_weekend,
+         "prediction_horizon_desc": prediction_horizon_desc,
+     }
+@@ -140,11 +141,12 @@ def get_future_trading_days(base_date: str, count: int = 3) -> list[dict[str, An
+ 
+     while len(trading_days) < count:
+         curr += timedelta(days=1)
+-        if curr.weekday() in (5, 6):
++        if not is_trading_day(curr):
+             continue  # Bỏ qua Thứ Bảy & Chủ Nhật
+ 
+         trading_days.append({
+             "day_offset": offset,
++            "holiday_calendar_verified": curr.year in VERIFIED_CALENDAR_YEARS,
+             "day_name": f"T+{offset}",
+             "date": curr.strftime("%Y-%m-%d"),
+             "formatted_date": curr.strftime("%d/%m/%Y"),
+diff --git a/apps/ml/vn_stock/modeling/predict.py b/apps/ml/vn_stock/modeling/predict.py
+index d1122dd..dbab2d6 100644
+--- a/apps/ml/vn_stock/modeling/predict.py
++++ b/apps/ml/vn_stock/modeling/predict.py
+@@ -184,13 +184,18 @@ def load_prediction_snapshot(
+                 hidden_size=info.get("hidden_size", hidden_size),
+                 num_layers=info.get("num_layers", num_layers),
+             )
++            import hashlib
++            generation = model_path.parent.name if pointer.exists() else hashlib.sha256(
++                b"".join(hashlib.sha256(p.read_bytes()).digest() for p in paths)
++            ).hexdigest()[:16]
++            info = {**info, "artifact_generation": generation, "serving_status": "healthy"}
+             _model_cache[cache_key] = (model, scaler, mtimes, info)
+             return model, scaler, info
+         except Exception:
+             if cached is None:
+                 raise
+             logger.exception("Artifact reload failed; retaining the complete cached generation.")
+-            return cached[0], cached[1], cached[3]
++            return cached[0], cached[1], {**cached[3], "serving_status": "degraded_cached_generation"}
+ 
+ 
+ def load_prediction_artifacts(
+@@ -483,6 +488,9 @@ def predict_trend(
+     else:
+         guidance = "Thị trường ĐI NGANG: Xu hướng tích lũy trong chu kỳ T+3. Khuyến nghị giữ tiền mặt và quan sát điểm bứt phá."
+ 
++    for step, day in zip(trajectory, future_days):
++        step["holiday_calendar_verified"] = day["holiday_calendar_verified"]
++
+     session_info = get_target_market_session_info()
+ 
+     return {
+@@ -498,6 +506,8 @@ def predict_trend(
+         "horizon": f"T+{horizon_days}",
+         "horizon_days": horizon_days,
+         "is_live_synced": is_live_synced,
++        "data_quality": {"historical_adjustment_status": "unverified",
++                         "source_provenance": "local_dataset_not_independently_verified"},
+         "trajectory": trajectory,
+         "summary_guidance": guidance,
+         "training_info": training_info,
+diff --git a/apps/ml/vn_stock/modeling/train.py b/apps/ml/vn_stock/modeling/train.py
+index 3627262..301cbe4 100644
+--- a/apps/ml/vn_stock/modeling/train.py
++++ b/apps/ml/vn_stock/modeling/train.py
+@@ -64,6 +64,27 @@ from vn_stock.splitting_data import (
+ logger = logging.getLogger(__name__)
+ 
+ 
++class ValidationEarlyStopping:
++    """Stop after consecutive validation epochs without a strict improvement."""
++
++    def __init__(self, patience: int = 10):
++        if patience < 1:
++            raise ValueError("Early stopping patience must be positive.")
++        self.patience = patience
++        self.best_loss = float("inf")
++        self.stale_epochs = 0
++
++    def observe(self, loss: float) -> bool:
++        if not np.isfinite(loss):
++            raise ValueError("Validation loss must be finite.")
++        if loss < self.best_loss:
++            self.best_loss = loss
++            self.stale_epochs = 0
++        else:
++            self.stale_epochs += 1
++        return self.stale_epochs >= self.patience
++
++
+ def _atomic_save_artifact(target_path: Path, write_fn: Any) -> None:
+     """Ghi artifact ra file tạm .tmp_{timestamp} rồi dùng os.replace nguyên tử để chống partial-read."""
+     target_path.parent.mkdir(parents=True, exist_ok=True)
+@@ -119,6 +140,7 @@ def train_production_model(
+     save_artifacts: bool = True,
+     models_dir: Path = MODELS_DIR,
+     raw_panel: pd.DataFrame | None = None,
++    lstm_patience: int = 10,
+ ) -> dict[str, Any]:
+     """
+     Huấn luyện mô hình thực chiến (Production Model) phục vụ dự báo trực tuyến:
+@@ -265,6 +287,8 @@ def train_production_model(
+     criterion = nn.CrossEntropyLoss(weight=class_weights)
+     optimizer = optim.Adam(lstm_model.parameters(), lr=DEFAULT_LSTM_LR, weight_decay=DEFAULT_LSTM_WEIGHT_DECAY)
+ 
++    early_stopping = ValidationEarlyStopping(lstm_patience)
++    epochs_completed = 0
+     best_vloss = float("inf")
+     best_epoch = 0
+     best_weights = copy.deepcopy(lstm_model.state_dict())
+@@ -292,6 +316,10 @@ def train_production_model(
+             best_vloss = avg_vloss
+             best_epoch = epoch + 1
+             best_weights = copy.deepcopy(lstm_model.state_dict())
++        epochs_completed = epoch + 1
++        if early_stopping.observe(avg_vloss):
++            logger.info("LSTM stopped at epoch %d; best epoch %d", epochs_completed, best_epoch)
++            break
+ 
+     lstm_model.load_state_dict(best_weights)
+     lstm_model.eval()
+@@ -341,7 +369,9 @@ def train_production_model(
+         "num_layers": DEFAULT_LSTM_NUM_LAYERS,
+         "optimizer": "Adam",
+         "seed": RANDOM_SEED,
+-        "epochs_completed": epochs,
++        "epochs_requested": epochs,
++        "epochs_completed": epochs_completed,
++        "lstm_early_stopping_patience": lstm_patience,
+         "best_lstm_epoch": best_epoch,
+         "best_lstm_validation_loss": best_vloss,
+         "lightgbm_best_iteration": int(lgb_model.best_iteration_),
+diff --git a/apps/ml/vn_stock/splitting_data.py b/apps/ml/vn_stock/splitting_data.py
+index 5fcdb3b..aaaea6d 100644
+--- a/apps/ml/vn_stock/splitting_data.py
++++ b/apps/ml/vn_stock/splitting_data.py
+@@ -299,8 +299,8 @@ def prepare_production_training_data(
+     train_dates = unique_dates[:t_end_idx]
+     val_dates = unique_dates[t_end_idx:]
+ 
+-    train_df = df[df[date_col].isin(train_dates)].copy()
+-    val_df = df[df[date_col].isin(val_dates)].copy()
++    train_df = df[df[date_col].isin(train_dates)].copy().reset_index(drop=True)
++    val_df = df[df[date_col].isin(val_dates)].copy().reset_index(drop=True)
+ 
+     # Cô lập ranh giới (Purged Boundary): Gán nhãn sentinel -1 cho purge_horizon phiên cuối của Train
+     purged_dates = np.array([])
+@@ -308,7 +308,11 @@ def prepare_production_training_data(
+         purge_start_idx = max(0, len(train_dates) - purge_horizon)
+         purged_dates = train_dates[purge_start_idx:]
+         if "Label" in train_df.columns and len(purged_dates) > 0:
+-            train_df.loc[train_df[date_col].isin(purged_dates), "Label"] = -1
++            # Labels use shift(-horizon) within each symbol. Global calendar
++            # dates alone under-purge a symbol with suspended/missing sessions.
++            trailing = train_df.sort_values([symbol_col, date_col]).groupby(symbol_col).tail(purge_horizon)
++            train_df.loc[trailing.index, "Label"] = -1
++            purged_dates = np.sort(trailing[date_col].unique())
+ 
+     train_s, val_s, _, scaler = scale_window(
+         train_df=train_df,
+diff --git a/apps/web/src/app/(auth)/layout.tsx b/apps/web/src/app/(auth)/layout.tsx
+index 65290e4..5b2eaaf 100644
+--- a/apps/web/src/app/(auth)/layout.tsx
++++ b/apps/web/src/app/(auth)/layout.tsx
+@@ -28,9 +28,6 @@ export default function AuthLayout({
+             <span className="text-lg font-black tracking-tight text-slate-100">
+               STOCK<span className="text-emerald-400">PULSE</span>
+             </span>
+-            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+-              Định Lượng &amp; Dự Báo Xu Hướng VN
+-            </span>
+           </div>
+         </Link>
+       </header>
+diff --git a/apps/web/src/components/DashboardApp.tsx b/apps/web/src/components/DashboardApp.tsx
+index 93ad0f3..917c3a2 100644
+--- a/apps/web/src/components/DashboardApp.tsx
++++ b/apps/web/src/components/DashboardApp.tsx
+@@ -44,6 +44,14 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
+   const [modelType, setModelType] = useState<"lightgbm" | "lstm">("lightgbm");
+   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
+ 
++  useEffect(() => {
++    const media = window.matchMedia("(max-width: 767px)");
++    const compact = () => { if (media.matches) setIsCollapsed(true); };
++    const timer = setTimeout(compact, 0);
++    media.addEventListener("change", compact);
++    return () => { clearTimeout(timer); media.removeEventListener("change", compact); };
++  }, []);
++
+   // Dữ liệu Thị trường
+   const [bars, setBars] = useState<StockBar[]>([]);
+   const [indicators, setIndicators] = useState<StockIndicatorBar[]>([]);
+@@ -51,6 +59,11 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
+   const [marketBoard, setMarketBoard] = useState<MarketBoardResponse | null>(null);
+   const [loadingMarket, setLoadingMarket] = useState<boolean>(true);
+ 
++  const [predictionError, setPredictionError] = useState<string | null>(null);
++  const [reloadPrediction, setReloadPrediction] = useState(0);
++  const [fetchedKey, setFetchedKey] = useState("");
++  const selectionKey = `${selectedSymbol}:${modelType}`;
++
+   // Dữ liệu Dự báo AI
+   const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
+   const [batchPrediction, setBatchPrediction] =
+@@ -135,6 +148,7 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
+       setIndicators([]);
+       setSummary(null);
+       setPrediction(null);
++      setPredictionError(null);
+       setLoadingMarket(true);
+       setLoadingPrediction(true);
+ 
+@@ -152,6 +166,8 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
+         if (indRes.status === "fulfilled") setIndicators(indRes.value.indicators);
+         if (sumRes.status === "fulfilled") setSummary(sumRes.value);
+         if (singlePred.status === "fulfilled") setPrediction(singlePred.value);
++        else setPredictionError("Không thể tải dự báo. Hãy thử lại sau.");
++        setFetchedKey(`${selectedSymbol}:${modelType}`);
+       } catch (err) {
+         console.warn("Lỗi tải dữ liệu chi tiết cổ phiếu:", err);
+       } finally {
+@@ -167,7 +183,7 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
+     return () => {
+       ignore = true;
+     };
+-  }, [selectedSymbol, modelType]);
++  }, [selectedSymbol, modelType, reloadPrediction]);
+ 
+   // Hook 3: Tải dữ liệu bảng giá thị trường ban đầu khi mount
+   useEffect(() => {
+@@ -252,14 +268,18 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
+ 
+           {activeTab === "prediction" && (
+             <AIPredictionTab
++              key={`${user?.id ?? "guest"}:${selectionKey}`}
++              userId={user?.id}
++              error={predictionError}
++              onRetry={() => setReloadPrediction(value => value + 1)}
+               selectedSymbol={selectedSymbol}
+               onSelectSymbol={setSelectedSymbol}
+-              bars={bars}
+-              prediction={prediction}
++              bars={fetchedKey === selectionKey ? bars : []}
++              prediction={fetchedKey === selectionKey ? prediction : null}
+               batchPrediction={batchPrediction}
+               modelType={modelType}
+               onChangeModelType={setModelType}
+-              loading={loadingPrediction}
++              loading={loadingPrediction || fetchedKey !== selectionKey}
+             />
+           )}
+ 
+diff --git a/apps/web/src/components/Sidebar.tsx b/apps/web/src/components/Sidebar.tsx
+index 9de4e59..e40f9c2 100644
+--- a/apps/web/src/components/Sidebar.tsx
++++ b/apps/web/src/components/Sidebar.tsx
+@@ -24,23 +24,20 @@ export interface SidebarProps {
+ const BASE_NAV_ITEMS = [
+   {
+     id: "market" as const,
+-    label: "Thị trường & Bảng giá",
++    label: "Thị trường & bảng điện",
+     shortLabel: "Bảng giá",
+-    description: "Bối cảnh thị trường & phân tích kỹ thuật",
+     icon: BarChart3,
+   },
+   {
+     id: "prediction" as const,
+-    label: "Tín hiệu dự báo xu hướng",
++    label: "Dự báo xu hướng",
+     shortLabel: "Dự báo",
+-    description: "Tín hiệu xu hướng từ mô hình",
+     icon: BrainCircuit,
+   },
+   {
+     id: "backtest" as const,
+     label: "Kiểm thử chiến lược",
+     shortLabel: "Kiểm thử",
+-    description: "Giả lập chiến lược & quản trị rủi ro",
+     icon: History,
+   },
+ ];
+@@ -98,9 +95,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
+                 <span className="text-base font-extrabold tracking-tight text-slate-100 whitespace-nowrap">
+                   STOCK<span className="text-emerald-400">PULSE</span>
+                 </span>
+-                <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap truncate">
+-                  AI Stock Prediction
+-                </span>
+               </div>
+             </div>
+ 
+@@ -138,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
+                 role="tab"
+                 aria-selected={isActive}
+                 onClick={() => setActiveTab(item.id)}
+-                title={isCollapsed ? `${item.label} — ${item.description}` : undefined}
++                title={isCollapsed ? item.label : undefined}
+                 className={`group relative flex items-center gap-3 rounded-xl px-3 py-3 text-left transition-all ${isActive
+                   ? "bg-emerald-500/10 text-emerald-400 font-semibold shadow-sm shadow-emerald-500/5 border border-emerald-500/30"
+                   : "text-slate-400 hover:bg-slate-900 hover:text-slate-200 border border-transparent"
+@@ -154,9 +148,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
+                     <span className="text-xs font-medium leading-tight truncate">
+                       {item.label}
+                     </span>
+-                    <span className="text-[10px] text-slate-500 truncate mt-0.5">
+-                      {item.description}
+-                    </span>
+                   </div>
+                 )}
+ 
+diff --git a/apps/web/src/components/TopHeader.tsx b/apps/web/src/components/TopHeader.tsx
+index e5576c0..42a28eb 100644
+--- a/apps/web/src/components/TopHeader.tsx
++++ b/apps/web/src/components/TopHeader.tsx
+@@ -22,23 +22,19 @@ interface TopHeaderProps {
+ 
+ const TAB_TITLES = {
+   market: {
+-    title: "Thị trường & Bảng giá Điện tử",
+-    subtitle: "Bối cảnh thị trường & phân tích kỹ thuật",
++    title: "Thị trường & bảng điện",
+     icon: BarChart3,
+   },
+   prediction: {
+-    title: "Tín hiệu dự báo xu hướng của mô hình",
+-    subtitle: "Dự báo xác suất 3 lớp (Tăng/Giữ/Giảm) qua LightGBM & PyTorch LSTM",
++    title: "Dự báo xu hướng của mô hình",
+     icon: BrainCircuit,
+   },
+   backtest: {
+     title: "Kiểm thử chiến lược",
+-    subtitle: "Phòng giả lập kiểm thử chiến lược đầu tư",
+     icon: History,
+   },
+   "admin-stats": {
+     title: "Phòng kiểm soát của Quản trị viên",
+-    subtitle: "Giám sát tài khoản người dùng & nhật ký hoạt động hệ thống",
+     icon: ShieldCheck,
+   },
+ };
+@@ -140,7 +136,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
+   ];
+ 
+   return (
+-    <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-950/85 backdrop-blur-md">
++    <header className="sticky top-0 z-30 flex min-h-[73px] items-center border-b border-slate-800 bg-slate-950/85 backdrop-blur-md">
+       <div className="mx-auto flex w-full flex-col gap-2.5 px-4 py-2.5 sm:px-6 md:flex-row md:items-center md:justify-between">
+         {/* Bên Trái: Tiêu đề Tab & Badge Phiên giao dịch */}
+         <div className="flex flex-wrap items-center gap-3">
+@@ -154,9 +150,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
+                   {currentTabInfo.title}
+                 </h1>
+               </div>
+-              <p className="hidden text-[11px] text-slate-400 md:block">
+-                {currentTabInfo.subtitle}
+-              </p>
+             </div>
+           </div>
+ 
+@@ -179,11 +172,14 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
+                     }}
+                     onFocus={() => setIsSearchOpen(true)}
+                     onKeyDown={handleSearchKeyDown}
++                    aria-label="Chọn mã cổ phiếu hoặc chỉ số"
+                     placeholder={`Chọn mã cổ phiếu (${selectedSymbol})...`}
+                     className="h-8 w-44 rounded-lg border border-slate-800 bg-slate-900/90 pl-8 pr-7 text-xs font-bold uppercase text-slate-100 placeholder:text-slate-500 placeholder:font-normal placeholder:normal-case focus:border-emerald-500/60 focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 sm:w-56 transition-all"
+                   />
+                   <button
+                     type="button"
++                    aria-label="Mở danh sách mã cổ phiếu"
++                    aria-expanded={isSearchOpen}
+                     onClick={() => setIsSearchOpen(!isSearchOpen)}
+                     className="absolute right-2 text-slate-400 hover:text-slate-200"
+                   >
+diff --git a/apps/web/src/components/charts/FireAntTrajectoryChart.tsx b/apps/web/src/components/charts/FireAntTrajectoryChart.tsx
+index 6516539..34f6ffb 100644
+--- a/apps/web/src/components/charts/FireAntTrajectoryChart.tsx
++++ b/apps/web/src/components/charts/FireAntTrajectoryChart.tsx
+@@ -1,5 +1,6 @@
+ "use client";
+-import { matchesPrediction, formatPriceVnd } from "@/lib/predictionPresentation";
++import { buildTrajectory, trajectoryProblem } from "@/lib/predictionTrajectory";
++import { formatPriceVnd } from "@/lib/predictionPresentation";
+ 
+ import React, { useEffect, useMemo, useRef, useState } from "react";
+ import {
+@@ -10,6 +11,7 @@ import {
+   HistogramSeries,
+   IChartApi,
+   ISeriesApi,
++  IPriceLine,
+   LineSeries,
+   LineStyle,
+   LineType,
+@@ -20,7 +22,7 @@ import {
+   Minus,
+   Sparkles,
+ } from "lucide-react";
+-import { DayForecast, PredictionResponse, StockBar } from "@/lib/types";
++import { PredictionResponse, StockBar } from "@/lib/types";
+ 
+ interface FireAntTrajectoryChartProps {
+   symbol: string;
+@@ -30,16 +32,6 @@ interface FireAntTrajectoryChartProps {
+   height?: number;
+ }
+ 
+-interface TrajectoryStepPoint {
+-  date: string;
+-  dayName: string;
+-  price: number;
+-  changePct: number;
+-  trend: "TĂNG" | "ĐI NGANG" | "GIẢM";
+-  confidence: number;
+-  signal: string;
+-}
+-
+ // Hàm tính SMA (Simple Moving Average)
+ function calculateSMA(
+   sorted: StockBar[],
+@@ -61,19 +53,6 @@ function calculateSMA(
+   return result;
+ }
+ 
+-// Hàm tìm ngày giao dịch kế tiếp (bỏ qua Thứ 7, Chủ Nhật)
+-function getNextTradingDay(dateStr: string): string {
+-  const d = new Date(dateStr);
+-  d.setDate(d.getDate() + 1);
+-  while (d.getDay() === 0 || d.getDay() === 6) {
+-    d.setDate(d.getDate() + 1);
+-  }
+-  const year = d.getFullYear();
+-  const month = String(d.getMonth() + 1).padStart(2, "0");
+-  const day = String(d.getDate()).padStart(2, "0");
+-  return `${year}-${month}-${day}`;
+-}
+-
+ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+   symbol,
+   bars,
+@@ -91,6 +70,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+   const sma50SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+   const trajectorySeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+   const trajectoryAreaSeriesRef = useRef<ISeriesApi<"Area"> | null>(null);
++  const targetPriceLineRef = useRef<IPriceLine | null>(null);
+ 
+   // Tùy chọn hiển thị
+   const [showTrajectory, setShowTrajectory] = useState<boolean>(true);
+@@ -123,74 +103,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+   const lastBar = sortedBars[sortedBars.length - 1];
+ 
+   // Tính toán các điểm giá cho Quỹ đạo dự phóng 3 phiên (T+1 -> T+3)
+-  const trajectoryPoints: TrajectoryStepPoint[] = useMemo(() => {
+-    if (!lastBar || !matchesPrediction(prediction, symbol, modelType) || !prediction?.trajectory?.length || (prediction.data_as_of_date || prediction.date) !== lastBar.date) return [];
+-
+-    const basePrice = lastBar.close;
+-    const baseDate = lastBar.date;
+-
+-    const trajectory = prediction?.trajectory || [];
+-    const points: TrajectoryStepPoint[] = [];
+-
+-    // Điểm gốc: Phiên T (Nến hiện tại)
+-    points.push({
+-      date: baseDate,
+-      dayName: "Phiên T (Hiện tại)",
+-      price: basePrice,
+-      changePct: 0,
+-      trend: "ĐI NGANG",
+-      confidence: 1.0,
+-      signal: "CHỐT PHIÊN",
+-    });
+-
+-    let currentPrice = basePrice;
+-    let prevDate = baseDate;
+-
+-    // Duyệt qua 3 bước T+1, T+2, T+3
+-    for (let i = 0; i < 3; i++) {
+-      const step: DayForecast | undefined = trajectory[i];
+-      const dayName = step?.day_name || `T+${i + 1}`;
+-      const trend = step?.predicted_trend || (prediction?.class_name as "TĂNG" | "ĐI NGANG" | "GIẢM") || "ĐI NGANG";
+-      const confidence = step?.confidence ?? 0;
+-      const signal = step?.signal || "NẮM GIỮ (HOLD)";
+-
+-      // Xác định ngày tương lai hợp lệ (phải lớn hơn ngày trước đó)
+-      let stepDate = step?.date;
+-      if (!stepDate || new Date(stepDate) <= new Date(prevDate)) {
+-        stepDate = getNextTradingDay(prevDate);
+-      }
+-      prevDate = stepDate;
+-
+-      // Tính toán tỷ lệ biến động giá dự kiến dựa trên xu hướng và xác suất
+-      let driftPct = 0;
+-      if (trend === "TĂNG") {
+-        driftPct = 0.012 + (confidence - 0.33) * 0.02; // Tăng +1.4% đến +2.2%
+-      } else if (trend === "GIẢM") {
+-        driftPct = -(0.012 + (confidence - 0.33) * 0.02); // Giảm -1.4% đến -2.2%
+-      } else {
+-        const pUp = step?.probabilities?.["TĂNG"] ?? 0.33;
+-        const pDown = step?.probabilities?.["GIẢM"] ?? 0.33;
+-        driftPct = (pUp - pDown) * 0.008; // Đi ngang giằng co quanh biên hẹp
+-      }
+-
+-      currentPrice = parseFloat((currentPrice * (1 + driftPct)).toFixed(2));
+-      const totalChangePct = parseFloat(
+-        (((currentPrice - basePrice) / basePrice) * 100).toFixed(2)
+-      );
+-
+-      points.push({
+-        date: stepDate,
+-        dayName,
+-        price: currentPrice,
+-        changePct: totalChangePct,
+-        trend,
+-        confidence,
+-        signal,
+-      });
+-    }
+-
+-    return points;
+-  }, [lastBar, prediction, symbol, modelType]);
++  const trajectoryError = trajectoryProblem(prediction, symbol, modelType, lastBar);
++  const trajectoryPoints = useMemo(() => buildTrajectory(prediction, symbol, modelType, lastBar), [lastBar, prediction, symbol, modelType]);
+ 
+   // Khởi tạo Lightweight Chart
+   useEffect(() => {
+@@ -248,7 +162,9 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+       priceFormat: {
+         type: "price",
+         precision: 2,
+-        minMove: 0.05,
++        // Shared price-scale formatter also formats the illustration. Preserve
++        // its two decimals instead of rounding a value such as 232.07 to 232.05.
++        minMove: 0.01,
+       },
+     });
+     candleSeriesRef.current = candleSeries;
+@@ -295,6 +211,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+       lineColor: "transparent",
+       lineWidth: 1,
+       priceLineVisible: false,
++      lastValueVisible: false,
+       crosshairMarkerVisible: false,
+     });
+     trajectoryAreaSeriesRef.current = trajectoryAreaSeries;
+@@ -306,11 +223,12 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+       lineType: LineType.Curved, // Đường cong uốn lượn mượt mà chuẩn FireAnt
+       pointMarkersVisible: true, // Hiển thị các chấm tròn tại các mốc T+1, T+2, T+3
+       pointMarkersRadius: 5,
+-      priceLineVisible: true, // Đường gióng ngang chỉ giá mục tiêu T+3 trên trục phải
++      priceLineVisible: false,
++      lastValueVisible: false,
+       priceLineWidth: 1,
+       priceLineStyle: LineStyle.Dashed,
+       priceLineColor: "#38bdf8",
+-      title: "Forecast",
++      title: "",
+     });
+     trajectorySeriesRef.current = trajectorySeries;
+ 
+@@ -352,6 +270,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+     return () => {
+       window.removeEventListener("resize", handleResize);
+       chart.remove();
++      targetPriceLineRef.current = null;
+       chartRef.current = null;
+     };
+   }, [height]);
+@@ -363,7 +282,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+     volumeSeriesRef.current?.applyOptions({ visible: showVolume });
+     trajectorySeriesRef.current?.applyOptions({ visible: showTrajectory });
+     trajectoryAreaSeriesRef.current?.applyOptions({ visible: showTrajectory });
+-  }, [showSMA20, showSMA50, showVolume, showTrajectory]);
++  }, [showSMA20, showSMA50, showVolume, showTrajectory, height]);
+ 
+   // Cập nhật dữ liệu Candlestick, Volume & Quỹ đạo AI vào Chart
+   useEffect(() => {
+@@ -433,7 +352,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+       trajectorySeriesRef.current.applyOptions({
+         color: trajectoryColor,
+         priceLineColor: trajectoryColor,
+-        title: "Forecast",
++        title: "",
+       });
+       trajectoryAreaSeriesRef.current.applyOptions({
+         topColor: areaColorTop,
+@@ -441,13 +360,29 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+ 
+       trajectorySeriesRef.current.setData(trajectoryData);
+       trajectoryAreaSeriesRef.current.setData(trajectoryData);
++      if (targetPriceLineRef.current) {
++        trajectorySeriesRef.current.removePriceLine(targetPriceLineRef.current);
++        targetPriceLineRef.current = null;
++      }
++      // The library's last-value label follows the last *visible* point when
++      // panning. A dedicated price line keeps the T+3 label tied to T+3.
++      if (targetPoint) {
++        targetPriceLineRef.current = trajectorySeriesRef.current.createPriceLine({
++          price: targetPoint.price,
++          color: trajectoryColor,
++          lineWidth: 1,
++          lineStyle: LineStyle.Dashed,
++          axisLabelVisible: true,
++          title: "Minh hoạ T+3",
++        });
++      }
+ 
+       // Tự động căn chỉnh vừa khung nhìn, tạo khoảng thoáng bên phải cho Quỹ đạo AI
+       chartRef.current?.timeScale().fitContent();
+     } catch (err) {
+       console.warn("Lỗi cập nhật biểu đồ nến Quỹ đạo FireAnt:", err);
+     }
+-  }, [displayBars, sortedBars, trajectoryPoints]);
++  }, [displayBars, sortedBars, trajectoryPoints, height]);
+ 
+   // Thông tin thanh nến hiển thị trên Header (khi hover hoặc mặc định là nến cuối cùng)
+   const currentInspectBar = hoveredBar || lastBar;
+@@ -466,6 +401,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+ 
+   return (
+     <div className="mt-4 flex flex-col rounded-xl border border-slate-800 bg-slate-950 shadow-2xl overflow-hidden">
++      {trajectoryError && <p role="status" className="border-b border-slate-800 px-4 py-3 text-sm text-amber-300">{trajectoryError}</p>}
+       {/* 1. Header Biểu đồ Phong cách FireAnt / TradingView */}
+       <div className="flex flex-wrap items-center justify-between border-b border-slate-800/80 bg-slate-900/80 px-4 py-2.5 gap-2 text-xs">
+         {/* Nhãn Ticker & Chỉ số Giá tức thời */}
+@@ -475,7 +411,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+               {symbol}
+             </span>
+             <span className="font-semibold text-slate-200">1D</span>
+-            <span className="text-[11px] text-slate-500">• HOSE</span>
++            <span className="text-[11px] text-slate-400">• HOSE</span>
+           </div>
+ 
+           {currentInspectBar && (
+@@ -503,7 +439,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+                 {inspectChange.toFixed(1)} ({isUp ? "+" : ""}
+                 {inspectChangePct.toFixed(2)}%)
+               </span>
+-              <span className="text-slate-500">
++              <span className="text-slate-400">
+                 Vol: {(currentInspectBar.volume / 1_000_000).toFixed(2)}M
+               </span>
+             </div>
+@@ -518,7 +454,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+               <button
+                 key={r}
+                 onClick={() => setTimeRange(r)}
+-                className={`rounded px-2 py-0.5 transition-all ${timeRange === r
++                aria-pressed={timeRange === r}
++                className={`min-h-9 min-w-9 rounded px-2 py-0.5 transition-all ${timeRange === r
+                     ? "bg-purple-600 text-white shadow-sm"
+                     : "text-slate-400 hover:text-slate-200"
+                   }`}
+@@ -536,7 +473,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+           {/* Toggle Quỹ đạo AI FireAnt */}
+           <button
+             onClick={() => setShowTrajectory(!showTrajectory)}
+-            className={`flex items-center gap-1.5 font-bold transition-opacity ${showTrajectory ? "text-sky-300" : "text-slate-500 line-through opacity-60"
++            aria-pressed={showTrajectory}
++            className={`flex min-h-9 items-center gap-1.5 font-bold transition-opacity ${showTrajectory ? "text-sky-300" : "text-slate-400 line-through"
+               }`}
+             title="Bật/Tắt đường đi xu hướng dự báo AI của các phiên tiếp theo"
+           >
+@@ -547,7 +485,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+           {/* Toggle SMA 20 */}
+           <button
+             onClick={() => setShowSMA20(!showSMA20)}
+-            className={`flex items-center gap-1.5 font-medium transition-opacity ${showSMA20 ? "text-blue-400" : "text-slate-500 line-through opacity-60"
++            aria-pressed={showSMA20}
++            className={`flex min-h-9 items-center gap-1.5 font-medium transition-opacity ${showSMA20 ? "text-blue-400" : "text-slate-400 line-through"
+               }`}
+           >
+             <span className="h-0.5 w-3 bg-blue-500"></span>
+@@ -557,7 +496,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+           {/* Toggle SMA 50 */}
+           <button
+             onClick={() => setShowSMA50(!showSMA50)}
+-            className={`flex items-center gap-1.5 font-medium transition-opacity ${showSMA50 ? "text-amber-400" : "text-slate-500 line-through opacity-60"
++            aria-pressed={showSMA50}
++            className={`flex min-h-9 items-center gap-1.5 font-medium transition-opacity ${showSMA50 ? "text-amber-400" : "text-slate-400 line-through"
+               }`}
+           >
+             <span className="h-0.5 w-3 bg-amber-400"></span>
+@@ -567,7 +507,8 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+           {/* Toggle Khối lượng Volume */}
+           <button
+             onClick={() => setShowVolume(!showVolume)}
+-            className={`flex items-center gap-1.5 font-medium transition-opacity ${showVolume ? "text-slate-300" : "text-slate-500 line-through opacity-60"
++            aria-pressed={showVolume}
++            className={`flex min-h-9 items-center gap-1.5 font-medium transition-opacity ${showVolume ? "text-slate-300" : "text-slate-400 line-through"
+               }`}
+           >
+             <span className="h-2 w-2 rounded-sm bg-slate-600"></span>
+@@ -603,7 +544,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
+             <span>Chi tiết Tọa độ Quỹ đạo Đường đi Xu hướng ({modelType.toUpperCase()})</span>
+           </div>
+           <span className="text-[11px] text-slate-400">
+-            Trục giá: nghìn VNĐ. Đường giá do quy tắc minh họa tạo ra, không phải dự báo giá hoặc khoảng tin cậy. Ngày tương lai chưa đối chiếu lịch nghỉ lễ.
++            Trục giá: nghìn VNĐ. Đường giá do quy tắc minh họa tạo ra, không phải dự báo giá hoặc khoảng tin cậy. {prediction?.trajectory?.length === 3 && prediction.trajectory.every(step => step.holiday_calendar_verified) ? "Ngày tương lai đã đối chiếu lịch nghỉ giao dịch 2026." : "Lịch nghỉ lễ của các ngày tương lai chưa được xác minh đầy đủ."}
+           </span>
+         </div>
+ 
+diff --git a/apps/web/src/components/market/FinancialDetailModal.tsx b/apps/web/src/components/market/FinancialDetailModal.tsx
+index a8e2820..3ca9e33 100644
+--- a/apps/web/src/components/market/FinancialDetailModal.tsx
++++ b/apps/web/src/components/market/FinancialDetailModal.tsx
+@@ -1,20 +1,30 @@
+ "use client";
+ 
+-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
++import React, {
++  useCallback,
++  useEffect,
++  useMemo,
++  useRef,
++  useState,
++} from "react";
++import { X, ArrowUpRight, ArrowDownRight, RefreshCw } from "lucide-react";
++import { DetailIndicatorChart } from "@/components/charts/DetailIndicatorChart";
++import { IndicatorSearch } from "./IndicatorSearch";
+ import {
+-  X,
+-  Activity,
+-  ArrowUpRight,
+-  ArrowDownRight,
+-  RefreshCw,
+-} from "lucide-react";
+-import { IChartApi } from "lightweight-charts";
+-import { CandlestickChart } from "@/components/charts/CandlestickChart";
+-import { RSIChart } from "@/components/charts/RSIChart";
+-import { getStockHistory, getStockIndicators, getStockSummary } from "@/lib/api";
+-import { StockBar, StockIndicatorBar, StockSummaryResponse } from "@/lib/types";
+-
+-export type DetailTimeframe = "1D" | "1W" | "1M" | "3M" | "6M" | "1Y" | "ALL" | "CUSTOM";
++  getStockHistory,
++  getChartIndicators,
++  getStockSummary,
++} from "@/lib/api";
++import {
++  DEFAULT_INDICATORS,
++  INDICATOR_STORAGE_KEY,
++  parseSelection,
++  type ChartIndicatorBar,
++} from "@/lib/chartIndicators";
++import { StockBar, StockSummaryResponse } from "@/lib/types";
++
++export type DetailTimeframe =
++  "1D" | "1W" | "1M" | "3M" | "6M" | "1Y" | "ALL" | "CUSTOM";
+ 
+ export interface TimeframePreset {
+   id: DetailTimeframe;
+@@ -24,13 +34,48 @@ export interface TimeframePreset {
+ }
+ 
+ export const TIMEFRAME_PRESETS: TimeframePreset[] = [
+-  { id: "1D", label: "1D", count: 1, description: "1 phiên giao dịch gần nhất" },
+-  { id: "1W", label: "1W", count: 5, description: "1 tuần giao dịch (5 phiên)" },
+-  { id: "1M", label: "1M", count: 22, description: "1 tháng giao dịch (22 phiên)" },
+-  { id: "3M", label: "3M", count: 66, description: "1 quý giao dịch (66 phiên)" },
+-  { id: "6M", label: "6M", count: 130, description: "6 tháng giao dịch (130 phiên)" },
+-  { id: "1Y", label: "1Y", count: 250, description: "1 năm giao dịch (250 phiên)" },
+-  { id: "ALL", label: "ALL", count: 9999, description: "Toàn bộ chuỗi nến lịch sử" },
++  {
++    id: "1D",
++    label: "1D",
++    count: 1,
++    description: "1 phiên giao dịch gần nhất",
++  },
++  {
++    id: "1W",
++    label: "1W",
++    count: 5,
++    description: "1 tuần giao dịch (5 phiên)",
++  },
++  {
++    id: "1M",
++    label: "1M",
++    count: 22,
++    description: "1 tháng giao dịch (22 phiên)",
++  },
++  {
++    id: "3M",
++    label: "3M",
++    count: 66,
++    description: "1 quý giao dịch (66 phiên)",
++  },
++  {
++    id: "6M",
++    label: "6M",
++    count: 130,
++    description: "6 tháng giao dịch (130 phiên)",
++  },
++  {
++    id: "1Y",
++    label: "1Y",
++    count: 250,
++    description: "1 năm giao dịch (250 phiên)",
++  },
++  {
++    id: "ALL",
++    label: "ALL",
++    count: 9999,
++    description: "Toàn bộ chuỗi nến lịch sử",
++  },
+ ];
+ 
+ export interface FinancialItemContext {
+@@ -99,55 +144,80 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
+   const [timeframe, setTimeframe] = useState<DetailTimeframe>("3M");
+   const [sessionCount, setSessionCount] = useState<number>(66);
+ 
+-  // Toggle cấu hình chỉ báo kỹ thuật (Phase 2 D)
+-  const [showSMA20, setShowSMA20] = useState<boolean>(true);
+-  const [showSMA50, setShowSMA50] = useState<boolean>(true);
+-  const [showSMA200, setShowSMA200] = useState<boolean>(false);
+-  const [showVolume, setShowVolume] = useState<boolean>(true);
+-  const [showRSI, setShowRSI] = useState<boolean>(true);
+-
++  const [selected, setSelected] = useState<string[]>(DEFAULT_INDICATORS);
++  const [selectionLoaded, setSelectionLoaded] = useState(false);
++  useEffect(() => {
++    const timer = setTimeout(() => {
++      try {
++        setSelected(
++          parseSelection(localStorage.getItem(INDICATOR_STORAGE_KEY)),
++        );
++      } catch {
++        setSelected([...DEFAULT_INDICATORS]);
++      }
++      setSelectionLoaded(true);
++    }, 0);
++    return () => clearTimeout(timer);
++  }, []);
++  useEffect(() => {
++    if (selectionLoaded)
++      try {
++        localStorage.setItem(INDICATOR_STORAGE_KEY, JSON.stringify(selected));
++      } catch {}
++  }, [selected, selectionLoaded]);
++  const removeIndicator = (id: string) =>
++    setSelected((ids) => ids.filter((x) => x !== id));
++  const [indicatorError, setIndicatorError] = useState(false);
+   // Dữ liệu API
+   const [bars, setBars] = useState<StockBar[]>([]);
+-  const [indicators, setIndicators] = useState<StockIndicatorBar[]>([]);
++  const [indicators, setIndicators] = useState<ChartIndicatorBar[]>([]);
+   const [summary, setSummary] = useState<StockSummaryResponse | null>(null);
+   const [loading, setLoading] = useState<boolean>(true);
+   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+ 
+-  const candleChartRef = useRef<IChartApi | null>(null);
+-  const rsiChartRef = useRef<IChartApi | null>(null);
+-
++  const requestId = useRef(0);
+   // Tải dữ liệu an toàn, nạp toàn bộ lịch sử (limit 1500) để phục vụ mọi khung thời gian
+   const fetchData = useCallback(async (sym: string) => {
++    const request = ++requestId.current;
+     setLoading(true);
++    setIndicatorError(false);
++    setIndicators([]);
++    setSummary(null);
+     setErrorMsg(null);
+ 
+     try {
+       const [histRes, indRes, sumRes] = await Promise.allSettled([
+         getStockHistory(sym, undefined, 1500),
+-        getStockIndicators(sym, 1500),
++        getChartIndicators(sym),
+         getStockSummary(sym),
+       ]);
+ 
++      if (request !== requestId.current) return;
+       if (histRes.status === "fulfilled") {
+         const fetchedBars = histRes.value.bars;
+         setBars(fetchedBars);
+       } else {
+-        throw new Error(histRes.reason?.message || "Không thể tải lịch sử giá.");
++        throw new Error(
++          histRes.reason?.message || "Không thể tải lịch sử giá.",
++        );
+       }
+ 
+       if (indRes.status === "fulfilled") {
+         setIndicators(indRes.value.indicators);
++      } else {
++        setIndicatorError(true);
+       }
+ 
+       if (sumRes.status === "fulfilled") {
+         setSummary(sumRes.value);
+       }
+     } catch (err: unknown) {
++      if (request !== requestId.current) return;
+       const message = err instanceof Error ? err.message : "Đã có lỗi xảy ra.";
+       console.warn("Lỗi tải chi tiết tài chính:", message);
+       setErrorMsg(message);
+     } finally {
+-      setLoading(false);
++      if (request === requestId.current) setLoading(false);
+     }
+   }, []);
+ 
+@@ -164,6 +234,9 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
+ 
+     return () => {
+       isCurrent = false;
++      // Invalidate async responses when closing or switching symbols.
++      // eslint-disable-next-line react-hooks/exhaustive-deps
++      requestId.current++;
+       clearTimeout(timer);
+     };
+   }, [isOpen, activeSymbol, fetchData]);
+@@ -187,7 +260,9 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
+     const clamped = Math.max(1, Math.min(newCount, maxBars));
+     setSessionCount(clamped);
+ 
+-    const matched = TIMEFRAME_PRESETS.find((p) => p.id !== "ALL" && p.count === clamped);
++    const matched = TIMEFRAME_PRESETS.find(
++      (p) => p.id !== "ALL" && p.count === clamped,
++    );
+     if (matched) {
+       setTimeframe(matched.id);
+     } else if (clamped >= maxBars) {
+@@ -204,76 +279,37 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
+     return bars.slice(-count);
+   }, [bars, sessionCount]);
+ 
+-  const filteredIndicators = useMemo(() => {
+-    if (!indicators || indicators.length === 0 || !filteredBars || filteredBars.length === 0) {
+-      return [];
+-    }
+-    const validDates = new Set(filteredBars.map((b) => b.date));
+-    return indicators.filter((ind) => validDates.has(ind.date));
+-  }, [indicators, filteredBars]);
+-
+-  // Đồng bộ VisibleLogicalRange giữa Nến và RSI
+-  const syncTimeScales = useCallback(() => {
+-    const c1 = candleChartRef.current;
+-    const c2 = rsiChartRef.current;
+-    if (!c1 || !c2) return;
+-
+-    let isSyncing = false;
+-
+-    c1.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+-      if (isSyncing || !range || !rsiChartRef.current) return;
+-      isSyncing = true;
+-      try {
+-        rsiChartRef.current.timeScale().setVisibleLogicalRange(range);
+-      } catch (err) {
+-        console.debug("Lỗi đồng bộ RSI:", err);
+-      }
+-      isSyncing = false;
+-    });
+-
+-    c2.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+-      if (isSyncing || !range || !candleChartRef.current) return;
+-      isSyncing = true;
+-      try {
+-        candleChartRef.current.timeScale().setVisibleLogicalRange(range);
+-      } catch (err) {
+-        console.debug("Lỗi đồng bộ Nến:", err);
+-      }
+-      isSyncing = false;
+-    });
+-  }, []);
+-
+-  const handleCandleReady = useCallback(
+-    (chart: IChartApi | null) => {
+-      candleChartRef.current = chart;
+-      syncTimeScales();
+-    },
+-    [syncTimeScales]
+-  );
+-
+-  const handleRsiReady = useCallback(
+-    (chart: IChartApi | null) => {
+-      rsiChartRef.current = chart;
+-      syncTimeScales();
+-    },
+-    [syncTimeScales]
+-  );
+-
+   if (!isOpen) return null;
+ 
+   // Tính toán thị giá hiển thị
+-  const latestClose = bars.length > 0 ? bars[bars.length - 1].close : summary?.latest_close ?? 0;
+-  const prevClose = bars.length > 1 ? bars[bars.length - 2].close : summary?.prev_close ?? latestClose;
++  const latestClose =
++    bars.length > 0
++      ? bars[bars.length - 1].close
++      : (summary?.latest_close ?? 0);
++  const prevClose =
++    bars.length > 1
++      ? bars[bars.length - 2].close
++      : (summary?.prev_close ?? latestClose);
+   const displayVal = item?.currentValue ?? propCurrentValue ?? latestClose;
+-  const displayChg = item?.change ?? propChange ?? (latestClose - prevClose);
++  const displayChg = item?.change ?? propChange ?? latestClose - prevClose;
+   const displayPct =
+-    item?.changePct ?? propChangePct ?? (prevClose > 0 ? (displayChg / prevClose) * 100 : 0);
++    item?.changePct ??
++    propChangePct ??
++    (prevClose > 0 ? (displayChg / prevClose) * 100 : 0);
+   const isUp = displayChg >= 0;
+ 
+   const latestBar = bars.length > 0 ? bars[bars.length - 1] : null;
+ 
+   return (
+-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-4 backdrop-blur-md animate-in fade-in duration-200">
++    <div
++      onKeyDown={(e) => {
++        if (e.key === "Escape") {
++          e.stopPropagation();
++          onClose();
++        }
++      }}
++      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-2 sm:p-4 backdrop-blur-md animate-in fade-in duration-200"
++    >
+       <div className="relative flex max-h-[95vh] w-full max-w-5xl flex-col rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl overflow-hidden">
+         {/* ========================================================================= */}
+         {/* 1. HEADER MODAL: THÔNG TIN CỐT LÕI (PHASE 2 A)                            */}
+@@ -328,7 +364,9 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
+               className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors"
+               title="Làm mới dữ liệu"
+             >
+-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin text-emerald-400" : ""}`} />
++              <RefreshCw
++                className={`h-4 w-4 ${loading ? "animate-spin text-emerald-400" : ""}`}
++              />
+             </button>
+             <button
+               onClick={onClose}
+@@ -351,18 +389,36 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
+                 <div className="flex items-center gap-2 text-[11px]">
+                   <span className="text-slate-400 font-semibold">Độ rộng:</span>
+                   <span className="text-emerald-400 font-bold">
+-                    ▲ {item.advancing} {item.ceiling ? `(${item.ceiling} Trần)` : ""}
++                    ▲ {item.advancing}{" "}
++                    {item.ceiling ? `(${item.ceiling} Trần)` : ""}
++                  </span>
++                  <span className="text-amber-400 font-bold">
++                    ■ {item.unchanged ?? 0}
+                   </span>
+-                  <span className="text-amber-400 font-bold">■ {item.unchanged ?? 0}</span>
+                   <span className="text-rose-400 font-bold">
+-                    ▼ {item.declining ?? 0} {item.floor ? `(${item.floor} Sàn)` : ""}
++                    ▼ {item.declining ?? 0}{" "}
++                    {item.floor ? `(${item.floor} Sàn)` : ""}
+                   </span>
+                 </div>
+               )}
+               {(item?.volumeStr || item?.valueStr) && (
+                 <div className="flex items-center gap-2 border-l border-slate-800 pl-3 text-[11px] text-slate-400">
+-                  {item.volumeStr && <span>KL: <strong className="text-slate-200">{item.volumeStr}</strong></span>}
+-                  {item.valueStr && <span>GT: <strong className="text-slate-200">{item.valueStr}</strong></span>}
++                  {item.volumeStr && (
++                    <span>
++                      KL:{" "}
++                      <strong className="text-slate-200">
++                        {item.volumeStr}
++                      </strong>
++                    </span>
++                  )}
++                  {item.valueStr && (
++                    <span>
++                      GT:{" "}
++                      <strong className="text-slate-200">
++                        {item.valueStr}
++                      </strong>
++                    </span>
++                  )}
+                 </div>
+               )}
+             </div>
+@@ -375,19 +431,49 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
+                 </span>
+               )}
+               {item?.reference !== undefined && (
+-                <span>TC: <strong className="text-amber-400">{item.reference.toFixed(2)}</strong></span>
++                <span>
++                  TC:{" "}
++                  <strong className="text-amber-400">
++                    {item.reference.toFixed(2)}
++                  </strong>
++                </span>
+               )}
+               {item?.stockCeiling !== undefined && (
+-                <span>Trần: <strong className="text-purple-400">{item.stockCeiling.toFixed(2)}</strong></span>
++                <span>
++                  Trần:{" "}
++                  <strong className="text-purple-400">
++                    {item.stockCeiling.toFixed(2)}
++                  </strong>
++                </span>
+               )}
+               {item?.stockFloor !== undefined && (
+-                <span>Sàn: <strong className="text-cyan-400">{item.stockFloor.toFixed(2)}</strong></span>
++                <span>
++                  Sàn:{" "}
++                  <strong className="text-cyan-400">
++                    {item.stockFloor.toFixed(2)}
++                  </strong>
++                </span>
+               )}
+               {latestBar && (
+                 <>
+-                  <span>Cao: <strong className="text-slate-200">{latestBar.high.toFixed(2)}</strong></span>
+-                  <span>Thấp: <strong className="text-slate-200">{latestBar.low.toFixed(2)}</strong></span>
+-                  <span>KL: <strong className="text-slate-200">{latestBar.volume.toLocaleString("vi-VN")}</strong></span>
++                  <span>
++                    Cao:{" "}
++                    <strong className="text-slate-200">
++                      {latestBar.high.toFixed(2)}
++                    </strong>
++                  </span>
++                  <span>
++                    Thấp:{" "}
++                    <strong className="text-slate-200">
++                      {latestBar.low.toFixed(2)}
++                    </strong>
++                  </span>
++                  <span>
++                    KL:{" "}
++                    <strong className="text-slate-200">
++                      {latestBar.volume.toLocaleString("vi-VN")}
++                    </strong>
++                  </span>
+                 </>
+               )}
+             </div>
+@@ -396,10 +482,21 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
+           {/* OHLC Status bar hover của phiên gần nhất */}
+           {latestBar && (
+             <div className="hidden md:flex items-center gap-2 text-[11px] text-slate-400">
+-              <span>O: <strong className="text-slate-200">{latestBar.open}</strong></span>
+-              <span>H: <strong className="text-slate-200">{latestBar.high}</strong></span>
+-              <span>L: <strong className="text-slate-200">{latestBar.low}</strong></span>
+-              <span>C: <strong className={isUp ? "text-emerald-400" : "text-rose-400"}>{latestBar.close}</strong></span>
++              <span>
++                O: <strong className="text-slate-200">{latestBar.open}</strong>
++              </span>
++              <span>
++                H: <strong className="text-slate-200">{latestBar.high}</strong>
++              </span>
++              <span>
++                L: <strong className="text-slate-200">{latestBar.low}</strong>
++              </span>
++              <span>
++                C:{" "}
++                <strong className={isUp ? "text-emerald-400" : "text-rose-400"}>
++                  {latestBar.close}
++                </strong>
++              </span>
+             </div>
+           )}
+         </div>
+@@ -429,7 +526,9 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
+ 
+             {/* Tinh chỉnh số phiên (Session Fine-Tuning) */}
+             <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/80 px-2 py-0.5 text-xs text-slate-400">
+-              <span className="text-[11px] text-slate-500 hidden sm:inline">Số phiên:</span>
++              <span className="text-[11px] text-slate-500 hidden sm:inline">
++                Số phiên:
++              </span>
+               <button
+                 type="button"
+                 onClick={() => handleCustomSessionChange(sessionCount - 10)}
+@@ -443,7 +542,9 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
+                 min={1}
+                 max={bars.length > 0 ? bars.length : 2000}
+                 value={sessionCount}
+-                onChange={(e) => handleCustomSessionChange(parseInt(e.target.value) || 1)}
++                onChange={(e) =>
++                  handleCustomSessionChange(parseInt(e.target.value) || 1)
++                }
+                 className="w-14 rounded bg-slate-950 px-1 py-0.5 text-center text-xs font-bold text-emerald-400 border border-slate-700/60 focus:border-emerald-500 focus:outline-none"
+                 title="Nhập số phiên nạp mong muốn"
+               />
+@@ -458,78 +559,7 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
+             </div>
+           </div>
+ 
+-          {/* Bộ nút Bật / Tắt Chỉ báo Kỹ thuật (Toggles) */}
+-          <div className="flex flex-wrap items-center gap-1.5">
+-            <span className="text-[11px] font-semibold text-slate-500 mr-1 flex items-center gap-1">
+-              <Activity className="h-3 w-3" />
+-              <span>Chỉ báo:</span>
+-            </span>
+-
+-            {/* Toggle SMA 20 */}
+-            <button
+-              onClick={() => setShowSMA20(!showSMA20)}
+-              className={`rounded px-2 py-0.5 text-[11px] font-bold transition-all border ${
+-                showSMA20
+-                  ? "border-amber-500/60 bg-amber-500/15 text-amber-300"
+-                  : "border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300"
+-              }`}
+-              title="Bật/Tắt đường trung bình động 20 phiên"
+-            >
+-              MA 20
+-            </button>
+-
+-            {/* Toggle SMA 50 */}
+-            <button
+-              onClick={() => setShowSMA50(!showSMA50)}
+-              className={`rounded px-2 py-0.5 text-[11px] font-bold transition-all border ${
+-                showSMA50
+-                  ? "border-purple-500/60 bg-purple-500/15 text-purple-300"
+-                  : "border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300"
+-              }`}
+-              title="Bật/Tắt đường trung bình động 50 phiên"
+-            >
+-              MA 50
+-            </button>
+-
+-            {/* Toggle SMA 200 */}
+-            <button
+-              onClick={() => setShowSMA200(!showSMA200)}
+-              className={`rounded px-2 py-0.5 text-[11px] font-bold transition-all border ${
+-                showSMA200
+-                  ? "border-sky-500/60 bg-sky-500/15 text-sky-300"
+-                  : "border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300"
+-              }`}
+-              title="Bật/Tắt đường trung bình động 200 phiên"
+-            >
+-              MA 200
+-            </button>
+-
+-            {/* Toggle Khối lượng */}
+-            <button
+-              onClick={() => setShowVolume(!showVolume)}
+-              className={`rounded px-2 py-0.5 text-[11px] font-bold transition-all border ${
+-                showVolume
+-                  ? "border-slate-600 bg-slate-800 text-slate-200"
+-                  : "border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300"
+-              }`}
+-              title="Bật/Tắt cột khối lượng giao dịch"
+-            >
+-              Volume
+-            </button>
+-
+-            {/* Toggle RSI (14) */}
+-            <button
+-              onClick={() => setShowRSI(!showRSI)}
+-              className={`rounded px-2 py-0.5 text-[11px] font-bold transition-all border ${
+-                showRSI
+-                  ? "border-indigo-500/60 bg-indigo-500/15 text-indigo-300"
+-                  : "border-slate-800 bg-slate-900/60 text-slate-500 hover:text-slate-300"
+-              }`}
+-              title="Bật/Tắt chỉ số sức mạnh tương đối RSI"
+-            >
+-              RSI (14)
+-            </button>
+-          </div>
++          <IndicatorSearch selected={selected} onChange={setSelected} />
+         </div>
+ 
+         {/* ========================================================================= */}
+@@ -559,26 +589,26 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
+             </div>
+           ) : (
+             <>
+-              {/* Biểu đồ nến chính kèm các đường MA và Volume */}
+-              <CandlestickChart
++              {indicatorError && (
++                <div
++                  role="status"
++                  className="flex items-center justify-between gap-2 text-sm text-amber-300"
++                >
++                  Không thể tải chỉ báo. Biểu đồ giá vẫn khả dụng.
++                  <button
++                    onClick={() => fetchData(activeSymbol)}
++                    className="min-h-9 underline"
++                  >
++                    Thử lại
++                  </button>
++                </div>
++              )}
++              <DetailIndicatorChart
+                 bars={filteredBars}
+-                allBars={bars}
+-                height={showRSI ? 340 : 450}
+-                onChartReady={handleCandleReady}
+-                showSMA20={showSMA20}
+-                showSMA50={showSMA50}
+-                showSMA200={showSMA200}
+-                showVolume={showVolume}
++                indicators={indicators}
++                selected={selected}
++                onRemove={removeIndicator}
+               />
+-
+-              {/* Panel phụ RSI (chỉ render nếu bật showRSI) */}
+-              {showRSI && (
+-                <RSIChart
+-                  indicators={filteredIndicators}
+-                  height={130}
+-                  onChartReady={handleRsiReady}
+-                />
+-              )}
+             </>
+           )}
+         </div>
+@@ -597,21 +627,36 @@ export const FinancialDetailModal: React.FC<FinancialDetailModalProps> = ({
+               </strong>{" "}
+               phiên{" "}
+               <span className="text-slate-500">
+-                ({timeframe === "CUSTOM" ? "Tùy chỉnh" : timeframe === "ALL" ? "Toàn bộ" : timeframe})
++                (
++                {timeframe === "CUSTOM"
++                  ? "Tùy chỉnh"
++                  : timeframe === "ALL"
++                    ? "Toàn bộ"
++                    : timeframe}
++                )
+               </span>
+             </span>
+             {filteredBars.length > 0 && (
+               <>
+                 <span className="h-3 w-[1px] bg-slate-800 hidden md:inline" />
+                 <span className="hidden md:inline text-slate-500">
+-                  Khoảng ngày: <span className="text-slate-300 font-medium">{filteredBars[0].date}</span> → <span className="text-slate-300 font-medium">{filteredBars[filteredBars.length - 1].date}</span>
++                  Khoảng ngày:{" "}
++                  <span className="text-slate-300 font-medium">
++                    {filteredBars[0].date}
++                  </span>{" "}
++                  →{" "}
++                  <span className="text-slate-300 font-medium">
++                    {filteredBars[filteredBars.length - 1].date}
++                  </span>
+                 </span>
+               </>
+             )}
+           </div>
+ 
+           <div className="flex items-center gap-2">
+-            <span className="font-semibold text-emerald-400 text-[11px]">Dữ liệu SSI FastConnect</span>
++            <span className="font-semibold text-emerald-400 text-[11px]">
++              Dữ liệu SSI FastConnect
++            </span>
+           </div>
+         </div>
+       </div>
+diff --git a/apps/web/src/components/tabs/AIPredictionTab.tsx b/apps/web/src/components/tabs/AIPredictionTab.tsx
+index 8f9a5f8..f5cd521 100644
+--- a/apps/web/src/components/tabs/AIPredictionTab.tsx
++++ b/apps/web/src/components/tabs/AIPredictionTab.tsx
+@@ -1,4 +1,5 @@
+ "use client";
++import { predictionHistoryKey, parsePredictionHistory } from "@/lib/predictionHistory";
+ import { matchesPrediction } from "@/lib/predictionPresentation";
+ 
+ import React, { useEffect, useRef, useState } from "react";
+@@ -19,7 +20,7 @@ import {
+   TrendingUp,
+   X,
+ } from "lucide-react";
+-import { getPredictStatus, getStockHistory } from "@/lib/api";
++import { getPredictStatus } from "@/lib/api";
+ import {
+   BatchPredictionResponse,
+   PredictionResponse,
+@@ -75,6 +76,9 @@ interface AIPredictionTabProps {
+   modelType: "lightgbm" | "lstm";
+   onChangeModelType: (model: "lightgbm" | "lstm") => void;
+   loading: boolean;
++  userId?: string;
++  error?: string | null;
++  onRetry?: () => void;
+ }
+ 
+ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+@@ -85,11 +89,13 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+   modelType,
+   onChangeModelType,
+   loading,
++  userId,
++  error,
++  onRetry,
+ }) => {
+   const [showInfo, setShowInfo] = useState(false);
+-  const [localPrediction, setLocalPrediction] = useState<PredictionResponse | null>(null);
+-  const [fallbackBars, setFallbackBars] = useState<StockBar[]>([]);
+-  const chartBars = bars && bars.length > 0 ? bars : fallbackBars;
++  const chartBars = bars ?? [];
++  const historyKey = userId ? predictionHistoryKey(userId) : null;
+ 
+   const [predictStatus, setPredictStatus] = useState<PredictStatusResponse | null>(null);
+ 
+@@ -128,28 +134,13 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+     }
+   };
+ 
+-  // Tải nến dự phòng nếu không nhận được bars từ props
+-  useEffect(() => {
+-    if (!bars || bars.length === 0) {
+-      let ignore = false;
+-      setFallbackBars([]);
+-      getStockHistory(selectedSymbol)
+-        .then((res) => {
+-          if (!ignore && res && res.bars) setFallbackBars(res.bars);
+-        })
+-        .catch((err) => console.warn("Lỗi tải nến biểu đồ:", err));
+-      return () => {
+-        ignore = true;
+-      };
+-    }
+-  }, [bars, selectedSymbol]);
+   const [detailModalItem, setDetailModalItem] = useState<FinancialItemContext | null>(null);
+   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+   const [history, setHistory] = useState<PredictionHistoryItem[]>(() => {
+     if (typeof window === "undefined") return [];
+     try {
+-      const stored = localStorage.getItem("vn_stock_prediction_history");
+-      return stored ? JSON.parse(stored) : [];
++      const stored = historyKey ? localStorage.getItem(historyKey) : null;
++      return parsePredictionHistory(stored);
+     } catch (err) {
+       console.warn("Không thể tải lịch sử dự báo từ localStorage:", err);
+       return [];
+@@ -160,6 +151,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+   const [hoveredModel, setHoveredModel] = useState<"lightgbm" | "lstm" | null>(null);
+   const [activeTooltipModel, setActiveTooltipModel] = useState<"lightgbm" | "lstm" | null>(null);
+   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
++  const modelDialogRef = useRef<HTMLDivElement>(null);
+ 
+   const startHoverTimer = (m: "lightgbm" | "lstm") => {
+     setHoveredModel(m);
+@@ -178,30 +170,46 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+     }
+   };
+ 
+-  // Lắng nghe phím Escape để đóng modal đặc tả mô hình
++  // Modal keyboard lifecycle: move focus inside, trap Tab, restore trigger.
+   useEffect(() => {
+-    const handleKeyDown = (e: KeyboardEvent) => {
+-      if (e.key === "Escape" && activeTooltipModel) {
++    if (!activeTooltipModel) return;
++    const previousFocus = document.activeElement as HTMLElement | null;
++    const focusable = () => Array.from(modelDialogRef.current?.querySelectorAll<HTMLElement>(
++      'button:not([disabled]), a[href], input:not([disabled]), [tabindex="0"]'
++    ) ?? []);
++    const focusTimer = setTimeout(() => focusable()[0]?.focus(), 0);
++    const handleKeyDown = (event: KeyboardEvent) => {
++      if (event.key === "Escape") {
++        event.preventDefault();
+         setActiveTooltipModel(null);
+         setHoveredModel(null);
+       }
++      if (event.key === "Tab") {
++        const elements = focusable();
++        const first = elements[0];
++        const last = elements[elements.length - 1];
++        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
++        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
++      }
+     };
+     window.addEventListener("keydown", handleKeyDown);
+-    return () => window.removeEventListener("keydown", handleKeyDown);
++    return () => {
++      clearTimeout(focusTimer);
++      window.removeEventListener("keydown", handleKeyDown);
++      previousFocus?.focus();
++    };
+   }, [activeTooltipModel]);
+ 
+-  // Hiển thị localPrediction nếu vừa đồng bộ Live, ngược lại hiển thị prediction từ props
+-  const activePred = matchesPrediction(localPrediction, selectedSymbol, modelType)
+-    ? localPrediction
+-    : matchesPrediction(prediction, selectedSymbol, modelType) ? prediction : null;
++  useEffect(() => () => { if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current); }, []);
++  const activePred = !loading && matchesPrediction(prediction, selectedSymbol, modelType) ? prediction : null;
+ 
+   // Tự động ghi vết dự báo vào lịch sử khi người dùng chọn cổ phiếu hoặc đổi mô hình
+   useEffect(() => {
+-    if (!activePred || loading) return;
++    if (!activePred || loading || !historyKey) return;
+ 
+     const timer = setTimeout(() => {
+       setHistory((prev) => {
+-        const last = prev[0];
++        const last = prev.find(item => item.symbol === activePred.symbol && item.model_type === activePred.model_type && item.data_date === (activePred.data_as_of_date || activePred.date));
+         const dataDate = activePred.data_as_of_date || activePred.date;
+         // Tránh ghi lặp nếu vừa ghi cùng mã, cùng mô hình và cùng phiên căn cứ
+         if (
+@@ -238,7 +246,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+ 
+         const updated = [newItem, ...prev].slice(0, 50); // Giới hạn 50 bản ghi gần nhất
+         try {
+-          localStorage.setItem("vn_stock_prediction_history", JSON.stringify(updated));
++          localStorage.setItem(historyKey, JSON.stringify(updated));
+         } catch (err) {
+           console.warn("Không thể lưu lịch sử vào localStorage:", err);
+         }
+@@ -251,12 +259,13 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+     activePred,
+     loading,
+     modelType,
++    historyKey,
+   ]);
+ 
+   const handleClearHistory = () => {
+     setHistory([]);
+     try {
+-      localStorage.removeItem("vn_stock_prediction_history");
++      if (historyKey) localStorage.removeItem(historyKey);
+     } catch (err) {
+       console.warn("Không thể xóa lịch sử từ localStorage:", err);
+     }
+@@ -270,6 +279,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+   // Confidence là xác suất cao nhất trong 3 lớp
+   const maxProb = Math.max(probUp, probHold, probDown);
+   const confidencePct = (maxProb * 100).toFixed(1);
++  const labelThreshold = activePred?.training_info?.threshold;
++  const thresholdPct = typeof labelThreshold === "number" && Number.isFinite(labelThreshold)
++    && labelThreshold > 0 && labelThreshold < 1
++    ? (labelThreshold * 100).toLocaleString("vi-VN") : null;
+ 
+   // Phân màu tín hiệu & chuẩn hóa tiếng Việt đồng bộ
+   const rawSignal = activePred?.signal || "ĐANG TÍNH TOÁN";
+@@ -291,12 +304,9 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+           <div>
+             <div className="flex items-center gap-2">
+               <h2 className="text-base font-bold text-slate-100 sm:text-lg">
+-                Dự báo xu hướng T+3
++                Dự báo xu hướng 3 phiên giao dịch tiếp theo.
+               </h2>
+             </div>
+-            <p className="text-xs text-slate-400">
+-              Dự báo xác suất xu hướng giá theo chu kỳ T+3 cho nhà đầu tư cá nhân
+-            </p>
+             {/* Huy hiệu Trạng thái Vận hành Tự trị (Autonomous Quantitative Architecture Badge) */}
+             <div className="mt-2 flex flex-wrap items-center gap-2">
+               <div
+@@ -309,9 +319,9 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+                 </span>
+                 <Bot className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                 <span>
+-                  Thông tin mô hình | Phiên chốt:{" "}
++                  Thông tin mô hình | Phiên mục tiêu:{" "}
+                   <strong className="text-emerald-200">
+-                    {predictStatus?.last_atc_session_date || "..."}
++                    {predictStatus?.last_atc_session_date || "Chưa tải được"}
+                   </strong>
+                 </span>
+                 <span className="text-emerald-400/70 text-[10px]">
+@@ -329,14 +339,14 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+           {/* Bộ chọn Mô hình kèm Cơ chế Hover 3 Giây Thả Đặc Tả */}
+           <div className="relative flex items-center gap-1 rounded-md border border-slate-800 bg-slate-950 p-1">
+             <button
++              aria-pressed={modelType === "lightgbm"}
+               onClick={() => {
+-                setLocalPrediction(null);
+                 onChangeModelType("lightgbm");
+               }}
+               onMouseEnter={() => startHoverTimer("lightgbm")}
+               onMouseLeave={cancelHoverTimer}
+               className={`relative flex items-center gap-1.5 overflow-hidden rounded px-2.5 py-1 text-xs font-semibold transition-colors ${modelType === "lightgbm"
+-                ? "bg-emerald-600 text-white shadow-sm"
++                ? "bg-emerald-700 text-white shadow-sm"
+                 : "text-slate-400 hover:text-slate-200"
+                 }`}
+               title="Giữ chuột 3 giây để xem cửa sổ đặc tả mô hình LightGBM"
+@@ -354,14 +364,14 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+               )}
+             </button>
+             <button
++              aria-pressed={modelType === "lstm"}
+               onClick={() => {
+-                setLocalPrediction(null);
+                 onChangeModelType("lstm");
+               }}
+               onMouseEnter={() => startHoverTimer("lstm")}
+               onMouseLeave={cancelHoverTimer}
+               className={`relative flex items-center gap-1.5 overflow-hidden rounded px-2.5 py-1 text-xs font-semibold transition-colors ${modelType === "lstm"
+-                ? "bg-emerald-600 text-white shadow-sm"
++                ? "bg-emerald-700 text-white shadow-sm"
+                 : "text-slate-400 hover:text-slate-200"
+                 }`}
+               title="Giữ chuột 3 giây để xem cửa sổ đặc tả mô hình PyTorch LSTM"
+@@ -379,6 +389,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+               )}
+             </button>
+ 
++            <button type="button" onClick={() => { cancelHoverTimer(); setActiveTooltipModel(modelType); }}
++              aria-label="Thông tin mô hình đang chọn" className="min-h-9 min-w-9 rounded px-2 text-slate-300 hover:bg-slate-800 focus-visible:outline focus-visible:outline-emerald-400">
++              <HelpCircle className="h-4 w-4" />
++            </button>
+             <style>{`
+               @keyframes fillProgress {
+                 from { width: 0%; opacity: 0.7; }
+@@ -389,6 +403,17 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+         </div>
+       </div>
+ 
++      {activePred?.training_info?.serving_status === "degraded_cached_generation" && (
++        <p role="status" className="rounded border border-amber-700 bg-amber-950/30 p-3 text-sm text-amber-200">
++          Chưa tải được bản mô hình mới. Dự báo đang dùng bản đã xác minh trước đó
++          {activePred.training_info.artifact_generation ? ` (${activePred.training_info.artifact_generation})` : ""}.
++        </p>
++      )}
++      {activePred?.data_quality?.historical_adjustment_status === "unverified" && (
++        <p className="text-xs leading-relaxed text-slate-400">
++          Dữ liệu lịch sử chưa được xác minh đầy đủ về điều chỉnh cổ tức và chia tách cổ phiếu.
++        </p>
++      )}
+       {/* 2. Thẻ Khuyến nghị Tín hiệu & Thanh Phân phối Xác suất */}
+       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+         {/* Cột trái: Thẻ Tín hiệu AI Hành động (5 cột) */}
+@@ -405,16 +430,14 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+                     LIVE SSI
+                   </span>
+                 )}
+-                <span className="rounded bg-slate-800 px-2 py-0.5 text-[11px] font-medium text-slate-300 font-mono">
+-                  {activePred?.horizon || "T+3"}
+-                </span>
+               </div>
+             </div>
+ 
+             {loading || !activePred ? (
+               <div className="my-8 flex flex-col items-center justify-center gap-2">
++                {!loading && onRetry && <button onClick={onRetry} className="min-h-9 rounded border border-slate-600 px-3 text-slate-100">Thử lại</button>}
+                 {loading && <div className="h-7 w-7 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />}
+-                <span className="text-xs text-slate-400">{loading ? "Mô hình đang suy luận..." : "Chưa có dự báo hợp lệ cho mã và mô hình này. Hãy thử tải lại."}</span>
++                <span className="text-xs text-slate-400">{loading ? "Mô hình đang suy luận..." : error || "Chưa có dự báo hợp lệ cho mã và mô hình này."}</span>
+               </div>
+             ) : (
+               <div className="my-4">
+@@ -496,7 +519,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+                 </span>
+                 <button
+                   onClick={() => setShowInfo(!showInfo)}
+-                  className="text-slate-400 hover:text-slate-200"
++                  aria-label="Giải thích xác suất và ngưỡng phân loại"
++                  aria-expanded={showInfo}
++                  aria-controls="prediction-probability-help"
++                  className="flex min-h-9 min-w-9 items-center justify-center rounded text-slate-400 hover:text-slate-200 focus-visible:outline focus-visible:outline-emerald-400"
+                 >
+                   <HelpCircle className="h-3.5 w-3.5" />
+                 </button>
+@@ -504,9 +530,14 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+             </div>
+ 
+             {showInfo && (
+-              <div className="mb-4 rounded-md bg-slate-950 p-3 text-xs text-slate-300 border border-slate-800 leading-relaxed">
++              <div id="prediction-probability-help" className="mb-4 rounded-md bg-slate-950 p-3 text-xs text-slate-300 border border-slate-800 leading-relaxed">
+                 <p>
+-                  Mô hình AI dự báo xác suất 3 kịch bản trong chu kỳ T+3: <strong>TĂNG</strong> (kỳ vọng lãi &gt; 1.5%), <strong>GIẢM</strong> (nguy cơ lỗ &gt; 1.5%) hoặc <strong>ĐI NGANG</strong>. Tổng xác suất bằng 100%. Kịch bản có xác suất cao nhất sẽ đưa ra khuyến nghị Mua, Bán hoặc Nắm giữ an toàn cho nhà đầu tư cá nhân.
++                  Mô hình ước tính xác suất của ba lớp xu hướng trong chu kỳ {activePred?.horizon || "T+3"}.
++                  Tổng xác suất ba lớp bằng 100%. Xác suất này không phải độ chính xác đã đo trên dữ liệu kiểm thử.
++                </p>
++                <p className="mt-2">
++                  {thresholdPct ? `Ngưỡng phân loại: ±${thresholdPct}% so với giá căn cứ. TĂNG khi mức thay đổi ≥ +${thresholdPct}%; GIẢM khi ≤ −${thresholdPct}%; ĐI NGANG nằm giữa hai ngưỡng.`
++                    : "Chưa có thông tin ngưỡng phân loại từ artifact mô hình."}
+                 </p>
+               </div>
+             )}
+@@ -526,7 +557,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+                 <div className="h-2 w-full rounded bg-slate-800 overflow-hidden">
+                   <div
+                     className="h-full bg-emerald-500 transition-all duration-300"
+-                    style={{ width: `${Math.max(probUp * 100, 2)}%` }}
++                    style={{ width: `${probUp * 100}%` }}
+                   />
+                 </div>
+               </div>
+@@ -544,7 +575,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+                 <div className="h-2 w-full rounded bg-slate-800 overflow-hidden">
+                   <div
+                     className="h-full bg-amber-500 transition-all duration-300"
+-                    style={{ width: `${Math.max(probHold * 100, 2)}%` }}
++                    style={{ width: `${probHold * 100}%` }}
+                   />
+                 </div>
+               </div>
+@@ -562,7 +593,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+                 <div className="h-2 w-full rounded bg-slate-800 overflow-hidden">
+                   <div
+                     className="h-full bg-rose-500 transition-all duration-300"
+-                    style={{ width: `${Math.max(probDown * 100, 2)}%` }}
++                    style={{ width: `${probDown * 100}%` }}
+                   />
+                 </div>
+               </div>
+@@ -571,12 +602,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+ 
+           <div className="mt-6 border-t border-slate-800/80 pt-3 flex items-center justify-between text-xs text-slate-400">
+             <span>Mô hình đang chạy: <strong className="text-slate-200">{modelType.toUpperCase()}</strong></span>
+-            <span className="text-[11px] text-slate-500">Kết quả nghiên cứu; chưa xác nhận hiệu quả đầu tư</span>
+           </div>
+         </div>
+       </div>
+ 
+-      <p className="text-xs text-slate-400" role="note">Mô hình phân loại xu hướng T+3. Xác suất lớp chưa được hiệu chỉnh và không phải tỷ lệ dự báo đúng. Kết quả kiểm thử tài chính còn phụ thuộc dữ liệu quyền cổ đông.</p>
+       {/* 2.5. Biểu đồ Nến Kỹ thuật & Quỹ đạo Dự phóng Xu hướng T+1 -> T+3 chuẩn FireAnt */}
+       <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+         <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+@@ -660,11 +689,17 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+                   return (
+                     <tr
+                       key={item.id}
++                      tabIndex={0}
++                      onKeyDown={(event) => {
++                        if (event.target === event.currentTarget && ["Enter", " "].includes(event.key)) {
++                          event.preventDefault(); event.currentTarget.click();
++                        }
++                      }}
+                       onClick={() => {
+                         onSelectSymbol(item.symbol);
+                         setDetailModalItem({
+                           symbol: item.symbol,
+-                          currentValue: item.current_price,
++
+                           isIndex: item.symbol.includes("VNINDEX") || item.symbol.includes("VN30"),
+                         });
+                         setIsDetailModalOpen(true);
+@@ -677,7 +712,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+                     >
+                       <td className="px-3 py-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">
+                         <div className="flex items-center gap-1.5">
+-                          <Clock className="h-3 w-3 text-slate-500" />
++                          <Clock className="h-3 w-3 text-slate-400" />
+                           <span>{item.timestamp}</span>
+                         </div>
+                       </td>
+@@ -760,13 +795,13 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+                 })
+               ) : (
+                 <tr>
+-                  <td colSpan={10} className="px-3 py-8 text-center text-slate-500">
++                  <td colSpan={10} className="px-3 py-8 text-center text-slate-400">
+                     <div className="flex flex-col items-center justify-center gap-1.5">
+                       <Clock className="h-5 w-5 text-slate-600" />
+                       <p className="text-xs font-medium text-slate-400">
+                         Chưa có lịch sử phân tích
+                       </p>
+-                      <p className="text-[11px] text-slate-500">
++                      <p className="text-[11px] text-slate-400">
+                         Mỗi khi bạn chọn một mã cổ phiếu hoặc thay đổi mô hình, kết quả dự báo sẽ tự động được ghi lại tại đây.
+                       </p>
+                     </div>
+@@ -788,6 +823,10 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+           }}
+         >
+           <div
++            ref={modelDialogRef}
++            role="dialog"
++            aria-modal="true"
++            aria-labelledby="model-dialog-title"
+             onClick={(e) => e.stopPropagation()}
+             className="relative w-full max-w-xl max-h-[90vh] flex flex-col rounded-lg border border-slate-700 bg-slate-900 shadow-xl overflow-hidden"
+           >
+@@ -807,7 +846,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+                   )}
+                 </div>
+                 <div>
+-                  <h3 className="font-bold text-slate-100 text-base leading-tight">
++                  <h3 id="model-dialog-title" className="font-bold text-slate-100 text-base leading-tight">
+                     {MODEL_SPECIFICATIONS[activeTooltipModel].title}
+                   </h3>
+                   <span className="inline-block mt-1 rounded px-2.5 py-0.5 text-[11px] font-semibold border border-slate-700 bg-slate-800 text-slate-300">
+@@ -891,16 +930,16 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+ 
+               {/* Quick Tip Footer Box */}
+               <div className="rounded-md border border-blue-500/20 bg-slate-950 p-3 text-xs text-slate-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+-                <span className="font-semibold text-blue-200">💡 Quy tắc ghi nhớ nhanh:</span>
++                <span className="font-semibold text-blue-200">Cách chọn mô hình:</span>
+                 <span className="font-medium text-slate-300">
+-                  Thị trường Sideway / Lướt ngắn ➔ <strong className="text-blue-300">LightGBM</strong> | Vào Sóng mạnh / Trend ➔ <strong className="text-sky-300">LSTM</strong>
++                  So sánh kết quả ngoài mẫu trên cùng mã và giai đoạn. Chưa có bằng chứng xác nhận mỗi mô hình phù hợp riêng với một trạng thái thị trường.
+                 </span>
+               </div>
+             </div>
+ 
+             {/* Footer Modal với các nút hành động */}
+             <div className="border-t border-slate-800 bg-slate-950/80 px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+-              <span className="text-[11px] text-slate-500 italic">
++              <span className="text-[11px] text-slate-400 italic">
+                 Bấm phím Esc hoặc bấm ra ngoài màn hình để đóng
+               </span>
+               <div className="flex items-center gap-2">
+@@ -916,8 +955,7 @@ export const AIPredictionTab: React.FC<AIPredictionTabProps> = ({
+                 {modelType !== activeTooltipModel ? (
+                   <button
+                     onClick={() => {
+-                      setLocalPrediction(null);
+-                      onChangeModelType(activeTooltipModel);
++                            onChangeModelType(activeTooltipModel);
+                       setActiveTooltipModel(null);
+                       setHoveredModel(null);
+                     }}
+diff --git a/apps/web/src/components/tabs/MarketOverviewTab.tsx b/apps/web/src/components/tabs/MarketOverviewTab.tsx
+index 4f0adf6..fcec772 100644
+--- a/apps/web/src/components/tabs/MarketOverviewTab.tsx
++++ b/apps/web/src/components/tabs/MarketOverviewTab.tsx
+@@ -1,5 +1,6 @@
+ "use client";
+ 
++import { formatSmaDeviation, describeSmaDeviation, describeVolumeRatio } from "@/lib/marketMetricPresentation";
+ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+ import {
+   ArrowDownRight,
+@@ -489,7 +490,6 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
+ 
+   return (
+     <div className="space-y-4">
+-      <p className="text-xs text-slate-400" role="note">Nguồn nến: SSI, theo phiên chốt. Một số chỉ số tổng quan, dòng tiền và dữ liệu cơ bản đang dùng giá trị ước lượng hoặc dự phòng; chưa phải dữ liệu thị trường đã xác minh đầy đủ.</p>
+       {/* ========================================================================= */}
+       {/* 1. BĂNG CHUYỂN CHỈ SỐ THỊ TRƯỜNG TÁCH BIỆT (INDEX RIBBON COMPONENT)       */}
+       {/* ========================================================================= */}
+@@ -1067,9 +1067,6 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
+                       {summary?.latest_date ? `Phiên: ${summary.latest_date}` : "Đang cập nhật..."}
+                     </span>
+                   </div>
+-                  <p className="text-xs text-slate-400">
+-                    Chi tiết Hành động Giá OHLCV, Khối lượng & Dao động RSI
+-                  </p>
+                 </div>
+               </div>
+ 
+@@ -1141,9 +1138,9 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
+ 
+           {/* Lưới 6 Thẻ Đo lường Kỹ thuật Cốt lõi (13 Đặc trưng ML) */}
+           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6 pt-1">
+-            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
++            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
+               <div className="flex items-center justify-between text-slate-400">
+-                <span className="text-[11px] font-medium">Lệch SMA(20)</span>
++                <span className="text-xs font-medium">Giá so với TB 20 phiên</span>
+                 <Layers className="h-3.5 w-3.5" />
+               </div>
+               <div className="mt-1">
+@@ -1151,15 +1148,16 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
+                   className={`text-sm font-bold tabular-nums ${(summary?.sma_20_dev ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
+                     }`}
+                 >
+-                  {summary ? `${(summary.sma_20_dev * 100).toFixed(2)}%` : "---"}
++                  {summary ? formatSmaDeviation(summary.sma_20_dev) : "---"}
+                 </span>
+               </div>
+-              <p className="mt-0.5 text-[9px] text-slate-500">So với TB 20 phiên</p>
++              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">{summary ? describeSmaDeviation(summary.sma_20_dev, 20) : "Chưa có dữ liệu"}</p>
++              <details className="mt-2 text-[11px] leading-relaxed text-slate-300"><summary className="cursor-pointer text-slate-400 focus-visible:outline focus-visible:outline-emerald-400">Cách đọc</summary><p className="mt-1">Giá đóng cửa gần nhất cao hoặc thấp hơn giá đóng cửa trung bình 20 phiên bao nhiêu %. Dấu + là cao hơn, dấu − là thấp hơn. Đây không phải mức tăng giá trong 20 phiên.</p></details>
+             </div>
+ 
+-            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
++            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
+               <div className="flex items-center justify-between text-slate-400">
+-                <span className="text-[11px] font-medium">Lệch SMA(50)</span>
++                <span className="text-xs font-medium">Giá so với TB 50 phiên</span>
+                 <Layers className="h-3.5 w-3.5" />
+               </div>
+               <div className="mt-1">
+@@ -1167,15 +1165,16 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
+                   className={`text-sm font-bold tabular-nums ${(summary?.sma_50_dev ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
+                     }`}
+                 >
+-                  {summary ? `${(summary.sma_50_dev * 100).toFixed(2)}%` : "---"}
++                  {summary ? formatSmaDeviation(summary.sma_50_dev) : "---"}
+                 </span>
+               </div>
+-              <p className="mt-0.5 text-[9px] text-slate-500">Xu hướng trung hạn</p>
++              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">{summary ? describeSmaDeviation(summary.sma_50_dev, 50) : "Chưa có dữ liệu"}</p>
++              <details className="mt-2 text-[11px] leading-relaxed text-slate-300"><summary className="cursor-pointer text-slate-400 focus-visible:outline focus-visible:outline-emerald-400">Cách đọc</summary><p className="mt-1">Giá đóng cửa gần nhất cao hoặc thấp hơn giá đóng cửa trung bình 50 phiên bao nhiêu %. SMA là đường trung bình động đơn giản.</p></details>
+             </div>
+ 
+-            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
++            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
+               <div className="flex items-center justify-between text-slate-400">
+-                <span className="text-[11px] font-medium">Biến động CV(50)</span>
++                <span className="text-xs font-medium">Độ dao động giá · 50 phiên</span>
+                 <Percent className="h-3.5 w-3.5" />
+               </div>
+               <div className="mt-1">
+@@ -1183,12 +1182,13 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
+                   {latestInd ? `${(latestInd.cv_50 * 100).toFixed(2)}%` : "---"}
+                 </span>
+               </div>
+-              <p className="mt-0.5 text-[9px] text-slate-500">Hệ số biến thiên 50p</p>
++              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">Số càng lớn, giá dao động càng mạnh</p>
++              <details className="mt-2 text-[11px] leading-relaxed text-slate-300"><summary className="cursor-pointer text-slate-400 focus-visible:outline focus-visible:outline-emerald-400">Cách đọc</summary><p className="mt-1">CV(50) = độ lệch chuẩn của giá đóng cửa 50 phiên / giá trung bình 50 phiên × 100%. Đo độ phân tán của mức giá; không phải mức tăng giảm trong ngày hay xác suất thua lỗ.</p></details>
+             </div>
+ 
+-            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
++            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
+               <div className="flex items-center justify-between text-slate-400">
+-                <span className="text-[11px] font-medium">Tỷ lệ KL / TB20</span>
++                <span className="text-xs font-medium">Khối lượng so với trung bình 20 phiên</span>
+                 <BarChart2 className="h-3.5 w-3.5" />
+               </div>
+               <div className="mt-1">
+@@ -1200,15 +1200,16 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
+                       : "text-slate-200"
+                     }`}
+                 >
+-                  {latestInd ? `${latestInd.vol_ratio.toFixed(2)}x` : "---"}
++                  {latestInd ? describeVolumeRatio(latestInd.vol_ratio).replace(" so với TB 20 phiên", "") : "---"}
+                 </span>
+               </div>
+-              <p className="mt-0.5 text-[9px] text-slate-500">So với mức bình quân</p>
++              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">Số cổ phiếu giao dịch trong phiên gần nhất</p>
++              <details className="mt-2 text-[11px] leading-relaxed text-slate-300"><summary className="cursor-pointer text-slate-400 focus-visible:outline focus-visible:outline-emerald-400">Cách đọc</summary><p className="mt-1">Cộng số cổ phiếu giao dịch của 20 phiên gần nhất (có cả phiên đang xét), rồi chia 20 để lấy mức trung bình. So sánh khối lượng phiên gần nhất với mức này. Ví dụ: trung bình 1 triệu cổ phiếu/phiên, phiên gần nhất có 900 nghìn → ít hơn 100 nghìn, tức ít hơn 10%. Công thức chênh lệch: (khối lượng phiên gần nhất ÷ khối lượng trung bình − 1) × 100%. Ví dụ trên: (900.000 ÷ 1.000.000 − 1) × 100% = −10%.</p></details>
+             </div>
+ 
+-            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
++            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
+               <div className="flex items-center justify-between text-slate-400">
+-                <span className="text-[11px] font-medium">Khối lượng GD</span>
++                <span className="text-xs font-medium">Số cổ phiếu giao dịch</span>
+                 <BarChart2 className="h-3.5 w-3.5" />
+               </div>
+               <div className="mt-1">
+@@ -1217,12 +1218,13 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
+                   <span className="text-[10px] font-normal text-slate-400">nghìn CP</span>
+                 </span>
+               </div>
+-              <p className="mt-0.5 text-[9px] text-slate-500">Khớp phiên gần nhất</p>
++              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">Tổng khối lượng phiên gần nhất</p>
++              <details className="mt-2 text-[11px] leading-relaxed text-slate-300"><summary className="cursor-pointer text-slate-400 focus-visible:outline focus-visible:outline-emerald-400">Cách đọc</summary><p className="mt-1">Tổng số cổ phiếu giao dịch trong phiên gần nhất. Ví dụ 1.799,1 nghìn cổ phiếu = 1.799.100 cổ phiếu. Đây là số lượng, không phải giá trị bằng tiền.</p></details>
+             </div>
+ 
+-            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5">
++            <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3">
+               <div className="flex items-center justify-between text-slate-400">
+-                <span className="text-[11px] font-medium">VN-Index (1 Phiên)</span>
++                <span className="text-xs font-medium">VN-Index · phiên gần nhất</span>
+                 {(latestInd?.vnindex_return_1d ?? 0) >= 0 ? (
+                   <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
+                 ) : (
+@@ -1241,7 +1243,8 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
+                     : "---"}
+                 </span>
+               </div>
+-              <p className="mt-0.5 text-[9px] text-slate-500">Lợi suất toàn sàn 1D</p>
++              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">So với phiên giao dịch trước</p>
++              <details className="mt-2 text-[11px] leading-relaxed text-slate-300"><summary className="cursor-pointer text-slate-400 focus-visible:outline focus-visible:outline-emerald-400">Cách đọc</summary><p className="mt-1">Mức thay đổi của VN-Index so với giá đóng cửa phiên trước. Ví dụ −1,37% nghĩa là chỉ số giảm 1,37%; không có nghĩa mọi cổ phiếu đều giảm như nhau.</p></details>
+             </div>
+           </div>
+         </div>
+diff --git a/apps/web/src/lib/api.ts b/apps/web/src/lib/api.ts
+index 488dc1b..be08b49 100644
+--- a/apps/web/src/lib/api.ts
++++ b/apps/web/src/lib/api.ts
+@@ -54,7 +54,12 @@ export function getAuthToken(): string | null {
+   return inMemoryToken;
+ }
+ 
+-async function fetchJson<T>(endpoint: string, options?: RequestInit): Promise<T> {
++async function fetchJson<T>(endpoint: string, options?: RequestInit, timeoutMs?: number): Promise<T> {
++  const controller = timeoutMs ? new AbortController() : null;
++  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
++  const abortFromCaller = () => controller?.abort();
++  if (controller && options?.signal?.aborted) controller.abort();
++  options?.signal?.addEventListener("abort", abortFromCaller, { once: true });
+   const url = `${API_BASE_URL}${endpoint}`;
+   const headers: Record<string, string> = {
+     "Content-Type": "application/json",
+@@ -69,6 +74,7 @@ async function fetchJson<T>(endpoint: string, options?: RequestInit): Promise<T>
+     const res = await fetch(url, {
+       credentials: "include",
+       ...options,
++      ...(controller ? { signal: controller.signal } : {}),
+       headers,
+     });
+ 
+@@ -85,6 +91,9 @@ async function fetchJson<T>(endpoint: string, options?: RequestInit): Promise<T>
+   } catch (error) {
+     console.warn(`Fetch failed for ${endpoint}:`, error);
+     throw error;
++  } finally {
++    if (timer !== null) clearTimeout(timer);
++    options?.signal?.removeEventListener("abort", abortFromCaller);
+   }
+ }
+ 
+@@ -118,7 +127,7 @@ export async function getStockHistory(
+   params.set("symbol", symbol);
+   if (startDate) params.set("start_date", startDate);
+   if (limit) params.set("limit", limit.toString());
+-  return fetchJson<StockHistoryResponse>(`/api/stocks/history?${params.toString()}`);
++  return fetchJson<StockHistoryResponse>(`/api/stocks/history?${params.toString()}`, undefined, 30_000);
+ }
+ 
+ export async function getStockIndicators(
+@@ -126,13 +135,13 @@ export async function getStockIndicators(
+   limit = 1500
+ ): Promise<StockIndicatorsResponse> {
+   return fetchJson<StockIndicatorsResponse>(
+-    `/api/stocks/indicators?symbol=${encodeURIComponent(symbol)}&limit=${limit}`
++    `/api/stocks/indicators?symbol=${encodeURIComponent(symbol)}&limit=${limit}`, undefined, 30_000
+   );
+ }
+ 
+ export async function getStockSummary(symbol: string): Promise<StockSummaryResponse> {
+   return fetchJson<StockSummaryResponse>(
+-    `/api/stocks/summary?symbol=${encodeURIComponent(symbol)}`
++    `/api/stocks/summary?symbol=${encodeURIComponent(symbol)}`, undefined, 30_000
+   );
+ }
+ 
+@@ -166,7 +175,7 @@ export async function getPredictionSignal(
+   modelType: "lightgbm" | "lstm" = "lightgbm"
+ ): Promise<PredictionResponse> {
+   return fetchJson<PredictionResponse>(
+-    `/api/predict/signal?symbol=${encodeURIComponent(symbol)}&model_type=${encodeURIComponent(modelType)}`
++    `/api/predict/signal?symbol=${encodeURIComponent(symbol)}&model_type=${encodeURIComponent(modelType)}`, undefined, 30_000
+   );
+ }
+ 
+@@ -174,7 +183,7 @@ export async function getBatchPrediction(
+   modelType: "lightgbm" | "lstm" = "lightgbm"
+ ): Promise<BatchPredictionResponse> {
+   return fetchJson<BatchPredictionResponse>(
+-    `/api/predict/batch?model_type=${encodeURIComponent(modelType)}`
++    `/api/predict/batch?model_type=${encodeURIComponent(modelType)}`, undefined, 30_000
+   );
+ }
+ 
+@@ -464,3 +473,7 @@ export const requestPasswordReset = (email: string) => accountRequest("forgot-pa
+ export const resetAccountPassword = (token: string, new_password: string) => accountRequest("reset-password", { token, new_password });
+ export const verifyAccountEmail = (token: string) => accountRequest("verify-email", { token });
+ export const resendVerification = () => accountRequest("resend-verification");
++
++export function getChartIndicators(symbol: string) {
++ return fetchJson<import('./chartIndicators').ChartIndicatorsResponse>(`/api/stocks/chart-indicators?symbol=${encodeURIComponent(symbol)}&limit=1500`);
++}
+diff --git a/apps/web/src/lib/predictionPresentation.ts b/apps/web/src/lib/predictionPresentation.ts
+index c3d0e5d..07bcfc0 100644
+--- a/apps/web/src/lib/predictionPresentation.ts
++++ b/apps/web/src/lib/predictionPresentation.ts
+@@ -1,10 +1,15 @@
+ import type { PredictionResponse } from "./types";
+ 
+ export function matchesPrediction(prediction: PredictionResponse | null, symbol: string, model: string): boolean {
+-  if (!prediction || prediction.symbol !== symbol || prediction.model_type.toLowerCase() !== model.toLowerCase()) return false;
+-  const probabilities = ["TĂNG", "ĐI NGANG", "GIẢM"].map(key => prediction.probabilities[key]);
++  if (!prediction || prediction.symbol !== symbol || typeof prediction.model_type !== "string"
++      || prediction.model_type.toLowerCase() !== model.toLowerCase()
++      || !prediction.probabilities || !Number.isFinite(prediction.current_price) || prediction.current_price <= 0) return false;
++  const classes = ["GIẢM", "ĐI NGANG", "TĂNG"];
++  const probabilities = classes.map(key => prediction.probabilities[key]);
+   return probabilities.every(value => Number.isFinite(value) && value >= 0 && value <= 1)
+-    && Math.abs(probabilities.reduce((sum, value) => sum + value, 0) - 1) < 0.01;
++    && Math.abs(probabilities.reduce((sum, value) => sum + value, 0) - 1) < 0.01
++    && classes[prediction.predicted_label] === prediction.class_name
++    && probabilities[prediction.predicted_label] >= Math.max(...probabilities) - 0.0001;
+ }
+ 
+ export function formatPriceVnd(priceInThousands: number): string {
+diff --git a/apps/web/src/lib/types.ts b/apps/web/src/lib/types.ts
+index a74c2e7..8b4d0a1 100644
+--- a/apps/web/src/lib/types.ts
++++ b/apps/web/src/lib/types.ts
+@@ -130,6 +130,7 @@ export interface MarketSyncStatusResponse {
+ }
+ 
+ export interface DayForecast {
++  holiday_calendar_verified?: boolean;
+   day_offset: number; // 1, 2, 3
+   day_name: string; // "T+1", "T+2", "T+3"
+   date?: string; // "YYYY-MM-DD"
+@@ -155,6 +156,7 @@ export interface ModelMetricsSummary {
+ }
+ 
+ export interface PredictionResponse {
++  data_quality?: { historical_adjustment_status: string; source_provenance: string } | null;
+   symbol: string;
+   date: string;
+   data_as_of_date?: string;
+@@ -177,6 +179,8 @@ export interface PredictionResponse {
+   trajectory?: DayForecast[];
+   summary_guidance?: string;
+   training_info?: {
++    artifact_generation?: string;
++    serving_status?: "healthy" | "degraded_cached_generation";
+     latest_market_date?: string;
+     horizon?: string;
+     threshold?: number;
+@@ -189,6 +193,8 @@ export interface PredictionResponse {
+ }
+ 
+ export interface BatchPredictionResponse {
++  requested_symbols?: number;
++  errors?: { symbol: string; status_code: number; detail: string }[];
+   model_type: string;
+   total_symbols: number;
+   predictions: PredictionResponse[];
+diff --git a/infra/tests/test_docker_adversarial.py b/infra/tests/test_docker_adversarial.py
+index 4d29fe4..4426b82 100644
+--- a/infra/tests/test_docker_adversarial.py
++++ b/infra/tests/test_docker_adversarial.py
+@@ -34,8 +34,8 @@ def compose_yaml():
+         return yaml.safe_load(f)
+ 
+ 
+-def test_compose_parses_with_zero_env_vars():
+-    """Verify compose file parses cleanly with zero environment variables set (all defaults)."""
++def test_compose_requires_public_url_and_parses_with_explicit_value():
++    """Required public URL must fail closed; explicit test URL permits rendering."""
+     clean_env = {
+         "PATH": os.environ.get("PATH", ""),
+         "HOME": os.environ.get("HOME", ""),
+@@ -46,7 +46,11 @@ def test_compose_parses_with_zero_env_vars():
+ 
+     cmd = [docker_bin, "compose", "-f", str(COMPOSE_FILE), "config"]
+     res = subprocess.run(cmd, env=clean_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+-    assert res.returncode == 0, f"docker compose config failed with empty env:\n{res.stderr}"
++    assert res.returncode != 0
++    assert "FRONTEND_PUBLIC_URL" in res.stderr
++    clean_env["FRONTEND_PUBLIC_URL"] = "http://localhost:3000"
++    res = subprocess.run(cmd, env=clean_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
++    assert res.returncode == 0, res.stderr
+ 
+     config_data = yaml.safe_load(res.stdout)
+     api_svc = config_data["services"]["vn_stock_api"]
+diff --git a/infra/tests/test_docker_deployment.py b/infra/tests/test_docker_deployment.py
+index 2bd2d13..07a6d71 100644
+--- a/infra/tests/test_docker_deployment.py
++++ b/infra/tests/test_docker_deployment.py
+@@ -41,7 +41,7 @@ def test_docker_compose_cli_validation():
+     docker_bin = shutil.which("docker")
+     if docker_bin:
+         cmd = [docker_bin, "compose", "-f", str(COMPOSE_FILE), "config"]
+-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
++        proc = subprocess.run(cmd, env={**os.environ, "FRONTEND_PUBLIC_URL": os.environ.get("FRONTEND_PUBLIC_URL") or "http://localhost:3000"}, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+         assert proc.returncode == 0, f"docker compose config failed:\n{proc.stderr}"
+     else:
+         pytest.skip("Docker CLI not installed on host machine.")
+diff --git a/infra/tests/test_retrain_worker.py b/infra/tests/test_retrain_worker.py
+index 07eb9dc..a55c69c 100644
+--- a/infra/tests/test_retrain_worker.py
++++ b/infra/tests/test_retrain_worker.py
+@@ -72,3 +72,20 @@ def test_trigger_retrain_success():
+         payload = json.loads(req.data.decode("utf-8"))
+         assert payload["scope"] == "VN30"
+         assert payload["horizon"] == 3
++
++
++def test_trigger_retrain_connection_failure_is_explicit():
++    from urllib.error import URLError
++    with patch('urllib.request.urlopen',side_effect=URLError('isolated offline')):
++        with pytest.raises(RuntimeError,match='Connection Error'):
++            trigger_retrain(api_base_url='http://isolated-api:8001',secret='test-only-key')
++
++
++def test_worker_retries_failure_and_does_not_repeat_successful_day():
++    scheduled=datetime(2026,11,8,2,5,tzinfo=ICT)
++    with patch.object(retrain_worker,'get_current_ict_time',return_value=scheduled), \
++         patch.object(retrain_worker,'trigger_retrain',side_effect=[RuntimeError('API unavailable'),{'status':'success'}]) as trigger, \
++         patch.object(retrain_worker.time,'sleep',side_effect=[None,None,StopIteration]):
++        with pytest.raises(StopIteration):
++            retrain_worker.run_worker_loop('http://isolated-api:8001','test-only-key')
++    assert trigger.call_count == 2

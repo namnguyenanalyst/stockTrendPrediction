@@ -1,0 +1,98 @@
+.....F...................................................                [100%]
+=================================== FAILURES ===================================
+_______ test_unverified_price_history_returns_public_unavailable_reason ________
+
+    def test_unverified_price_history_returns_public_unavailable_reason():
+        from vn_stock.data_quality import UnverifiedPriceHistoryError
+        from app.services.prediction_service import predict_stock_signal
+        with patch('vn_stock.modeling.predict_trend',side_effect=UnverifiedPriceHistoryError('TCB','2026-10-29')):
+            with pytest.raises(HTTPException) as exc:
+>               predict_stock_signal('TCB','lightgbm')
+
+tests/test_prediction_audit.py:68: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+symbol = 'TCB', model_type = 'lightgbm'
+
+    def predict_stock_signal(
+        symbol: str = "VIC",
+        model_type: str = "lightgbm",
+    ) -> PredictionResponse:
+        """
+        Thực hiện suy luận dự báo xu hướng chu kỳ T+3 và Quỹ đạo 3 phiên cho một mã cổ phiếu.
+    
+        Args:
+            symbol: Mã cổ phiếu (ví dụ: VIC, HPG, FPT).
+            model_type: 'lightgbm' hoặc 'lstm'.
+    
+        Returns:
+            PredictionResponse chứa nhãn, tên xu hướng, khuyến nghị Mua/Bán, xác suất 3 lớp và Quỹ đạo 3 phiên (T+1 -> T+3).
+        """
+        clean_sym = normalize_symbol(symbol)
+        model_clean = model_type.strip().lower()
+        if model_clean not in ["lightgbm", "lstm"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Mô hình '{model_type}' không hợp lệ. Hệ thống chỉ hỗ trợ 'lightgbm' hoặc 'lstm'.",
+            )
+    
+        started = perf_counter()
+        try:
+            from vn_stock.modeling import predict_trend
+    
+            res = predict_trend(
+                symbol=clean_sym,
+                model_type=model_clean,
+                models_dir=settings.MODELS_DIR,
+            )
+    
+            session_info = get_market_sync_status()
+            session_label = session_info.get("status_label", "")
+    
+            response = PredictionResponse(
+                symbol=res["symbol"],
+                date=res["date"],
+                data_as_of_date=res.get("data_as_of_date", res["date"]),
+                current_price=res["current_price"],
+                model_type=res["model_type"],
+                predicted_label=res["predicted_label"],
+                class_name=res["class_name"],
+                signal=res["signal"],
+                probabilities=res["probabilities"],
+                horizon=res.get("horizon", "T+3"),
+                horizon_days=res.get("horizon_days", 3),
+                is_live_synced=res.get("is_live_synced", False),
+                market_session_label=res.get("market_session_label", session_label),
+                session_info=session_info,
+                trajectory=res.get("trajectory", []),
+                summary_guidance=res.get("summary_guidance", ""),
+                training_info=res.get("training_info"),
+                data_quality=res.get("data_quality"),
+            )
+            _log_prediction(response, started)
+            return response
+        except UnverifiedPriceHistoryError as quality_error:
+            logger.warning('prediction_rejected symbol=%s model=%s reason=%s', clean_sym, model_clean, quality_error)
+>           raise PublicServiceUnavailable(str(quality_error)) from None
+E           app.core.errors.PublicServiceUnavailable: 503: Dữ liệu giá của TCB có biến động lớn chưa được xác minh tại 2026-10-29. Chưa thể tạo dự báo; cần đối chiếu điều chỉnh cổ tức/chia tách.
+
+app/services/prediction_service.py:97: PublicServiceUnavailable
+----------------------------- Captured stderr call -----------------------------
+2026-11-21 22:09:29,671 - app.services.prediction_service - WARNING - prediction_rejected symbol=TCB model=lightgbm reason=Dữ liệu giá của TCB có biến động lớn chưa được xác minh tại 2026-10-29. Chưa thể tạo dự báo; cần đối chiếu điều chỉnh cổ tức/chia tách.
+------------------------------ Captured log call -------------------------------
+WARNING  app.services.prediction_service:prediction_service.py:96 prediction_rejected symbol=TCB model=lightgbm reason=Dữ liệu giá của TCB có biến động lớn chưa được xác minh tại 2026-10-29. Chưa thể tạo dự báo; cần đối chiếu điều chỉnh cổ tức/chia tách.
+=============================== warnings summary ===============================
+tests/test_phase3_integrity.py::test_refresh_session_migration_round_trip
+tests/test_phase3_integrity.py::test_refresh_session_migration_round_trip
+  /Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/api/.venv/lib/python3.10/site-packages/alembic/config.py:604: DeprecationWarning: No path_separator found in configuration; falling back to legacy splitting on spaces, commas, and colons for prepend_sys_path.  Consider adding path_separator=os to Alembic config.
+    util.warn_deprecated(
+
+tests/test_phase3_integrity.py::test_refresh_session_migration_round_trip
+tests/test_phase3_integrity.py::test_refresh_session_migration_round_trip
+  /Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/api/.venv/lib/python3.10/site-packages/alembic/config.py:552: DeprecationWarning: The version_path_separator configuration parameter is deprecated; please use path_separator
+    util.warn_deprecated(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_prediction_audit.py::test_unverified_price_history_returns_public_unavailable_reason
+1 failed, 56 passed, 4 warnings in 5.45s

@@ -1,0 +1,12 @@
+{
+  "image": "sha256:2227adf14cb719bf70b82d64129c00886d89520216b84a85eaedb3e896c1453d",
+  "health": {
+    "status": "healthy",
+    "service": "vn-stock-api",
+    "version": "0.1.0",
+    "environment": "development"
+  },
+  "artifact_changes": [],
+  "price_source_policy": "SSI only; no user-supplied corporate-action calendar required",
+  "production_retrained": false
+}

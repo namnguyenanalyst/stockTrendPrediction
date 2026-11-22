@@ -1,0 +1,113 @@
+[
+  {
+    "symbol": "CTG",
+    "status": 503,
+    "detail": "Dữ liệu giá của CTG có biến động lớn chưa được xác minh tại 2025-12-17. Chưa thể tạo dự báo; cần đối chiếu điều chỉnh cổ tức/chia tách.",
+    "price_context": [
+      {
+        "date": "2025-12-16",
+        "open": 49.24,
+        "high": 50.23,
+        "low": 48.3,
+        "close": 50.23,
+        "volume": 15094400
+      },
+      {
+        "date": "2025-12-17",
+        "open": 34.96,
+        "high": 35.01,
+        "low": 33.83,
+        "close": 34.17,
+        "volume": 10665100
+      },
+      {
+        "date": "2025-12-18",
+        "open": 34.17,
+        "high": 34.22,
+        "low": 33.43,
+        "close": 33.83,
+        "volume": 5822900
+      }
+    ],
+    "close_change_fraction": -0.31972924547083403,
+    "official_event": {
+      "ex_date": "2025-12-17",
+      "stock_dividend_fraction": 0.4463658403,
+      "source_url": "https://investor.vietinbank.vn/documents/20126/32acccd3-8a3d-7828-3cd8-9b47d97eb9b4",
+      "source_location": "Annual Report 2025, printed pages 126–129; capital increase history",
+      "status": "Issuer confirms ex-date and dividend ratio"
+    }
+  },
+  {
+    "symbol": "HDB",
+    "status": 503,
+    "detail": "Dữ liệu giá của HDB có biến động lớn chưa được xác minh tại 2025-12-18. Chưa thể tạo dự báo; cần đối chiếu điều chỉnh cổ tức/chia tách.",
+    "price_context": [
+      {
+        "date": "2025-12-17",
+        "open": 24.61,
+        "high": 25.04,
+        "low": 24.38,
+        "close": 24.69,
+        "volume": 23353800
+      },
+      {
+        "date": "2025-12-18",
+        "open": 19.23,
+        "high": 20.0,
+        "low": 19.04,
+        "close": 19.69,
+        "volume": 27159300
+      },
+      {
+        "date": "2025-12-19",
+        "open": 19.69,
+        "high": 20.0,
+        "low": 19.58,
+        "close": 19.96,
+        "volume": 21301200
+      }
+    ],
+    "close_change_fraction": -0.20251113811259613,
+    "official_event": {
+      "ex_date": "2025-12-18",
+      "stock_dividend_fraction": 0.25,
+      "bonus_share_fraction": 0.0469,
+      "source_url": "https://staticfile.hsx.vn/Uploads/UploadDocuments/2423661/20251212%20-%20HDB%20-%20TB%20so%202316%20ve%20NDKCC%20tra%20co%20tuc%20bang%20CP%20va%20PHCP%20tang%20VCP%20tu%20NVCSH.pdf",
+      "source_location": "HOSE notice 2316/TB-SGDHCM, 12/12/2025, pages 1–2",
+      "status": "Exchange confirms ex-date and simultaneous stock dividend plus bonus"
+    }
+  },
+  {
+    "symbol": "TCB",
+    "status": 503,
+    "detail": "Dữ liệu giá của TCB có biến động lớn chưa được xác minh tại 2026-10-29. Chưa thể tạo dự báo; cần đối chiếu điều chỉnh cổ tức/chia tách.",
+    "price_context": [
+      {
+        "date": "2026-10-28",
+        "open": 33.7,
+        "high": 33.75,
+        "low": 33.3,
+        "close": 33.5,
+        "volume": 25101000
+      },
+      {
+        "date": "2026-10-29",
+        "open": 22.65,
+        "high": 22.8,
+        "low": 22.2,
+        "close": 22.35,
+        "volume": 23642700
+      },
+      {
+        "date": "2026-10-30",
+        "open": 22.2,
+        "high": 22.25,
+        "low": 21.6,
+        "close": 21.6,
+        "volume": 17644300
+      }
+    ],
+    "close_change_fraction": -0.3328358208955223
+  }
+]

@@ -1,0 +1,12 @@
+
+ RUN  v5.0.5 /Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/web
+
+
+ Test Files  23 passed (23)
+      Tests  207 passed (207)
+   Start at  15:46:54
+   Duration  10.21s (environment 52%, import 24%, tests 20%, transform 3%, worker 1%)
+
+    Isolate  23 workers spawned · ~1.84s startup each (spawn + environment, per file)
+             at least ~4.20s faster with isolate: false — reuses workers across files instead of one per file
+

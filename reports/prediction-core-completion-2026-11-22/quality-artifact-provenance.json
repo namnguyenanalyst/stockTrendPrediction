@@ -1,0 +1,179 @@
+[
+  {
+    "fold": "fold-1",
+    "evaluation_keys": [
+      "evaluation_role",
+      "config",
+      "data_sha256",
+      "test_start_date",
+      "test_end_date",
+      "test_samples",
+      "training_info",
+      "metrics",
+      "limitations"
+    ],
+    "config": {
+      "cutoff_date": "2026-08-18",
+      "end_date": "2026-09-23",
+      "horizon": 3,
+      "threshold": 0.02,
+      "val_buffer_days": 40,
+      "seq_length": 20,
+      "epochs": 40
+    },
+    "test_start": "2026-08-19",
+    "test_end": "2026-09-18",
+    "manifest_sha256": "34e2e88b1771b19c9cdbec121c57ef5ec4009e2b8201ffdd357cdc507a888590",
+    "artifact_files": {
+      "production_lgb_t3.txt": {
+        "path": "runs/8a065754fda54185959437931673533a/production_lgb_t3.txt",
+        "sha256": "0477a803d12fe145b699b85b08c8cddeafc5a149335dc6b4ae419472ff35a09e"
+      },
+      "production_training_info_t3.json": {
+        "path": "runs/8a065754fda54185959437931673533a/production_training_info_t3.json",
+        "sha256": "2a1116a772f8e20a3b908e99f9ff9ca8b81cde016e200972ebd4f36c346b7f27"
+      },
+      "production_lstm_t3.pth": {
+        "path": "runs/8a065754fda54185959437931673533a/production_lstm_t3.pth",
+        "sha256": "b52c99f977f3c7db870d14860da6ef64c1446c09998cf1921376a4cbe8b244c1"
+      },
+      "production_lgb_t3.pkl": {
+        "path": "runs/8a065754fda54185959437931673533a/production_lgb_t3.pkl",
+        "sha256": "80489d1f4698e9ceeab52c767a75b282fafaafb8f978e906d59382401bf86770"
+      },
+      "feature_importance.json": {
+        "path": "runs/8a065754fda54185959437931673533a/feature_importance.json",
+        "sha256": "277cefeea9ddb80c1d2f818ff8920af62cd2cc20f3b0a8f85a9bde6038140456"
+      },
+      "production_scaler_t3.pkl": {
+        "path": "runs/8a065754fda54185959437931673533a/production_scaler_t3.pkl",
+        "sha256": "5826c97d159fbc5c177b1d1f7a48daa278ebe86404e384493e6dc69b8e01cc1b"
+      }
+    },
+    "runtime_versions": {
+      "scikit-learn": "1.7.2",
+      "numpy": "1.26.4",
+      "pandas": "2.3.3",
+      "lightgbm": "4.7.0",
+      "torch": "2.14.0"
+    }
+  },
+  {
+    "fold": "fold-2",
+    "evaluation_keys": [
+      "evaluation_role",
+      "config",
+      "data_sha256",
+      "test_start_date",
+      "test_end_date",
+      "test_samples",
+      "training_info",
+      "metrics",
+      "limitations"
+    ],
+    "config": {
+      "cutoff_date": "2026-09-18",
+      "end_date": "2026-10-21",
+      "horizon": 3,
+      "threshold": 0.02,
+      "val_buffer_days": 40,
+      "seq_length": 20,
+      "epochs": 40
+    },
+    "test_start": "2026-09-21",
+    "test_end": "2026-10-16",
+    "manifest_sha256": "980d393f469cce67314cf9ab2e81f7d15bfbf7c5b53c7fe266d66e76c59ea69d",
+    "artifact_files": {
+      "production_lgb_t3.txt": {
+        "path": "runs/1bca67bb4e1f400d91ad40a0b97f87cc/production_lgb_t3.txt",
+        "sha256": "e1be698f44add5f633f9e06a5c07fb152ad01e7dc2fd9b10895c5bd3f3dabf5e"
+      },
+      "production_training_info_t3.json": {
+        "path": "runs/1bca67bb4e1f400d91ad40a0b97f87cc/production_training_info_t3.json",
+        "sha256": "922e140fda578579dfda41123f765ea96290ca129fddbe4e894830dcbc2d8d57"
+      },
+      "production_lstm_t3.pth": {
+        "path": "runs/1bca67bb4e1f400d91ad40a0b97f87cc/production_lstm_t3.pth",
+        "sha256": "1458b06e1d9e0da112e0bceb7971c2009de8ab815e3e89dd98a02120d5520a80"
+      },
+      "production_lgb_t3.pkl": {
+        "path": "runs/1bca67bb4e1f400d91ad40a0b97f87cc/production_lgb_t3.pkl",
+        "sha256": "c8a2ac8f487cfb6c801a46602107ab280d086a7a1bcaa28e8891e64e5c519fe0"
+      },
+      "feature_importance.json": {
+        "path": "runs/1bca67bb4e1f400d91ad40a0b97f87cc/feature_importance.json",
+        "sha256": "4bb0c4a375ecac7f60c1ad16ad67f8d5747cc6e8ec918acee659f02fde94d7be"
+      },
+      "production_scaler_t3.pkl": {
+        "path": "runs/1bca67bb4e1f400d91ad40a0b97f87cc/production_scaler_t3.pkl",
+        "sha256": "7d79df5cb2c9650970b18f2941e9c31908319814c36cf041b4d7f78bf7ffe987"
+      }
+    },
+    "runtime_versions": {
+      "scikit-learn": "1.7.2",
+      "numpy": "1.26.4",
+      "pandas": "2.3.3",
+      "lightgbm": "4.7.0",
+      "torch": "2.14.0"
+    }
+  },
+  {
+    "fold": "fold-3",
+    "evaluation_keys": [
+      "evaluation_role",
+      "config",
+      "data_sha256",
+      "test_start_date",
+      "test_end_date",
+      "test_samples",
+      "training_info",
+      "metrics",
+      "limitations"
+    ],
+    "config": {
+      "cutoff_date": "2026-10-16",
+      "end_date": "2026-11-18",
+      "horizon": 3,
+      "threshold": 0.02,
+      "val_buffer_days": 40,
+      "seq_length": 20,
+      "epochs": 40
+    },
+    "test_start": "2026-10-19",
+    "test_end": "2026-11-13",
+    "manifest_sha256": "a544fb4807088e83a64d13940c41fb10b1f261e2bc12716dd2f10d8696ca8571",
+    "artifact_files": {
+      "production_lgb_t3.txt": {
+        "path": "runs/e664d77011bf4e1ab3434488f087ed5e/production_lgb_t3.txt",
+        "sha256": "2b0adba03a53172883eeb2d78ec00f4c96571280e2c2ae9f9eef1e23c8652ddd"
+      },
+      "production_training_info_t3.json": {
+        "path": "runs/e664d77011bf4e1ab3434488f087ed5e/production_training_info_t3.json",
+        "sha256": "0fdb3ff03dee154fc1353134e0065d494a840991512a330147532282cbcd1748"
+      },
+      "production_lstm_t3.pth": {
+        "path": "runs/e664d77011bf4e1ab3434488f087ed5e/production_lstm_t3.pth",
+        "sha256": "e1ddd812474a479248bb4a6359f79f7ca2fdd499a861879936e0f1b223d6dfa2"
+      },
+      "production_lgb_t3.pkl": {
+        "path": "runs/e664d77011bf4e1ab3434488f087ed5e/production_lgb_t3.pkl",
+        "sha256": "8f0b7bc9963643ef3715b80670fc5336fde1b5632b4ba456f5fdd29f64f52c71"
+      },
+      "feature_importance.json": {
+        "path": "runs/e664d77011bf4e1ab3434488f087ed5e/feature_importance.json",
+        "sha256": "b8ddfa734094bb90c063d76570b8fafe256df611bda49d2bff9b5dd3e7bf76c9"
+      },
+      "production_scaler_t3.pkl": {
+        "path": "runs/e664d77011bf4e1ab3434488f087ed5e/production_scaler_t3.pkl",
+        "sha256": "bc87a2e700e36d9b506e42933c7f3a9000b474f7a78d37a84bc714b53bcf6d3f"
+      }
+    },
+    "runtime_versions": {
+      "scikit-learn": "1.7.2",
+      "numpy": "1.26.4",
+      "pandas": "2.3.3",
+      "lightgbm": "4.7.0",
+      "torch": "2.14.0"
+    }
+  }
+]

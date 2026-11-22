@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "horizon_days": 3,
+  "feature_cols": [
+    "Open_Close_Ratio",
+    "High_Close_Ratio",
+    "Low_Close_Ratio",
+    "HL_Ratio",
+    "SMA_20_Dev",
+    "SMA_50_Dev",
+    "SMA_200_Dev",
+    "CV_50",
+    "CV_200",
+    "RSI",
+    "Return_1d",
+    "Vol_Ratio",
+    "VNINDEX_Return_1d"
+  ],
+  "all_feature_cols": [
+    "Open_Close_Ratio",
+    "High_Close_Ratio",
+    "Low_Close_Ratio",
+    "HL_Ratio",
+    "SMA_20_Dev",
+    "SMA_50_Dev",
+    "SMA_200_Dev",
+    "CV_50",
+    "CV_200",
+    "RSI",
+    "Return_1d",
+    "Vol_Ratio",
+    "VNINDEX_Return_1d",
+    "Symbol_Code"
+  ],
+  "symbol_to_code": {
+    "ACB": 0,
+    "BCM": 1,
+    "BID": 2,
+    "BVH": 3,
+    "CTG": 4,
+    "FPT": 5,
+    "GAS": 6,
+    "GVR": 7,
+    "HDB": 8,
+    "HPG": 9,
+    "MBB": 10,
+    "MSN": 11,
+    "MWG": 12,
+    "PLX": 13,
+    "POW": 14,
+    "SAB": 15,
+    "SHB": 16,
+    "SSB": 17,
+    "SSI": 18,
+    "STB": 19,
+    "TCB": 20,
+    "TPB": 21,
+    "VCB": 22,
+    "VHM": 23,
+    "VIB": 24,
+    "VIC": 25,
+    "VJC": 26,
+    "VNM": 27,
+    "VPB": 28,
+    "VRE": 29
+  },
+  "files": {
+    "production_lgb_t3.txt": {
+      "path": "runs/e664d77011bf4e1ab3434488f087ed5e/production_lgb_t3.txt",
+      "sha256": "2b0adba03a53172883eeb2d78ec00f4c96571280e2c2ae9f9eef1e23c8652ddd"
+    },
+    "production_training_info_t3.json": {
+      "path": "runs/e664d77011bf4e1ab3434488f087ed5e/production_training_info_t3.json",
+      "sha256": "0fdb3ff03dee154fc1353134e0065d494a840991512a330147532282cbcd1748"
+    },
+    "production_lstm_t3.pth": {
+      "path": "runs/e664d77011bf4e1ab3434488f087ed5e/production_lstm_t3.pth",
+      "sha256": "e1ddd812474a479248bb4a6359f79f7ca2fdd499a861879936e0f1b223d6dfa2"
+    },
+    "production_lgb_t3.pkl": {
+      "path": "runs/e664d77011bf4e1ab3434488f087ed5e/production_lgb_t3.pkl",
+      "sha256": "8f0b7bc9963643ef3715b80670fc5336fde1b5632b4ba456f5fdd29f64f52c71"
+    },
+    "feature_importance.json": {
+      "path": "runs/e664d77011bf4e1ab3434488f087ed5e/feature_importance.json",
+      "sha256": "b8ddfa734094bb90c063d76570b8fafe256df611bda49d2bff9b5dd3e7bf76c9"
+    },
+    "production_scaler_t3.pkl": {
+      "path": "runs/e664d77011bf4e1ab3434488f087ed5e/production_scaler_t3.pkl",
+      "sha256": "bc87a2e700e36d9b506e42933c7f3a9000b474f7a78d37a84bc714b53bcf6d3f"
+    }
+  }
+}

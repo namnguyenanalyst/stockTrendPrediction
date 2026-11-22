@@ -1,0 +1,135 @@
+[
+  {
+    "symbol": "TCB",
+    "from_date": "18/06/2024",
+    "to_date": "21/06/2024",
+    "rows": [
+      {
+        "Symbol": "TCB",
+        "TradingDate": "21/06/2024",
+        "ClosePrice": "24500",
+        "ClosePriceAdjusted": "16334.15",
+        "RefPrice": "24800",
+        "PerPriceChange": "-1.20"
+      },
+      {
+        "Symbol": "TCB",
+        "TradingDate": "20/06/2024",
+        "ClosePrice": "24800",
+        "ClosePriceAdjusted": "16534.16",
+        "RefPrice": "24150",
+        "PerPriceChange": "2.70"
+      },
+      {
+        "Symbol": "TCB",
+        "TradingDate": "19/06/2024",
+        "ClosePrice": "48300",
+        "ClosePriceAdjusted": "32201.61",
+        "RefPrice": "48800",
+        "PerPriceChange": "-1"
+      },
+      {
+        "Symbol": "TCB",
+        "TradingDate": "18/06/2024",
+        "ClosePrice": "48800",
+        "ClosePriceAdjusted": "32534.96",
+        "RefPrice": "48600",
+        "PerPriceChange": "0.40"
+      }
+    ]
+  },
+  {
+    "symbol": "CTG",
+    "from_date": "15/12/2025",
+    "to_date": "19/12/2025",
+    "rows": [
+      {
+        "Symbol": "CTG",
+        "TradingDate": "19/12/2025",
+        "ClosePrice": "34450",
+        "ClosePriceAdjusted": "33926.36",
+        "RefPrice": "34350",
+        "PerPriceChange": "0.30"
+      },
+      {
+        "Symbol": "CTG",
+        "TradingDate": "18/12/2025",
+        "ClosePrice": "34350",
+        "ClosePriceAdjusted": "33827.88",
+        "RefPrice": "34700",
+        "PerPriceChange": "-1"
+      },
+      {
+        "Symbol": "CTG",
+        "TradingDate": "17/12/2025",
+        "ClosePrice": "34700",
+        "ClosePriceAdjusted": "34172.56",
+        "RefPrice": "51000",
+        "PerPriceChange": "-32"
+      },
+      {
+        "Symbol": "CTG",
+        "TradingDate": "16/12/2025",
+        "ClosePrice": "51000",
+        "ClosePriceAdjusted": "50224.80",
+        "RefPrice": "49700",
+        "PerPriceChange": "2.60"
+      },
+      {
+        "Symbol": "CTG",
+        "TradingDate": "15/12/2025",
+        "ClosePrice": "49700",
+        "ClosePriceAdjusted": "48944.56",
+        "RefPrice": "49500",
+        "PerPriceChange": "0.40"
+      }
+    ]
+  },
+  {
+    "symbol": "HDB",
+    "from_date": "15/12/2025",
+    "to_date": "19/12/2025",
+    "rows": [
+      {
+        "Symbol": "HDB",
+        "TradingDate": "19/12/2025",
+        "ClosePrice": "25950",
+        "ClosePriceAdjusted": "19960.74",
+        "RefPrice": "25600",
+        "PerPriceChange": "1.40"
+      },
+      {
+        "Symbol": "HDB",
+        "TradingDate": "18/12/2025",
+        "ClosePrice": "25600",
+        "ClosePriceAdjusted": "19691.52",
+        "RefPrice": "32100",
+        "PerPriceChange": "-20.20"
+      },
+      {
+        "Symbol": "HDB",
+        "TradingDate": "17/12/2025",
+        "ClosePrice": "32100",
+        "ClosePriceAdjusted": "24691.32",
+        "RefPrice": "32100",
+        "PerPriceChange": "0"
+      },
+      {
+        "Symbol": "HDB",
+        "TradingDate": "16/12/2025",
+        "ClosePrice": "32100",
+        "ClosePriceAdjusted": "24691.32",
+        "RefPrice": "30000",
+        "PerPriceChange": "7"
+      },
+      {
+        "Symbol": "HDB",
+        "TradingDate": "15/12/2025",
+        "ClosePrice": "30000",
+        "ClosePriceAdjusted": "23076",
+        "RefPrice": "30200",
+        "PerPriceChange": "-0.70"
+      }
+    ]
+  }
+]

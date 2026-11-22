@@ -1,0 +1,9 @@
+
+ RUN  v5.0.5 /Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/web
+
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  21:22:02
+   Duration  4.97s (tests 56%, environment 24%, import 18%, transform 2%)
+

@@ -1,0 +1,160 @@
+{
+  "endpoint": "/api/v2/Market/DailyStockPrice",
+  "results": [
+    {
+      "symbol": "ACB",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "BCM",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "BID",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "BVH",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "CTG",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "FPT",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "GAS",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "GVR",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "HDB",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "HPG",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "MBB",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "MSN",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "MWG",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "PLX",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "POW",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "SAB",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "SHB",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "SSB",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "SSI",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "STB",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "TCB",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "TPB",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "VCB",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "VHM",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "VIB",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "VIC",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "VJC",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "VNM",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "VPB",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    },
+    {
+      "symbol": "VRE",
+      "local_rows": 1214,
+      "error_type": "ValueError"
+    }
+  ],
+  "limitations": [
+    "Vendor adjusted close is a current reference, not original ingestion provenance.",
+    "Comparisons use 0.011 thousand VND tolerance; no prices are changed.",
+    "Frozen evaluation snapshot ends 2026-11-18; latest VIC/HPG checked separately."
+  ]
+}

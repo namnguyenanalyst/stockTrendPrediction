@@ -1,0 +1,31 @@
+
+ RUN  v5.0.5 /Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/web
+
+ ❯ src/lib/personalization_adversarial.test.ts (12 tests | 1 failed) 284ms
+   ❯ Milestone 3 Adversarial Verification Suite (12)
+     ❯ 3. Backtest History Diary & Massive Equity Curves (3)
+       × should serialize, save, and calculate SVG path for large equity curves (5,000 points) 169ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/personalization_adversarial.test.ts > Milestone 3 Adversarial Verification Suite > 3. Backtest History Diary & Massive Equity Curves > should serialize, save, and calculate SVG path for large equity curves (5,000 points)
+AssertionError: expected 53.291708000000085 to be less than 50
+ ❯ src/lib/personalization_adversarial.test.ts:436:32
+    434|       const chartComputeTime = performance.now() - chartStartTime;
+    435|
+    436|       expect(chartComputeTime).toBeLessThan(50); // SVG Path generatio…
+       |                                ^
+    437|       expect(aiSvgPath.startsWith(" M")).toBe(true);
+    438|       expect(aiSvgPath.length).toBeGreaterThan(10000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 22 passed (23)
+      Tests  1 failed | 206 passed (207)
+   Start at  21:09:36
+   Duration  10.42s (environment 55%, import 23%, tests 18%, transform 2%, worker 1%)
+
+    Isolate  23 workers spawned · ~2.08s startup each (spawn + environment, per file)
+             at least ~4.75s faster with isolate: false — reuses workers across files instead of one per file
+

@@ -1,0 +1,246 @@
+{
+  "evaluation_role": "temporal_holdout",
+  "config": {
+    "cutoff_date": "2026-08-18",
+    "end_date": "2026-09-23",
+    "horizon": 3,
+    "threshold": 0.02,
+    "val_buffer_days": 40,
+    "seq_length": 20,
+    "epochs": 40
+  },
+  "data_sha256": "ba3a3810f8d51aec972c615d29e5065ea7df9880c06cba9c03b761c70e2186ba",
+  "test_start_date": "2026-08-19",
+  "test_end_date": "2026-09-18",
+  "test_samples": 600,
+  "training_info": {
+    "status": "success",
+    "timestamp": "2026-11-22T05:37:35.125901+00:00",
+    "scope": "VN30",
+    "symbols_count": 30,
+    "symbols": [
+      "ACB",
+      "BCM",
+      "BID",
+      "BVH",
+      "CTG",
+      "FPT",
+      "GAS",
+      "GVR",
+      "HDB",
+      "HPG",
+      "MBB",
+      "MSN",
+      "MWG",
+      "PLX",
+      "POW",
+      "SAB",
+      "SHB",
+      "SSB",
+      "SSI",
+      "STB",
+      "TCB",
+      "TPB",
+      "VCB",
+      "VHM",
+      "VIB",
+      "VIC",
+      "VJC",
+      "VNM",
+      "VPB",
+      "VRE"
+    ],
+    "horizon": "T+3",
+    "horizon_days": 3,
+    "threshold": 0.02,
+    "val_buffer_days": 40,
+    "latest_market_date": "2026-08-18",
+    "train_samples": 24000,
+    "val_samples": 1200,
+    "total_samples": 25200,
+    "evaluation_role": "model_selection_validation_not_independent_test",
+    "train_fit_samples": {
+      "lightgbm": 23910,
+      "lstm": 23340
+    },
+    "purged_samples": 90,
+    "train_end_date": "2026-06-18",
+    "validation_start_date": "2026-06-19",
+    "validation_end_date": "2026-08-13",
+    "seq_length": 20,
+    "hidden_size": 64,
+    "num_layers": 2,
+    "optimizer": "Adam",
+    "runtime_versions": {
+      "scikit-learn": "1.7.2",
+      "numpy": "1.26.4",
+      "pandas": "2.3.3",
+      "lightgbm": "4.7.0",
+      "torch": "2.14.0"
+    },
+    "seed": 42,
+    "epochs_requested": 40,
+    "epochs_completed": 16,
+    "lstm_early_stopping_patience": 10,
+    "best_lstm_epoch": 6,
+    "best_lstm_validation_loss": 1.0705954138601885,
+    "lightgbm_best_iteration": 45,
+    "lightgbm_parameters": {
+      "boosting_type": "gbdt",
+      "class_weight": "balanced",
+      "colsample_bytree": 0.8,
+      "importance_type": "split",
+      "learning_rate": 0.03,
+      "max_depth": 5,
+      "min_child_samples": 20,
+      "min_child_weight": 0.001,
+      "min_split_gain": 0.0,
+      "n_estimators": 300,
+      "n_jobs": 1,
+      "num_leaves": 20,
+      "objective": null,
+      "random_state": 42,
+      "reg_alpha": 0.0,
+      "reg_lambda": 0.0,
+      "subsample": 0.8,
+      "subsample_for_bin": 200000,
+      "subsample_freq": 0,
+      "verbose": -1
+    },
+    "train_class_counts": [
+      4574,
+      14085,
+      5251
+    ],
+    "lightgbm_metrics": {
+      "accuracy": 0.42916666666666664,
+      "macro_f1": 0.4024132710875858,
+      "weighted_f1": 0.4280709985197571,
+      "precision_macro": 0.40002070131222195,
+      "recall_macro": 0.4146067890400022,
+      "confusion_matrix": [
+        [
+          96,
+          168,
+          109
+        ],
+        [
+          149,
+          305,
+          125
+        ],
+        [
+          56,
+          78,
+          114
+        ]
+      ]
+    },
+    "lstm_metrics": {
+      "accuracy": 0.45166666666666666,
+      "macro_f1": 0.4285904994164215,
+      "weighted_f1": 0.4564503436214682,
+      "precision_macro": 0.43112719906173363,
+      "recall_macro": 0.4305747054844251,
+      "confusion_matrix": [
+        [
+          165,
+          128,
+          80
+        ],
+        [
+          204,
+          291,
+          84
+        ],
+        [
+          83,
+          79,
+          86
+        ]
+      ]
+    },
+    "artifact_publication": {
+      "artifact_generation": "8a065754fda54185959437931673533a",
+      "compatibility_export_failures": []
+    }
+  },
+  "metrics": {
+    "lightgbm": {
+      "accuracy": 0.48,
+      "macro_f1": 0.4076023391812866,
+      "weighted_f1": 0.4865092149565833,
+      "precision_macro": 0.43106691129354796,
+      "recall_macro": 0.42382063254841024,
+      "confusion_matrix": [
+        [
+          59,
+          53,
+          8
+        ],
+        [
+          113,
+          203,
+          37
+        ],
+        [
+          50,
+          51,
+          26
+        ]
+      ]
+    },
+    "lstm": {
+      "accuracy": 0.455,
+      "macro_f1": 0.3602959149489484,
+      "weighted_f1": 0.4556648155430823,
+      "precision_macro": 0.4143421998562185,
+      "recall_macro": 0.37833765821765203,
+      "confusion_matrix": [
+        [
+          52,
+          58,
+          10
+        ],
+        [
+          133,
+          206,
+          14
+        ],
+        [
+          55,
+          57,
+          15
+        ]
+      ]
+    },
+    "train_majority_baseline": {
+      "accuracy": 0.5883333333333334,
+      "macro_f1": 0.24693948933193424,
+      "weighted_f1": 0.43584819867086394,
+      "precision_macro": 0.19611111111111112,
+      "recall_macro": 0.3333333333333333,
+      "confusion_matrix": [
+        [
+          0,
+          120,
+          0
+        ],
+        [
+          0,
+          353,
+          0
+        ],
+        [
+          0,
+          127,
+          0
+        ]
+      ]
+    }
+  },
+  "limitations": [
+    "Current constituent universe; not survivorship-adjusted.",
+    "Classification holdout; not a claim of tradable profitability."
+  ]
+}

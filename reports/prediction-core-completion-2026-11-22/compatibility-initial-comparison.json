@@ -1,0 +1,8 @@
+{
+  "rows": 30450,
+  "max_abs_scaled_difference": 0.0,
+  "max_abs_lightgbm_probability_difference": 1.1102230246251565e-16,
+  "lightgbm_label_disagreements": 0,
+  "scope": "Same saved scaler and LightGBM, host Python3.10/sklearn1.7.2 versus current Docker Python3.11/sklearn1.9.1; not a guarantee for arbitrary artifacts.",
+  "decision": "Pin shared runtime to artifact sklearn1.7.2; different-version pickle loading unsupported per official sklearn documentation."
+}

@@ -1,0 +1,139 @@
+{
+  "status": "success",
+  "timestamp": "2026-11-20T15:55:03.179771+00:00",
+  "scope": "VN30",
+  "symbols_count": 30,
+  "symbols": [
+    "ACB",
+    "BCM",
+    "BID",
+    "BVH",
+    "CTG",
+    "FPT",
+    "GAS",
+    "GVR",
+    "HDB",
+    "HPG",
+    "MBB",
+    "MSN",
+    "MWG",
+    "PLX",
+    "POW",
+    "SAB",
+    "SHB",
+    "SSB",
+    "SSI",
+    "STB",
+    "TCB",
+    "TPB",
+    "VCB",
+    "VHM",
+    "VIB",
+    "VIC",
+    "VJC",
+    "VNM",
+    "VPB",
+    "VRE"
+  ],
+  "horizon": "T+3",
+  "horizon_days": 3,
+  "threshold": 0.02,
+  "val_buffer_days": 40,
+  "latest_market_date": "2026-08-18",
+  "train_samples": 24000,
+  "val_samples": 1200,
+  "total_samples": 25200,
+  "evaluation_role": "model_selection_validation_not_independent_test",
+  "train_fit_samples": {
+    "lightgbm": 23910,
+    "lstm": 23340
+  },
+  "purged_samples": 90,
+  "train_end_date": "2026-06-18",
+  "validation_start_date": "2026-06-19",
+  "validation_end_date": "2026-08-13",
+  "seq_length": 20,
+  "hidden_size": 64,
+  "num_layers": 2,
+  "optimizer": "Adam",
+  "seed": 42,
+  "epochs_completed": 40,
+  "best_lstm_epoch": 6,
+  "best_lstm_validation_loss": 1.0705954138601885,
+  "lightgbm_best_iteration": 45,
+  "lightgbm_parameters": {
+    "boosting_type": "gbdt",
+    "class_weight": "balanced",
+    "colsample_bytree": 0.8,
+    "importance_type": "split",
+    "learning_rate": 0.03,
+    "max_depth": 5,
+    "min_child_samples": 20,
+    "min_child_weight": 0.001,
+    "min_split_gain": 0.0,
+    "n_estimators": 300,
+    "n_jobs": 1,
+    "num_leaves": 20,
+    "objective": null,
+    "random_state": 42,
+    "reg_alpha": 0.0,
+    "reg_lambda": 0.0,
+    "subsample": 0.8,
+    "subsample_for_bin": 200000,
+    "subsample_freq": 0,
+    "verbose": -1
+  },
+  "train_class_counts": [
+    4574,
+    14085,
+    5251
+  ],
+  "lightgbm_metrics": {
+    "accuracy": 0.42916666666666664,
+    "macro_f1": 0.4024132710875858,
+    "weighted_f1": 0.4280709985197571,
+    "precision_macro": 0.40002070131222195,
+    "recall_macro": 0.4146067890400022,
+    "confusion_matrix": [
+      [
+        96,
+        168,
+        109
+      ],
+      [
+        149,
+        305,
+        125
+      ],
+      [
+        56,
+        78,
+        114
+      ]
+    ]
+  },
+  "lstm_metrics": {
+    "accuracy": 0.45166666666666666,
+    "macro_f1": 0.4285904994164215,
+    "weighted_f1": 0.4564503436214682,
+    "precision_macro": 0.43112719906173363,
+    "recall_macro": 0.4305747054844251,
+    "confusion_matrix": [
+      [
+        165,
+        128,
+        80
+      ],
+      [
+        204,
+        291,
+        84
+      ],
+      [
+        83,
+        79,
+        86
+      ]
+    ]
+  }
+}

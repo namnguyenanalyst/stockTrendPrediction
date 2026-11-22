@@ -1,0 +1,13 @@
+{
+  "image": "sha256:1bb94a1d8b86d1b04b12561eb9ae9a60f80eff053d6a237316e8006382a20aa4",
+  "container_state": "running",
+  "container_health": "healthy",
+  "http_health": {
+    "status": "healthy",
+    "service": "vn-stock-api",
+    "version": "0.1.0",
+    "environment": "development"
+  },
+  "baseline_artifacts_changed": [],
+  "production_retrained": false
+}

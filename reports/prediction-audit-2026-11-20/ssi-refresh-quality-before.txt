@@ -1,0 +1,18 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_ test_required_refresh_rejects_suspect_ssi_history_before_replacing_raw_cache _
+
+    def test_required_refresh_rejects_suspect_ssi_history_before_replacing_raw_cache():
+        from vn_stock.prediction_data_quality import UnverifiedPriceHistoryError
+        fresh = prices(30.)
+        fresh.loc[fresh.index[-2]:, ['Open','High','Low','Close']] = 20.
+        with patch('vn_stock.data_ingestion.SSIFastConnectClient') as client, \
+             patch('vn_stock.data_ingestion._atomic_save_parquet') as save:
+            client.return_value.get_daily_ohlcv.return_value = fresh
+>           with pytest.raises(UnverifiedPriceHistoryError, match='TCB'):
+E           Failed: DID NOT RAISE UnverifiedPriceHistoryError
+
+apps/ml/tests/test_data_refresh_provenance.py:76: Failed
+=========================== short test summary info ============================
+FAILED apps/ml/tests/test_data_refresh_provenance.py::test_required_refresh_rejects_suspect_ssi_history_before_replacing_raw_cache
+1 failed in 1.15s

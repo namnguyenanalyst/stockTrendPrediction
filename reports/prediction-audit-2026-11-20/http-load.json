@@ -1,0 +1,67 @@
+{
+  "results": {
+    "lightgbm": {
+      "first_request": {
+        "ok": true,
+        "seconds": 2.204622540999935
+      },
+      "levels": [
+        {
+          "concurrency": 1,
+          "requests": 2,
+          "errors": 0,
+          "p50_seconds": 0.07899952100001428,
+          "p95_seconds": 0.08087705240002378
+        },
+        {
+          "concurrency": 5,
+          "requests": 10,
+          "errors": 0,
+          "p50_seconds": 0.3806005209999057,
+          "p95_seconds": 0.39233349215001
+        },
+        {
+          "concurrency": 10,
+          "requests": 20,
+          "errors": 0,
+          "p50_seconds": 0.6584141455000463,
+          "p95_seconds": 0.9936302347999799
+        }
+      ]
+    },
+    "lstm": {
+      "first_request": {
+        "ok": true,
+        "seconds": 1.8557151659997544
+      },
+      "levels": [
+        {
+          "concurrency": 1,
+          "requests": 2,
+          "errors": 0,
+          "p50_seconds": 0.038161395499855644,
+          "p95_seconds": 0.039001939249760656
+        },
+        {
+          "concurrency": 5,
+          "requests": 10,
+          "errors": 0,
+          "p50_seconds": 0.3434230210000351,
+          "p95_seconds": 0.5073169684501181
+        },
+        {
+          "concurrency": 10,
+          "requests": 20,
+          "errors": 0,
+          "p50_seconds": 0.5780655210000987,
+          "p95_seconds": 0.7834014253002807
+        }
+      ]
+    }
+  },
+  "environment": "Isolated uvicorn/SQLite on 8001, same production artifacts, auto-sync disabled",
+  "limitations": [
+    "LSTM first request follows LightGBM first request; imports and OS file cache partly warm.",
+    "Bounded request counts; no SLA or sustained-load claim."
+  ]
+}

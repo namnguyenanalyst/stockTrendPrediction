@@ -1,0 +1,33 @@
+{
+  "environment": "Disposable worker containers + local fake API; no production retrain",
+  "results": [
+    {
+      "fixture_http_status": 200,
+      "worker_exit_code": 0,
+      "request": {
+        "path": "/api/v1/predict/retrain",
+        "payload": {
+          "horizon": 3,
+          "threshold": 0.02,
+          "val_buffer_days": 40,
+          "scope": "VN30"
+        },
+        "has_test_auth": true
+      }
+    },
+    {
+      "fixture_http_status": 503,
+      "worker_exit_code": 1,
+      "request": {
+        "path": "/api/v1/predict/retrain",
+        "payload": {
+          "horizon": 3,
+          "threshold": 0.02,
+          "val_buffer_days": 40,
+          "scope": "VN30"
+        },
+        "has_test_auth": true
+      }
+    }
+  ]
+}

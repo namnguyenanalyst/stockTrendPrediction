@@ -1,0 +1,38 @@
+.....F                                                                   [100%]
+=================================== FAILURES ===================================
+____ test_training_rejects_unverified_history_before_fitting_or_publishing _____
+
+tmp_path = PosixPath('/private/var/folders/r0/rl0ngg91681ggmyxzy2jqckr0000gn/T/pytest-of-huongnguyen/pytest-35/test_training_rejects_unverifi0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x11c61e770>
+
+    def test_training_rejects_unverified_history_before_fitting_or_publishing(tmp_path, monkeypatch):
+        from vn_stock.modeling.train import train_production_model
+        frame = history()
+        frame.loc[100:, 'Close'] = 20.
+        def must_not_fit(*args, **kwargs):
+            pytest.fail('Feature/model fitting must not start on unverified history')
+        monkeypatch.setattr('vn_stock.modeling.train.compute_features_per_symbol', must_not_fit)
+        with pytest.raises(UnverifiedPriceHistoryError, match='TCB'):
+>           train_production_model(symbols=['TCB'], raw_panel=frame, models_dir=tmp_path)
+
+apps/ml/tests/test_price_history_quality.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+apps/ml/vn_stock/modeling/train.py:200: in train_production_model
+    feat_df = compute_features_per_symbol(raw_panel, drop_na=True)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (          Date Symbol  Open  High   Low  Close  Volume  VNINDEX_Return_1d
+0   2024-01-01    TCB  30.0  31.0  29.0   3...                0.0
+299 2025-02-21    TCB  30.0  31.0  29.0   20.0  1000.0                0.0
+
+[300 rows x 8 columns],)
+kwargs = {'drop_na': True}
+
+    def must_not_fit(*args, **kwargs):
+>       pytest.fail('Feature/model fitting must not start on unverified history')
+E       Failed: Feature/model fitting must not start on unverified history
+
+apps/ml/tests/test_price_history_quality.py:37: Failed
+=========================== short test summary info ============================
+FAILED apps/ml/tests/test_price_history_quality.py::test_training_rejects_unverified_history_before_fitting_or_publishing
+1 failed, 5 passed in 3.48s

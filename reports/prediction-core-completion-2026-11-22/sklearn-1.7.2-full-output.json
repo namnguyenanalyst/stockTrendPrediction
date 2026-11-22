@@ -1,0 +1,14 @@
+{
+  "python": "3.10.14",
+  "platform": "macOS-27.2-arm64-arm-64bit",
+  "versions": {
+    "scikit-learn": "1.7.2",
+    "numpy": "1.26.4",
+    "pandas": "2.3.3",
+    "lightgbm": "4.7.0",
+    "torch": "2.14.0"
+  },
+  "rows": 30450,
+  "artifact_generation": "78b54b04ae9c3fee",
+  "warnings": []
+}

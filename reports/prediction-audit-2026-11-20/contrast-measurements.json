@@ -1,0 +1,23 @@
+{
+  "method": "Read-only rendered DOM colors; OKLCH/OKLab to sRGB, alpha compositing, WCAG relative luminance. 117 text nodes checked in populated forecast state.",
+  "before": {
+    "LightGBM": 3.6651568682328257,
+    "HOSE": 3.8570069032117686,
+    "Volume": 3.8570069032117686,
+    "SMA50_off": 2.1887644458035953
+  },
+  "after": {
+    "LightGBM": 5.367398961440309,
+    "HOSE": 6.995779941953483,
+    "Volume": 6.995779941953483,
+    "SMA50_off": 7.675032715379756
+  },
+  "remaining_failures_in_scanned_state": 0,
+  "sources": [
+    "https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html",
+    "https://www.w3.org/TR/css-color-4/#color-conversion-code"
+  ],
+  "limitations": [
+    "Not a WCAG certification; canvas labels, hover states and placeholders were not included in this text-node scan."
+  ]
+}

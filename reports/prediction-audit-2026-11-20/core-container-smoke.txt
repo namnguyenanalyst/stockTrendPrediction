@@ -1,0 +1,8 @@
+artifact_compatibility_export_failed file=lightgbm_classifier.pkl
+Traceback (most recent call last):
+  File "/app/apps/ml/vn_stock/modeling/artifacts.py", line 75, in publish_training_bundle
+    temporary.replace(models_dir / alias)
+  File "<stdin>", line 14, in fail_alias
+OSError: isolated export failure
+retraining_rejected reason=Dữ liệu giá của TCB có biến động lớn chưa được xác minh tại 2026-10-29. Chưa thể tạo dự báo; cần đối chiếu điều chỉnh cổ tức/chia tách.
+{"isolated_bundle_export_failure": "passed", "retrain_data_rejection": "passed", "production_artifacts_written": false}

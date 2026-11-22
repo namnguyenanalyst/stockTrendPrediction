@@ -1,0 +1,357 @@
+
+ RUN  v5.0.5 /Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/web
+
+ ❯ src/components/tabs/AIPredictionTab.accessibility.test.tsx (2 tests | 1 failed) 232ms
+   × explains probabilities with the artifact threshold and exposes expansion state 70ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/components/tabs/AIPredictionTab.accessibility.test.tsx > explains probabilities with the artifact threshold and exposes expansion state
+TestingLibraryElementError: Unable to find an accessible element with the role "button" and name "Giải thích xác suất và ngưỡng phân loại"
+
+Here are the accessible roles:
+
+  heading:
+
+  Name "Dự báo xu hướng 3 phiên giao dịch tiếp theo.":
+  [36m<h2[39m
+    [33mclass[39m=[32m"text-base font-bold text-slate-100 sm:text-lg"[39m
+  [36m/>[39m
+
+  Name "ĐANG TÍNH TOÁN":
+  [36m<h3[39m
+    [33mclass[39m=[32m"text-lg font-bold tracking-tight sm:text-xl"[39m
+  [36m/>[39m
+
+  Name "Biểu đồ nến và Dự báo xu hướng":
+  [36m<h3[39m
+    [33mclass[39m=[32m"text-sm font-semibold text-slate-100 sm:text-base"[39m
+  [36m/>[39m
+
+  Name "Lịch sử dự báo":
+  [36m<h3[39m
+    [33mclass[39m=[32m"text-sm font-semibold text-slate-100 sm:text-base"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  strong:
+
+  Name "":
+  [36m<strong[39m
+    [33mclass[39m=[32m"text-emerald-200"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<strong[39m
+    [33mclass[39m=[32m"text-slate-200"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "LightGBM":
+  [36m<button[39m
+    [33mclass[39m=[32m"relative flex items-center gap-1.5 overflow-hidden rounded px-2.5 py-1 text-xs font-semibold transition-colors bg-emerald-600 text-white shadow-sm"[39m
+    [33mtitle[39m=[32m"Giữ chuột 3 giây để xem cửa sổ đặc tả mô hình LightGBM"[39m
+  [36m/>[39m
+
+  Name "LSTM Network":
+  [36m<button[39m
+    [33mclass[39m=[32m"relative flex items-center gap-1.5 overflow-hidden rounded px-2.5 py-1 text-xs font-semibold transition-colors text-slate-400 hover:text-slate-200"[39m
+    [33mtitle[39m=[32m"Giữ chuột 3 giây để xem cửa sổ đặc tả mô hình PyTorch LSTM"[39m
+  [36m/>[39m
+
+  Name "Thông tin mô hình đang chọn":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Thông tin mô hình đang chọn"[39m
+    [33mclass[39m=[32m"min-h-9 min-w-9 rounded px-2 text-slate-300 hover:bg-slate-800 focus-visible:outline focus-visible:outline-emerald-400"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<button[39m
+    [33mclass[39m=[32m"text-slate-400 hover:text-slate-200"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-[11px] text-slate-400"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-xs font-medium text-slate-400"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-[11px] text-slate-500"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  table:
+
+  Name "":
+  [36m<table[39m
+    [33mclass[39m=[32m"w-full text-left text-xs"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  rowgroup:
+
+  Name "":
+  [36m<thead[39m
+    [33mclass[39m=[32m"sticky top-0 z-10 border-b border-slate-800 bg-slate-950/95 backdrop-blur-md text-slate-400 shadow-sm"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<tbody[39m
+    [33mclass[39m=[32m"divide-y divide-slate-800/60"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  row:
+
+  Name "Thời điểm Mã CP Mô hình Nến căn cứ Thị giá Tín hiệu Khuyến nghị Xác suất Tăng Xác suất Giảm Xác suất lớp Hành động":
+  [36m<tr />[39m
+
+  Name "Chưa có lịch sử phân tích Mỗi khi bạn chọn một mã cổ phiếu hoặc thay đổi mô hình, kết quả dự báo sẽ tự động được ghi lại tại đây.":
+  [36m<tr />[39m
+
+  --------------------------------------------------
+  columnheader:
+
+  Name "Thời điểm":
+  [36m<th[39m
+    [33mclass[39m=[32m"px-3 py-2.5 font-semibold"[39m
+  [36m/>[39m
+
+  Name "Mã CP":
+  [36m<th[39m
+    [33mclass[39m=[32m"px-3 py-2.5 font-semibold"[39m
+  [36m/>[39m
+
+  Name "Mô hình":
+  [36m<th[39m
+    [33mclass[39m=[32m"px-3 py-2.5 font-semibold"[39m
+  [36m/>[39m
+
+  Name "Nến căn cứ":
+  [36m<th[39m
+    [33mclass[39m=[32m"px-3 py-2.5 font-semibold"[39m
+  [36m/>[39m
+
+  Name "Thị giá":
+  [36m<th[39m
+    [33mclass[39m=[32m"px-3 py-2.5 text-right font-semibold"[39m
+  [36m/>[39m
+
+  Name "Tín hiệu Khuyến nghị":
+  [36m<th[39m
+    [33mclass[39m=[32m"px-3 py-2.5 text-center font-semibold"[39m
+  [36m/>[39m
+
+  Name "Xác suất Tăng":
+  [36m<th[39m
+    [33mclass[39m=[32m"px-3 py-2.5 text-right font-semibold"[39m
+  [36m/>[39m
+
+  Name "Xác suất Giảm":
+  [36m<th[39m
+    [33mclass[39m=[32m"px-3 py-2.5 text-right font-semibold"[39m
+  [36m/>[39m
+
+  Name "Xác suất lớp":
+  [36m<th[39m
+    [33mclass[39m=[32m"px-3 py-2.5 text-right font-semibold"[39m
+  [36m/>[39m
+
+  Name "Hành động":
+  [36m<th[39m
+    [33mclass[39m=[32m"px-3 py-2.5 text-center font-semibold"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  cell:
+
+  Name "Chưa có lịch sử phân tích Mỗi khi bạn chọn một mã cổ phiếu hoặc thay đổi mô hình, kết quả dự báo sẽ tự động được ghi lại tại đây.":
+  [36m<td[39m
+    [33mclass[39m=[32m"px-3 py-8 text-center text-slate-500"[39m
+    [33mcolspan[39m=[32m"10"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"space-y-4"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex flex-col gap-3 rounded-lg border border-slate-800 bg-slate-900 p-4 lg:flex-row lg:items-center lg:justify-between"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex items-center gap-3"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex h-10 w-10 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-400"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-brain h-5 w-5"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M12 18V5"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M17.997 5.125a4 4 0 0 1 2.526 5.77"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M18 18a4 4 0 0 0 2-7.464"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M6 18a4 4 0 0 1-2-7.464"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M6.003 5.125a4 4 0 0 0-2.526 5.77"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"flex items-center gap-2"[39m
+            [36m>[39m
+              [36m<h2[39m
+                [33mclass[39m=[32m"text-base font-bold text-slate-100 sm:text-lg"[39m
+              [36m>[39m
+                [0mDự báo xu hướng 3 phiên giao dịch tiếp theo.[0m
+              [36m</h2>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"mt-2 flex flex-wrap items-center gap-2"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"inline-flex flex-wrap items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/40 px-3 py-1 text-[11px] font-medium text-emerald-300 shadow-sm backdrop-blur-sm"[39m
+                [33mdata-testid[39m=[32m"autonomous-status-badge"[39m
+              [36m>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"relative flex h-2 w-2 shrink-0"[39m
+                [36m>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"[39m
+                  [36m/>[39m
+                  [36m<span[39m
+                    [33mclass[39m=[32m"relative inline-flex h-2 w-2 rounded-full bg-emerald-500"[39m
+                  [36m/>[39m
+                [36m</span>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"lucide lucide-bot h-3.5 w-3.5 shrink-0 text-emerald-400"[39m
+                  [33mfill[39m=[32m"none"[39m
+                  [33mheight[39m=[32m"24"[39m
+                  [33mstroke[39m=[32m"currentColor"[39m
+                  [33mstroke-linecap[39m=[32m"round"[39m
+                  [33mstroke-linejoin[39m=[32m"round"[39m
+                  [33mstroke-width[39m=[32m"2"[39m
+                  [33mviewBox[39m=[32m"0 0 24 24"[39m
+                  [33mwidth[39m=[32m"24"[39m
+                  [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M12 8V4H8"[39m
+                  [36m/>[39m
+                  [36m<rect[39m
+                    [33mheight[39m=[32m"12"[39m
+                    [33mrx[39m=[32m"2"[39m
+                    [33mwidth[39m=[32m"16"[39m
+                    [33mx[39m=[32m"4"[39m
+                    [33my[39m=[32m"8"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M2 14h2"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M20 14h2"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M15 13v2"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M9 13v2"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+                [36m<span>[39m
+                  [0mThông tin mô hình | Phiên mục tiêu:[0m
+                  [0m [0m
+                  [36m<strong[39m
+                    [33mclass[39m=[32m"text-emerald-200"[39m
+                  [36m>[39m
+                    [0mChưa tải được[0m
+                  [36m</strong>[39m
+                [36m</span>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"text-emerald-400/70 text-[10px]"[39m
+                [36m>[39m
+                  [0m(Cập nhật: [0m
+                  [0mChưa có lần cập nhật nào[0m
+                  [0m)[0m
+                [36m</span>[39m
+              [36m</div>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex flex-wrap items-center gap-2 self-start lg:self-auto"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"relative flex items-center gap-1 rounded-md border border-slate-800 bg-slate-950 p-1"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"relative flex items-center gap-1.5 overflow-hidden rounded px-2.5 py-1 text-xs font-semibold transition-colors bg-emerald-600 text-white shadow-sm"[39m
+              [33mtitle[39m=[32m"Giữ chuột 3 giây để xem cửa sổ đặc tả mô hình LightGBM"[39m
+            [36m>[39m
+              [36m<svg[39m
+                [33maria-hidden[39m=[32m"true"[39m
+                [33mclass[39m=...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/components/tabs/AIPredictionTab.accessibility.test.tsx:27:23
+     25|   training_info:{threshold:.02}} as PredictionResponse;
+     26|  render(<AIPredictionTab selectedSymbol="VIC" modelType="lightgbm" pre…
+     27|  const trigger=screen.getByRole('button',{name:'Giải thích xác suất và…
+       |                       ^
+     28|  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+     29|  fireEvent.click(trigger);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  21:36:55
+   Duration  2.11s (environment 64%, import 18%, tests 12%, transform 5%, worker 1%)
+

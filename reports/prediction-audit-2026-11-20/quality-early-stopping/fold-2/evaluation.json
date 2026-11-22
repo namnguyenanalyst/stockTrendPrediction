@@ -1,0 +1,235 @@
+{
+  "evaluation_role": "temporal_holdout",
+  "config": {
+    "cutoff_date": "2026-09-18",
+    "end_date": "2026-10-21",
+    "horizon": 3,
+    "threshold": 0.02,
+    "val_buffer_days": 40,
+    "seq_length": 20,
+    "epochs": 40
+  },
+  "data_sha256": "ba3a3810f8d51aec972c615d29e5065ea7df9880c06cba9c03b761c70e2186ba",
+  "test_start_date": "2026-09-21",
+  "test_end_date": "2026-10-16",
+  "test_samples": 600,
+  "training_info": {
+    "status": "success",
+    "timestamp": "2026-11-21T08:34:46.732640+00:00",
+    "scope": "VN30",
+    "symbols_count": 30,
+    "symbols": [
+      "ACB",
+      "BCM",
+      "BID",
+      "BVH",
+      "CTG",
+      "FPT",
+      "GAS",
+      "GVR",
+      "HDB",
+      "HPG",
+      "MBB",
+      "MSN",
+      "MWG",
+      "PLX",
+      "POW",
+      "SAB",
+      "SHB",
+      "SSB",
+      "SSI",
+      "STB",
+      "TCB",
+      "TPB",
+      "VCB",
+      "VHM",
+      "VIB",
+      "VIC",
+      "VJC",
+      "VNM",
+      "VPB",
+      "VRE"
+    ],
+    "horizon": "T+3",
+    "horizon_days": 3,
+    "threshold": 0.02,
+    "val_buffer_days": 40,
+    "latest_market_date": "2026-09-18",
+    "train_samples": 24600,
+    "val_samples": 1200,
+    "total_samples": 25800,
+    "evaluation_role": "model_selection_validation_not_independent_test",
+    "train_fit_samples": {
+      "lightgbm": 24510,
+      "lstm": 23940
+    },
+    "purged_samples": 90,
+    "train_end_date": "2026-07-16",
+    "validation_start_date": "2026-07-17",
+    "validation_end_date": "2026-09-15",
+    "seq_length": 20,
+    "hidden_size": 64,
+    "num_layers": 2,
+    "optimizer": "Adam",
+    "seed": 42,
+    "epochs_requested": 40,
+    "epochs_completed": 12,
+    "lstm_early_stopping_patience": 10,
+    "best_lstm_epoch": 2,
+    "best_lstm_validation_loss": 1.077399563417914,
+    "lightgbm_best_iteration": 43,
+    "lightgbm_parameters": {
+      "boosting_type": "gbdt",
+      "class_weight": "balanced",
+      "colsample_bytree": 0.8,
+      "importance_type": "split",
+      "learning_rate": 0.03,
+      "max_depth": 5,
+      "min_child_samples": 20,
+      "min_child_weight": 0.001,
+      "min_split_gain": 0.0,
+      "n_estimators": 300,
+      "n_jobs": 1,
+      "num_leaves": 20,
+      "objective": null,
+      "random_state": 42,
+      "reg_alpha": 0.0,
+      "reg_lambda": 0.0,
+      "subsample": 0.8,
+      "subsample_for_bin": 200000,
+      "subsample_freq": 0,
+      "verbose": -1
+    },
+    "train_class_counts": [
+      4740,
+      14440,
+      5330
+    ],
+    "lightgbm_metrics": {
+      "accuracy": 0.42916666666666664,
+      "macro_f1": 0.39854219821922426,
+      "weighted_f1": 0.4377572229651844,
+      "precision_macro": 0.4012662167843788,
+      "recall_macro": 0.39976378419353303,
+      "confusion_matrix": [
+        [
+          82,
+          116,
+          79
+        ],
+        [
+          171,
+          307,
+          126
+        ],
+        [
+          91,
+          102,
+          126
+        ]
+      ]
+    },
+    "lstm_metrics": {
+      "accuracy": 0.43,
+      "macro_f1": 0.3877650749535073,
+      "weighted_f1": 0.4359742615775645,
+      "precision_macro": 0.41986485161713,
+      "recall_macro": 0.38950266709126485,
+      "confusion_matrix": [
+        [
+          104,
+          123,
+          50
+        ],
+        [
+          222,
+          337,
+          45
+        ],
+        [
+          136,
+          108,
+          75
+        ]
+      ]
+    }
+  },
+  "metrics": {
+    "lightgbm": {
+      "accuracy": 0.47333333333333333,
+      "macro_f1": 0.3921504943029676,
+      "weighted_f1": 0.4909519081410184,
+      "precision_macro": 0.40049531913975706,
+      "recall_macro": 0.3930635593198239,
+      "confusion_matrix": [
+        [
+          58,
+          53,
+          56
+        ],
+        [
+          72,
+          205,
+          67
+        ],
+        [
+          23,
+          45,
+          21
+        ]
+      ]
+    },
+    "lstm": {
+      "accuracy": 0.48,
+      "macro_f1": 0.39357191099550776,
+      "weighted_f1": 0.4902447052656477,
+      "precision_macro": 0.39460763646740715,
+      "recall_macro": 0.39671382346360323,
+      "confusion_matrix": [
+        [
+          74,
+          57,
+          36
+        ],
+        [
+          94,
+          199,
+          51
+        ],
+        [
+          29,
+          45,
+          15
+        ]
+      ]
+    },
+    "train_majority_baseline": {
+      "accuracy": 0.5733333333333334,
+      "macro_f1": 0.24293785310734461,
+      "weighted_f1": 0.41785310734463277,
+      "precision_macro": 0.19111111111111112,
+      "recall_macro": 0.3333333333333333,
+      "confusion_matrix": [
+        [
+          0,
+          167,
+          0
+        ],
+        [
+          0,
+          344,
+          0
+        ],
+        [
+          0,
+          89,
+          0
+        ]
+      ]
+    }
+  },
+  "limitations": [
+    "Current constituent universe; not survivorship-adjusted.",
+    "Classification holdout; not a claim of tradable profitability."
+  ]
+}

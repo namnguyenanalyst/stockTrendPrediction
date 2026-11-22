@@ -1,0 +1,23 @@
+{
+  "image": "sha256:1bb94a1d8b86d1b04b12561eb9ae9a60f80eff053d6a237316e8006382a20aa4",
+  "container_health": "healthy",
+  "api_health": {
+    "status": "healthy",
+    "service": "vn-stock-api",
+    "version": "0.1.0",
+    "environment": "development"
+  },
+  "ml_mounts": [
+    {
+      "destination": "/app/apps/ml/data",
+      "writable": false
+    },
+    {
+      "destination": "/app/apps/ml/models",
+      "writable": false
+    }
+  ],
+  "retrain_worker_running": false,
+  "remaining_blocker": "No fully verified adjusted history/action ledger for discrepant or discontinuous production price series. Do not promote partial SSI replacement or retrain production on unverified history.",
+  "completed_work_not_reaudited": true
+}

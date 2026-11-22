@@ -1,0 +1,22 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+__________ test_sync_reports_panel_publish_failure_instead_of_success __________
+
+    def test_sync_reports_panel_publish_failure_instead_of_success():
+        from vn_stock.data_ingestion import sync_latest_market_data
+        with patch('vn_stock.data_ingestion.fetch_stock_data', return_value=prices(10)), \
+             patch('vn_stock.data_ingestion.fetch_daily_index', return_value=prices(1000)), \
+             patch('vn_stock.data_ingestion.build_panel_dataset', side_effect=OSError('isolated panel publish failure')):
+            result = sync_latest_market_data(['VIC'])
+>       assert result['status'] == 'partial'
+E       AssertionError: assert 'success' == 'partial'
+E         
+E         - partial
+E         + success
+
+apps/ml/tests/test_data_refresh_provenance.py:65: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  vn_stock.data_ingestion:data_ingestion.py:478 Lỗi cập nhật panel interim sau đồng bộ: isolated panel publish failure
+=========================== short test summary info ============================
+FAILED apps/ml/tests/test_data_refresh_provenance.py::test_sync_reports_panel_publish_failure_instead_of_success
+1 failed in 0.92s

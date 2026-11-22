@@ -1,0 +1,9 @@
+{
+  "symbol": "HPG",
+  "model": "lstm",
+  "data_as_of": "2026-11-20",
+  "generation": "71d398842a1f2650",
+  "matching_logs": [
+    "vn_stock_api  | 2026-11-21 14:18:24,523 - app.services.prediction_service - INFO - prediction_completed symbol=HPG model=lstm data_as_of=2026-11-20 generation=71d398842a1f2650 status=healthy elapsed_ms=4080.59"
+  ]
+}

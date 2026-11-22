@@ -1,0 +1,13 @@
+{
+  "git_head": "17b529f1b29a2f6ac3a83ff8571d8d272335150c",
+  "status": " M DESIGN.md\n M apps/api/app/routers/stocks.py\n M apps/api/app/services/stock_service.py\n M apps/ml/vn_stock/backtest.py\n M apps/web/src/app/(auth)/layout.tsx\n M apps/web/src/components/Sidebar.tsx\n M apps/web/src/components/TopHeader.tsx\n M apps/web/src/components/charts/FireAntTrajectoryChart.tsx\n M apps/web/src/components/market/FinancialDetailModal.tsx\n M apps/web/src/components/tabs/AIPredictionTab.tsx\n M apps/web/src/components/tabs/MarketOverviewTab.tsx\n M apps/web/src/lib/api.ts\n?? apps/api/tests/test_chart_indicators.py\n?? apps/ml/tests/test_chart_indicators.py\n?? apps/ml/vn_stock/chart_indicators.py\n?? apps/web/src/components/charts/DetailIndicatorChart.tsx\n?? apps/web/src/components/market/IndicatorSearch.test.tsx\n?? apps/web/src/components/market/IndicatorSearch.tsx\n?? apps/web/src/lib/chartIndicators.test.ts\n?? apps/web/src/lib/chartIndicators.ts\n?? apps/web/src/lib/chartIndicatorsApi.test.ts\n?? apps/web/src/lib/marketMetricPresentation.test.ts\n?? apps/web/src/lib/marketMetricPresentation.ts\n",
+  "containers": "vn_stock_api infra-vn_stock_api:latest Up 8 minutes (healthy)\nvn_stock_retrain_worker python:3.11-alpine Up 4 hours\nvn_stock_db postgres:16-alpine Up 4 hours (healthy)\n",
+  "artifact_hashes": {
+    "apps/ml/models/production_lgb_t3.txt": "4b82b772ab8f72a04af749abe89d98b82f5558b2b60f92a2c292e1e52dd034d5",
+    "apps/ml/models/production_training_info_t3.json": "50f52abc884801cf9c002b6b5b291e1957860be8c04f90e1b1664b35182e6fe4",
+    "apps/ml/models/production_lstm_t3.pth": "27618f9497c6cfb2aee5b7243ac36cbbf0d6249fb9840072ceb37f8f17e369bb",
+    "apps/ml/models/production_training_info.json": "50f52abc884801cf9c002b6b5b291e1957860be8c04f90e1b1664b35182e6fe4",
+    "apps/ml/models/production_lgb_t3.pkl": "0ab6eda5d3d532225e8a618963bbec8461d59f1238055550f5eb5f72f68fa604",
+    "apps/ml/models/production_scaler_t3.pkl": "7eedd5d9f3cfb8c7372d50e6010692af85d49d6569d112c3a8459c85aacbefdf"
+  }
+}

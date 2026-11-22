@@ -1,0 +1,55 @@
+{
+  "environment": "IAB 3001 / isolated API 8001, Audit Two",
+  "cases": [
+    {
+      "width": 390,
+      "page": 384,
+      "main": 304,
+      "canvas": 7,
+      "dialog_width": 352,
+      "dialog_x": 16,
+      "focus_inside": true,
+      "model": "lightgbm"
+    },
+    {
+      "width": 768,
+      "page": 762,
+      "main": 682,
+      "canvas": 7,
+      "dialog_width": 576,
+      "dialog_x": 93,
+      "focus_inside": true,
+      "model": "lstm"
+    },
+    {
+      "width": 1280,
+      "page": 1274,
+      "main": 1194,
+      "canvas": 7,
+      "dialog_width": 576,
+      "dialog_x": 349,
+      "focus_inside": true,
+      "model": "lightgbm"
+    },
+    {
+      "width": 1920,
+      "page": 1914,
+      "main": 1280,
+      "canvas": 7,
+      "dialog_width": 576,
+      "dialog_x": 669,
+      "focus_inside": true,
+      "model": "lstm"
+    }
+  ],
+  "all_cases": {
+    "sma50_enter_pressed": true,
+    "one_month_enter_pressed": true,
+    "probability_help_expanded_by_enter": true,
+    "model_dialog_escape_closed": true,
+    "model_selected_by_enter": true,
+    "model_aria_pressed_true": true
+  },
+  "viewport_reset": true,
+  "limitation": "A cold LSTM request exceeded an initial locator observation deadline; subsequent AX state confirmed completion with valid LSTM trajectory, not application failure."
+}

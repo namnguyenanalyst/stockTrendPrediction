@@ -1,0 +1,17 @@
+[
+  {
+    "fold": 1,
+    "cutoff": "2026-08-18",
+    "purge_mask_difference_on_frozen_data": 0
+  },
+  {
+    "fold": 2,
+    "cutoff": "2026-09-18",
+    "purge_mask_difference_on_frozen_data": 0
+  },
+  {
+    "fold": 3,
+    "cutoff": "2026-10-16",
+    "purge_mask_difference_on_frozen_data": 0
+  }
+]

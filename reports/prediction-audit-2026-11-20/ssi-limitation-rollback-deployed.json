@@ -1,0 +1,48 @@
+{
+  "image": "sha256:f613c708ec3d67a2dde23ec98fd17f7aedf947b8e2f62221badccde8d345e02e",
+  "rows": [
+    {
+      "symbol": "CTG",
+      "model": "lightgbm",
+      "status": 200,
+      "date": "2026-11-20",
+      "price": 30.1
+    },
+    {
+      "symbol": "CTG",
+      "model": "lstm",
+      "status": 200,
+      "date": "2026-11-20",
+      "price": 30.1
+    },
+    {
+      "symbol": "HDB",
+      "model": "lightgbm",
+      "status": 200,
+      "date": "2026-11-20",
+      "price": 21.8
+    },
+    {
+      "symbol": "HDB",
+      "model": "lstm",
+      "status": 200,
+      "date": "2026-11-20",
+      "price": 21.8
+    },
+    {
+      "symbol": "TCB",
+      "model": "lightgbm",
+      "status": 200,
+      "date": "2026-11-20",
+      "price": 21.2
+    },
+    {
+      "symbol": "TCB",
+      "model": "lstm",
+      "status": 200,
+      "date": "2026-11-20",
+      "price": 21.2
+    }
+  ],
+  "scope": "Removed heuristic price-jump rejections; no corporate-action price correction applied."
+}

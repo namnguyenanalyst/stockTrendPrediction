@@ -1,0 +1,15 @@
+....F                                                                    [100%]
+=================================== FAILURES ===================================
+_____ test_compatibility_export_failure_does_not_hide_committed_generation _____
+
+tmp_path = PosixPath('/private/var/folders/r0/rl0ngg91681ggmyxzy2jqckr0000gn/T/pytest-of-huongnguyen/pytest-33/test_compatibility_export_fail0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x15033b2e0>
+
+    def test_compatibility_export_failure_does_not_hide_committed_generation(tmp_path, monkeypatch):
+>       from vn_stock.modeling.artifacts import publish_training_bundle
+E       ImportError: cannot import name 'publish_training_bundle' from 'vn_stock.modeling.artifacts' (/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/vn_stock/modeling/artifacts.py)
+
+apps/ml/tests/test_artifact_bundles.py:95: ImportError
+=========================== short test summary info ============================
+FAILED apps/ml/tests/test_artifact_bundles.py::test_compatibility_export_failure_does_not_hide_committed_generation
+1 failed, 4 passed in 1.09s

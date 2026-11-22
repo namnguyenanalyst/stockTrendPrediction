@@ -1,0 +1,12 @@
+   Building vn-stock @ file:///Users/huongnguyen/Desktop/Ho%CC%A3c%20Python/Project/Machine%20Learning/machine_learning_projects/stockTrendPrediction/apps/ml
+      Built vn-stock @ file:///Users/huongnguyen/Desktop/Ho%CC%A3c%20Python/Project/Machine%20Learning/machine_learning_projects/stockTrendPrediction/apps/ml
+Uninstalled 1 package in 2ms
+Installed 1 package in 2ms
+.                                                                        [100%]
+=============================== warnings summary ===============================
+tests/test_modeling.py::test_train_production_model
+  /Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/lightgbm/sklearn.py:1106: LGBMDeprecationWarning: The argument 'eval_set' is deprecated, use 'eval_X' and 'eval_y' instead.
+    eval_set = _validate_eval_set_Xy(eval_set=eval_set, eval_X=eval_X, eval_y=eval_y)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+1 passed, 1 warning in 5.25s

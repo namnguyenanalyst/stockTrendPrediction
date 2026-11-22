@@ -1,0 +1,27 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_ test_required_refresh_raises_instead_of_using_covering_cache_after_vendor_failure _
+
+    def test_required_refresh_raises_instead_of_using_covering_cache_after_vendor_failure():
+        with patch('vn_stock.data_ingestion.load_local_data',return_value=prices(10)), \
+             patch('vn_stock.data_ingestion.SSIFastConnectClient') as client:
+            client.return_value.get_daily_ohlcv.side_effect=OSError('isolated unavailable')
+            with pytest.raises(RuntimeError,match='refresh'):
+>               fetch_stock_data('VIC','2024-01-01','2024-01-10',save_to_raw=False,require_fresh=True)
+E               TypeError: fetch_stock_data() got an unexpected keyword argument 'require_fresh'
+
+tests/test_data_refresh_provenance.py:18: TypeError
+_ test_required_refresh_replaces_revised_history_in_memory_even_when_dates_are_unchanged _
+
+    def test_required_refresh_replaces_revised_history_in_memory_even_when_dates_are_unchanged():
+        with patch('vn_stock.data_ingestion.load_local_data',return_value=prices(10)), \
+             patch('vn_stock.data_ingestion.SSIFastConnectClient') as client:
+            client.return_value.get_daily_ohlcv.return_value=prices(5)
+>           result=fetch_stock_data('VIC','2024-01-01','2024-01-10',save_to_raw=False,require_fresh=True)
+E           TypeError: fetch_stock_data() got an unexpected keyword argument 'require_fresh'
+
+tests/test_data_refresh_provenance.py:25: TypeError
+=========================== short test summary info ============================
+FAILED tests/test_data_refresh_provenance.py::test_required_refresh_raises_instead_of_using_covering_cache_after_vendor_failure
+FAILED tests/test_data_refresh_provenance.py::test_required_refresh_replaces_revised_history_in_memory_even_when_dates_are_unchanged
+2 failed in 2.30s

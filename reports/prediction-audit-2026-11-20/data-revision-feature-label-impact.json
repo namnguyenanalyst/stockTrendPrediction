@@ -1,0 +1,182 @@
+[
+  {
+    "symbol": "ACB",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "BCM",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "BID",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "BVH",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "CTG",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "FPT",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "GAS",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "GVR",
+    "samples": 903,
+    "label_changes": 5,
+    "feature_rows_changed": 903
+  },
+  {
+    "symbol": "HDB",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "HPG",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "MBB",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "MSN",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "MWG",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "PLX",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "POW",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "SAB",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "SHB",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "SSB",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "SSI",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "STB",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "TCB",
+    "samples": 903,
+    "label_changes": 8,
+    "feature_rows_changed": 903
+  },
+  {
+    "symbol": "TPB",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "VCB",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "VHM",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "VIB",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "VIC",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "VJC",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "VNM",
+    "samples": 903,
+    "label_changes": 5,
+    "feature_rows_changed": 903
+  },
+  {
+    "symbol": "VPB",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  },
+  {
+    "symbol": "VRE",
+    "samples": 903,
+    "label_changes": 0,
+    "feature_rows_changed": 0
+  }
+]

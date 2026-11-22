@@ -1,0 +1,8 @@
+{
+  "exit_code": 143,
+  "stdout": "",
+  "stderr": "",
+  "uid": "501:20",
+  "private_directory": "/var/folders/r0/rl0ngg91681ggmyxzy2jqckr0000gn/T/stock-training-preflight-k4aj35c1",
+  "image": "infra-vn_stock_api:core-runtime-172"
+}

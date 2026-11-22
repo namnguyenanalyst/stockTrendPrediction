@@ -1,0 +1,15 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________ test_shared_sklearn_runtime_matches_existing_serving_artifacts ________
+
+    def test_shared_sklearn_runtime_matches_existing_serving_artifacts():
+        root=Path(__file__).resolve().parents[2]
+        project=tomllib.loads((root/'apps/ml/pyproject.toml').read_text())
+        requirements=project['project']['dependencies']
+>       assert 'scikit-learn==1.7.2' in requirements
+E       AssertionError: assert 'scikit-learn==1.7.2' in ['lightgbm>=4.7.0', 'matplotlib', 'numpy<2', 'pandas', 'pyarrow>=14.0.0,<18.0.0', 'fastparquet', ...]
+
+infra/tests/test_ml_runtime_contract.py:13: AssertionError
+=========================== short test summary info ============================
+FAILED infra/tests/test_ml_runtime_contract.py::test_shared_sklearn_runtime_matches_existing_serving_artifacts
+1 failed in 0.05s

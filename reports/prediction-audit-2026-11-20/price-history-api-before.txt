@@ -1,0 +1,43 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______ test_unverified_price_history_returns_public_unavailable_reason ________
+
+    def test_unverified_price_history_returns_public_unavailable_reason():
+        from vn_stock.data_quality import UnverifiedPriceHistoryError
+        from app.services.prediction_service import predict_stock_signal
+        with patch('vn_stock.modeling.predict_trend',side_effect=UnverifiedPriceHistoryError('TCB','2026-10-29')):
+            with pytest.raises(HTTPException) as exc:
+                predict_stock_signal('TCB','lightgbm')
+>       assert exc.value.status_code==503
+E       AssertionError: assert 500 == 503
+E        +  where 500 = HTTPException(status_code=500, detail='Lỗi khi thực hiện suy luận dự báo.').status_code
+E        +    where HTTPException(status_code=500, detail='Lỗi khi thực hiện suy luận dự báo.') = <ExceptionInfo HTTPException(status_code=500, detail='Lỗi khi thực hiện suy luận dự báo.') tblen=2>.value
+
+tests/test_prediction_audit.py:69: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-11-21 22:06:08,214 - app.services.prediction_service - ERROR - Lỗi suy luận dự báo symbol=TCB model=lightgbm
+Traceback (most recent call last):
+  File "/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/api/app/services/prediction_service.py", line 61, in predict_stock_signal
+    res = predict_trend(
+  File "/opt/anaconda3/lib/python3.10/unittest/mock.py", line 1114, in __call__
+    return self._mock_call(*args, **kwargs)
+  File "/opt/anaconda3/lib/python3.10/unittest/mock.py", line 1118, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+  File "/opt/anaconda3/lib/python3.10/unittest/mock.py", line 1173, in _execute_mock_call
+    raise effect
+vn_stock.data_quality.UnverifiedPriceHistoryError: Dữ liệu giá của TCB có biến động lớn chưa được xác minh tại 2026-10-29. Chưa thể tạo dự báo; cần đối chiếu điều chỉnh cổ tức/chia tách.
+------------------------------ Captured log call -------------------------------
+ERROR    app.services.prediction_service:prediction_service.py:101 Lỗi suy luận dự báo symbol=TCB model=lightgbm
+Traceback (most recent call last):
+  File "/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/api/app/services/prediction_service.py", line 61, in predict_stock_signal
+    res = predict_trend(
+  File "/opt/anaconda3/lib/python3.10/unittest/mock.py", line 1114, in __call__
+    return self._mock_call(*args, **kwargs)
+  File "/opt/anaconda3/lib/python3.10/unittest/mock.py", line 1118, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+  File "/opt/anaconda3/lib/python3.10/unittest/mock.py", line 1173, in _execute_mock_call
+    raise effect
+vn_stock.data_quality.UnverifiedPriceHistoryError: Dữ liệu giá của TCB có biến động lớn chưa được xác minh tại 2026-10-29. Chưa thể tạo dự báo; cần đối chiếu điều chỉnh cổ tức/chia tách.
+=========================== short test summary info ============================
+FAILED tests/test_prediction_audit.py::test_unverified_price_history_returns_public_unavailable_reason
+1 failed, 18 deselected in 0.54s

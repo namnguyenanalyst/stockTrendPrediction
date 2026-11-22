@@ -1,0 +1,26 @@
+[
+  {
+    "symbol": "TCB",
+    "before": "19/06/2024",
+    "after": "20/06/2024",
+    "before_adjusted_vnd": 32201.61,
+    "after_adjusted_vnd": 16534.16,
+    "adjusted_change_fraction": -0.48654244306418226
+  },
+  {
+    "symbol": "CTG",
+    "before": "16/12/2025",
+    "after": "17/12/2025",
+    "before_adjusted_vnd": 50224.8,
+    "after_adjusted_vnd": 34172.56,
+    "adjusted_change_fraction": -0.319607843137255
+  },
+  {
+    "symbol": "HDB",
+    "before": "17/12/2025",
+    "after": "18/12/2025",
+    "before_adjusted_vnd": 24691.32,
+    "after_adjusted_vnd": 19691.52,
+    "adjusted_change_fraction": -0.20249221183800625
+  }
+]

@@ -1,0 +1,120 @@
+...FF                                                                    [100%]
+=================================== FAILURES ===================================
+_____ test_production_training_does_not_fall_through_failed_sync[outcome0] _____
+
+outcome = OSError('sync unavailable')
+tmp_path = PosixPath('/private/var/folders/r0/rl0ngg91681ggmyxzy2jqckr0000gn/T/pytest-of-huongnguyen/pytest-40/test_production_training_does_0')
+
+    @pytest.mark.parametrize('outcome', [OSError('sync unavailable'), {'status':'partial','errors':{'VIC':'missing data'}}])
+    def test_production_training_does_not_fall_through_failed_sync(outcome, tmp_path):
+        from vn_stock.modeling.train import train_production_model
+        kwargs = {'side_effect': outcome} if isinstance(outcome, Exception) else {'return_value': outcome}
+        with patch('vn_stock.data_ingestion.sync_latest_market_data', **kwargs), \
+             patch('vn_stock.modeling.train.build_panel_dataset') as build:
+            with pytest.raises(RuntimeError, match='synchronization'):
+>               train_production_model(symbols=['VIC'], models_dir=tmp_path)
+
+apps/ml/tests/test_data_refresh_provenance.py:54: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+apps/ml/vn_stock/modeling/train.py:203: in train_production_model
+    for symbol, history in apply_study_window(raw_panel).groupby("Symbol"):
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+df = <MagicMock name='build_panel_dataset()' id='5704222128'>
+start_date = '2023-04-03', date_col = 'Date'
+
+    def apply_study_window(
+        df: pd.DataFrame,
+        start_date: str = STUDY_START_DATE,
+        date_col: str = "Date",
+    ) -> pd.DataFrame:
+        """
+        Cắt gọn tập dữ liệu bảng đa mã về đúng phạm vi cửa sổ nghiên cứu (Study Window).
+    
+        Lý do tồn tại hàm:
+        - Trong pipeline ML, dữ liệu giá thô cần được thu thập từ FETCH_START_DATE (2022-01-01)
+          để cung cấp ~250 phiên giao dịch khởi động (warm-up history) cho các chỉ báo kỹ thuật có cửa sổ
+          dài như SMA_200 và CV_200.
+        - Hàm compute_features_per_symbol(drop_na=True) phải được tính trên TOÀN BỘ lịch sử này để không
+          bị mất các phiên đầu năm 2023.
+        - Sau khi đã tính xong đầy đủ đặc trưng, hàm apply_study_window() được gọi để cắt gọn lại dữ liệu,
+          chỉ giữ các phiên từ STUDY_START_DATE (2023-01-04) trở đi. Nhờ đó:
+          (a) Các đặc trưng kỹ thuật rolling đã hội tụ đầy đủ giá trị ngay từ ngày 2023-01-04 cho cả 5 mã.
+          (b) Dữ liệu huấn luyện thực chiến được tính toán nghiêm ngặt trên đúng
+              tập các ngày của cửa sổ nghiên cứu, bảo đảm tính nhất quán và chất lượng đặc trưng.
+    
+        Args:
+            df: DataFrame chứa dữ liệu đặc trưng đã tính toán.
+            start_date: Ngày bắt đầu cửa sổ nghiên cứu (mặc định STUDY_START_DATE = "2023-01-04").
+            date_col: Tên cột thời gian (mặc định 'Date').
+    
+        Returns:
+            pd.DataFrame chỉ chứa các dòng có Date >= start_date, đã sắp xếp theo Date và Symbol.
+        """
+        if date_col not in df.columns:
+>           raise ValueError(f"DataFrame phải chứa cột '{date_col}' để áp dụng cửa sổ nghiên cứu.")
+E           ValueError: DataFrame phải chứa cột 'Date' để áp dụng cửa sổ nghiên cứu.
+
+apps/ml/vn_stock/splitting_data.py:46: ValueError
+------------------------------ Captured log call -------------------------------
+WARNING  vn_stock.modeling.train:train.py:196 Không thể tự động đồng bộ nến mới trước khi huấn luyện: sync unavailable
+_____ test_production_training_does_not_fall_through_failed_sync[outcome1] _____
+
+outcome = {'status': 'partial', 'errors': {'VIC': 'missing data'}}
+tmp_path = PosixPath('/private/var/folders/r0/rl0ngg91681ggmyxzy2jqckr0000gn/T/pytest-of-huongnguyen/pytest-40/test_production_training_does_1')
+
+    @pytest.mark.parametrize('outcome', [OSError('sync unavailable'), {'status':'partial','errors':{'VIC':'missing data'}}])
+    def test_production_training_does_not_fall_through_failed_sync(outcome, tmp_path):
+        from vn_stock.modeling.train import train_production_model
+        kwargs = {'side_effect': outcome} if isinstance(outcome, Exception) else {'return_value': outcome}
+        with patch('vn_stock.data_ingestion.sync_latest_market_data', **kwargs), \
+             patch('vn_stock.modeling.train.build_panel_dataset') as build:
+            with pytest.raises(RuntimeError, match='synchronization'):
+>               train_production_model(symbols=['VIC'], models_dir=tmp_path)
+
+apps/ml/tests/test_data_refresh_provenance.py:54: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+apps/ml/vn_stock/modeling/train.py:203: in train_production_model
+    for symbol, history in apply_study_window(raw_panel).groupby("Symbol"):
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+df = <MagicMock name='build_panel_dataset()' id='5705579200'>
+start_date = '2023-04-03', date_col = 'Date'
+
+    def apply_study_window(
+        df: pd.DataFrame,
+        start_date: str = STUDY_START_DATE,
+        date_col: str = "Date",
+    ) -> pd.DataFrame:
+        """
+        Cắt gọn tập dữ liệu bảng đa mã về đúng phạm vi cửa sổ nghiên cứu (Study Window).
+    
+        Lý do tồn tại hàm:
+        - Trong pipeline ML, dữ liệu giá thô cần được thu thập từ FETCH_START_DATE (2022-01-01)
+          để cung cấp ~250 phiên giao dịch khởi động (warm-up history) cho các chỉ báo kỹ thuật có cửa sổ
+          dài như SMA_200 và CV_200.
+        - Hàm compute_features_per_symbol(drop_na=True) phải được tính trên TOÀN BỘ lịch sử này để không
+          bị mất các phiên đầu năm 2023.
+        - Sau khi đã tính xong đầy đủ đặc trưng, hàm apply_study_window() được gọi để cắt gọn lại dữ liệu,
+          chỉ giữ các phiên từ STUDY_START_DATE (2023-01-04) trở đi. Nhờ đó:
+          (a) Các đặc trưng kỹ thuật rolling đã hội tụ đầy đủ giá trị ngay từ ngày 2023-01-04 cho cả 5 mã.
+          (b) Dữ liệu huấn luyện thực chiến được tính toán nghiêm ngặt trên đúng
+              tập các ngày của cửa sổ nghiên cứu, bảo đảm tính nhất quán và chất lượng đặc trưng.
+    
+        Args:
+            df: DataFrame chứa dữ liệu đặc trưng đã tính toán.
+            start_date: Ngày bắt đầu cửa sổ nghiên cứu (mặc định STUDY_START_DATE = "2023-01-04").
+            date_col: Tên cột thời gian (mặc định 'Date').
+    
+        Returns:
+            pd.DataFrame chỉ chứa các dòng có Date >= start_date, đã sắp xếp theo Date và Symbol.
+        """
+        if date_col not in df.columns:
+>           raise ValueError(f"DataFrame phải chứa cột '{date_col}' để áp dụng cửa sổ nghiên cứu.")
+E           ValueError: DataFrame phải chứa cột 'Date' để áp dụng cửa sổ nghiên cứu.
+
+apps/ml/vn_stock/splitting_data.py:46: ValueError
+=========================== short test summary info ============================
+FAILED apps/ml/tests/test_data_refresh_provenance.py::test_production_training_does_not_fall_through_failed_sync[outcome0]
+FAILED apps/ml/tests/test_data_refresh_provenance.py::test_production_training_does_not_fall_through_failed_sync[outcome1]
+2 failed, 3 passed in 3.81s

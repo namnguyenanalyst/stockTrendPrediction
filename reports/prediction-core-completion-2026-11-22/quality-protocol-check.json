@@ -1,0 +1,63 @@
+{
+  "folds": [
+    {
+      "fold": "fold-1",
+      "prediction_rows": 1200,
+      "models": [
+        "lightgbm",
+        "lstm"
+      ],
+      "heldout_dates": 20,
+      "training_runtime_versions": {
+        "scikit-learn": "1.7.2",
+        "numpy": "1.26.4",
+        "pandas": "2.3.3",
+        "lightgbm": "4.7.0",
+        "torch": "2.14.0"
+      },
+      "training_cutoff": null,
+      "test_start": "2026-08-19",
+      "test_end": "2026-09-18"
+    },
+    {
+      "fold": "fold-2",
+      "prediction_rows": 1200,
+      "models": [
+        "lightgbm",
+        "lstm"
+      ],
+      "heldout_dates": 20,
+      "training_runtime_versions": {
+        "scikit-learn": "1.7.2",
+        "numpy": "1.26.4",
+        "pandas": "2.3.3",
+        "lightgbm": "4.7.0",
+        "torch": "2.14.0"
+      },
+      "training_cutoff": null,
+      "test_start": "2026-09-21",
+      "test_end": "2026-10-16"
+    },
+    {
+      "fold": "fold-3",
+      "prediction_rows": 1200,
+      "models": [
+        "lightgbm",
+        "lstm"
+      ],
+      "heldout_dates": 20,
+      "training_runtime_versions": {
+        "scikit-learn": "1.7.2",
+        "numpy": "1.26.4",
+        "pandas": "2.3.3",
+        "lightgbm": "4.7.0",
+        "torch": "2.14.0"
+      },
+      "training_cutoff": null,
+      "test_start": "2026-10-19",
+      "test_end": "2026-11-13"
+    }
+  ],
+  "unique_model_symbol_date_observations": 3600,
+  "no_duplicate_heldout_observations": true
+}

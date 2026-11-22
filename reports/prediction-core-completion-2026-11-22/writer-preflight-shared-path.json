@@ -1,0 +1,7 @@
+{
+  "exit_code": 125,
+  "stdout": "",
+  "stderr": "docker: error during connect: Post \"http://%2FUsers%2Fhuongnguyen%2F.docker%2Frun%2Fdocker.sock/v1.56/containers/create?name=vn-stock-core-writer-preflight-20261122\": EOF\n\nRun 'docker run --help' for more information\n",
+  "private_directory": "/Users/huongnguyen/Desktop/Ho\u0323c Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/reports/prediction-core-completion-2026-11-22/writer-storage-probe",
+  "uid": "501:20"
+}

@@ -1,0 +1,8 @@
+{
+  "container": "vn-stock-core-training-audit-20261122-v2",
+  "image": "sha256:32701272565e7b4a4ed1972c80b35c03ac7c02e245b81c3aa5266193be33bfc2",
+  "mounts": [],
+  "url": "http://localhost:8003",
+  "credentials": "Isolated fake account seeded by bootstrap; SSI values passed only as runtime environment.",
+  "initial_source": "Copies of current raw data and frozen serving artifacts; two observations trimmed in private copies to force SSI refresh."
+}

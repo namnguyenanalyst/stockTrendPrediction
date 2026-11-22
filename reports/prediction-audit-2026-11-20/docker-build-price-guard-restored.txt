@@ -1,0 +1,146 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.81kB 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.11-slim
+#2 DONE 1.3s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 825B done
+#3 DONE 0.0s
+
+#4 [stage-0 1/9] FROM docker.io/library/python:3.11-slim@sha256:07d4824036af339fa1b6ef769cc99d9c10a141769538b52b3b597c84f7a7b535
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 24.88kB 5.4s
+#5 transferring context: 59.89kB 5.4s done
+#5 DONE 5.4s
+
+#6 [stage-0 2/9] WORKDIR /app
+#6 CACHED
+
+#7 [stage-0 3/9] RUN apt-get update && apt-get install -y --no-install-recommends     gcc     libpq-dev     curl     postgresql-client     && rm -rf /var/lib/apt/lists/*
+#7 CACHED
+
+#8 [stage-0 4/9] RUN pip install --no-cache-dir uv
+#8 CACHED
+
+#9 [stage-0 5/9] COPY apps/ml /app/apps/ml
+#9 DONE 0.1s
+
+#10 [stage-0 6/9] COPY apps/api /app/apps/api
+#10 DONE 0.0s
+
+#11 [stage-0 7/9] WORKDIR /app/apps/api
+#11 DONE 0.0s
+
+#12 [stage-0 8/9] RUN --mount=type=cache,target=/root/.cache/uv     uv sync --frozen --no-dev
+#12 0.146 Using CPython 3.11.18 interpreter at: /usr/local/bin/python3
+#12 0.146 Creating virtual environment at: .venv
+#12 0.157    Building api @ file:///app/apps/api
+#12 0.157    Building vn-stock @ file:///app/apps/ml
+#12 1.555       Built vn-stock @ file:///app/apps/ml
+#12 1.615       Built api @ file:///app/apps/api
+#12 1.618 Prepared 2 packages in 1.46s
+#12 1.619 warning: Failed to hardlink files; falling back to full copy. This may lead to degraded performance.
+#12 1.619          If the cache and target directories are on different filesystems, hardlinking may not be supported.
+#12 1.619          If this is intentional, set `export UV_LINK_MODE=copy` or use `--link-mode=copy` to suppress this warning.
+#12 5.603 Installed 84 packages in 3.98s
+#12 5.603  + aiosqlite==0.22.1
+#12 5.603  + alembic==1.20.1
+#12 5.604  + annotated-doc==0.0.5
+#12 5.604  + annotated-types==0.8.0
+#12 5.604  + anyio==4.15.1
+#12 5.604  + api==0.1.0 (from file:///app/apps/api)
+#12 5.606  + asyncpg==0.32.0
+#12 5.606  + bcrypt==5.0.0
+#12 5.606  + certifi==2026.7.22
+#12 5.606  + cffi==2.1.1
+#12 5.606  + charset-normalizer==3.5.2
+#12 5.606  + click==8.5.0
+#12 5.606  + cloudpickle==3.1.2
+#12 5.606  + contourpy==1.3.3
+#12 5.606  + cramjam==2.14.0
+#12 5.606  + cryptography==50.0.2
+#12 5.606  + cycler==0.12.1
+#12 5.606  + fastapi==0.143.0
+#12 5.606  + fastparquet==2026.9.0
+#12 5.606  + filelock==4.1.0
+#12 5.606  + fonttools==4.66.1
+#12 5.606  + fsspec==2026.9.0
+#12 5.606  + greenlet==3.5.6
+#12 5.606  + h11==0.16.0
+#12 5.606  + httpcore==1.0.9
+#12 5.606  + httptools==0.9.0
+#12 5.606  + httpx==0.28.1
+#12 5.606  + idna==3.20
+#12 5.606  + iniconfig==2.3.1
+#12 5.606  + jinja2==3.1.6
+#12 5.606  + joblib==1.6.0
+#12 5.606  + kiwisolver==1.5.1
+#12 5.606  + lightgbm==4.7.0
+#12 5.606  + llvmlite==0.50.0
+#12 5.606  + mako==1.4.3
+#12 5.606  + markupsafe==3.0.4
+#12 5.606  + matplotlib==3.11.2
+#12 5.606  + mpmath==1.3.0
+#12 5.606  + narwhals==2.27.1
+#12 5.606  + networkx==3.6.1
+#12 5.606  + numba==0.68.0
+#12 5.606  + numpy==1.26.4
+#12 5.606  + opentelemetry-api==1.45.1
+#12 5.606  + packaging==26.3
+#12 5.606  + pandas==2.3.3
+#12 5.606  + pillow==12.3.0
+#12 5.606  + pluggy==1.6.0
+#12 5.606  + pyarrow==17.0.0
+#12 5.606  + pycparser==3.11
+#12 5.606  + pydantic==2.14.0
+#12 5.606  + pydantic-core==2.50.0
+#12 5.606  + pydantic-settings==2.15.0
+#12 5.606  + pygments==2.21.0
+#12 5.606  + pyjwt==2.15.1
+#12 5.606  + pyparsing==3.3.3
+#12 5.606  + pytest==9.1.1
+#12 5.606  + pytest-asyncio==1.4.1
+#12 5.606  + python-dateutil==2.9.0.post0
+#12 5.606  + python-dotenv==1.2.4
+#12 5.606  + python-multipart==0.0.32
+#12 5.606  + pytz==2026.5
+#12 5.606  + pyyaml==6.0.3
+#12 5.606  + requests==2.34.2
+#12 5.606  + scikit-learn==1.9.1
+#12 5.606  + scipy==1.13.1
+#12 5.606  + setuptools==84.0.0
+#12 5.606  + shap==0.49.1
+#12 5.606  + six==1.17.0
+#12 5.606  + slicer==0.0.8
+#12 5.606  + sqlalchemy==2.1.6
+#12 5.606  + starlette==1.7.0
+#12 5.606  + sympy==1.14.0
+#12 5.606  + threadpoolctl==3.7.0
+#12 5.606  + torch==2.14.1+cpu
+#12 5.606  + tqdm==4.70.1
+#12 5.606  + typing-extensions==4.16.0
+#12 5.606  + typing-inspection==0.4.4
+#12 5.606  + tzdata==2026.5
+#12 5.606  + urllib3==2.8.0
+#12 5.606  + uvicorn==0.54.0
+#12 5.606  + uvloop==0.23.0
+#12 5.606  + vn-stock==0.1.0 (from file:///app/apps/ml)
+#12 5.606  + watchfiles==1.3.0
+#12 5.606  + websockets==17.2
+#12 DONE 7.1s
+
+#13 [stage-0 9/9] RUN useradd --create-home --uid 1001 apiuser
+#13 DONE 0.2s
+
+#14 exporting to image
+#14 exporting layers
+#14 exporting layers 7.0s done
+#14 writing image sha256:7880e271f36340d4d55ca2067c39d54cbe4a02025c18cf21af53b04a1044eda1 done
+#14 naming to docker.io/library/infra-vn_stock_api:latest done
+#14 DONE 7.0s

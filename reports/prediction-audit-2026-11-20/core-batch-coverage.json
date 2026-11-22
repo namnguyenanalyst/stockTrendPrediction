@@ -1,0 +1,46 @@
+[
+  {
+    "model": "lightgbm",
+    "successes": 27,
+    "errors": [
+      {
+        "symbol": "CTG",
+        "status_code": 503,
+        "detail": "Không thể tạo dự báo cho mã này."
+      },
+      {
+        "symbol": "HDB",
+        "status_code": 503,
+        "detail": "Không thể tạo dự báo cho mã này."
+      },
+      {
+        "symbol": "TCB",
+        "status_code": 503,
+        "detail": "Không thể tạo dự báo cho mã này."
+      }
+    ],
+    "requested_count": 30
+  },
+  {
+    "model": "lstm",
+    "successes": 27,
+    "errors": [
+      {
+        "symbol": "CTG",
+        "status_code": 503,
+        "detail": "Không thể tạo dự báo cho mã này."
+      },
+      {
+        "symbol": "HDB",
+        "status_code": 503,
+        "detail": "Không thể tạo dự báo cho mã này."
+      },
+      {
+        "symbol": "TCB",
+        "status_code": 503,
+        "detail": "Không thể tạo dự báo cho mã này."
+      }
+    ],
+    "requested_count": 30
+  }
+]

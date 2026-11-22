@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "horizon_days": 3,
+  "feature_cols": [
+    "Open_Close_Ratio",
+    "High_Close_Ratio",
+    "Low_Close_Ratio",
+    "HL_Ratio",
+    "SMA_20_Dev",
+    "SMA_50_Dev",
+    "SMA_200_Dev",
+    "CV_50",
+    "CV_200",
+    "RSI",
+    "Return_1d",
+    "Vol_Ratio",
+    "VNINDEX_Return_1d"
+  ],
+  "all_feature_cols": [
+    "Open_Close_Ratio",
+    "High_Close_Ratio",
+    "Low_Close_Ratio",
+    "HL_Ratio",
+    "SMA_20_Dev",
+    "SMA_50_Dev",
+    "SMA_200_Dev",
+    "CV_50",
+    "CV_200",
+    "RSI",
+    "Return_1d",
+    "Vol_Ratio",
+    "VNINDEX_Return_1d",
+    "Symbol_Code"
+  ],
+  "symbol_to_code": {
+    "ACB": 0,
+    "BCM": 1,
+    "BID": 2,
+    "BVH": 3,
+    "CTG": 4,
+    "FPT": 5,
+    "GAS": 6,
+    "GVR": 7,
+    "HDB": 8,
+    "HPG": 9,
+    "MBB": 10,
+    "MSN": 11,
+    "MWG": 12,
+    "PLX": 13,
+    "POW": 14,
+    "SAB": 15,
+    "SHB": 16,
+    "SSB": 17,
+    "SSI": 18,
+    "STB": 19,
+    "TCB": 20,
+    "TPB": 21,
+    "VCB": 22,
+    "VHM": 23,
+    "VIB": 24,
+    "VIC": 25,
+    "VJC": 26,
+    "VNM": 27,
+    "VPB": 28,
+    "VRE": 29
+  },
+  "files": {
+    "production_lgb_t3.txt": {
+      "path": "runs/2c96bf15c7f0439ea9c7e1e0d54f180f/production_lgb_t3.txt",
+      "sha256": "80ea282b7a445d0ebf88b5b65118e10bb8c0165d03db2e27d571e85691bbf0da"
+    },
+    "production_training_info_t3.json": {
+      "path": "runs/2c96bf15c7f0439ea9c7e1e0d54f180f/production_training_info_t3.json",
+      "sha256": "55edca503baa0c28c4c5e660fc9b5166980baa2a59b234f58a793e8b937e601a"
+    },
+    "production_lstm_t3.pth": {
+      "path": "runs/2c96bf15c7f0439ea9c7e1e0d54f180f/production_lstm_t3.pth",
+      "sha256": "b053c0edc789f4926b1c9a60923c198617b87f13c67b346bc73ad289c6edaa18"
+    },
+    "production_lgb_t3.pkl": {
+      "path": "runs/2c96bf15c7f0439ea9c7e1e0d54f180f/production_lgb_t3.pkl",
+      "sha256": "fe66bd0278aacd77ca6d3133f9ebd518367bbf1d917090bc1855636e8fcdae4c"
+    },
+    "production_scaler_t3.pkl": {
+      "path": "runs/2c96bf15c7f0439ea9c7e1e0d54f180f/production_scaler_t3.pkl",
+      "sha256": "4ec5c5b12227e1137914446573a8e60d58ac6887cabcc2f47c48e7da2671e6c3"
+    }
+  }
+}

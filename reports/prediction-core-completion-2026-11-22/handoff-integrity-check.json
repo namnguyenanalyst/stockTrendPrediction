@@ -1,0 +1,50 @@
+{
+  "checked_at": "2026-11-22T09:29:49.101429+00:00",
+  "production_artifact_changes": [],
+  "verified_quality_artifacts": [
+    {
+      "fold": "fold-1",
+      "files": 6,
+      "manifest_sha256": "34e2e88b1771b19c9cdbec121c57ef5ec4009e2b8201ffdd357cdc507a888590"
+    },
+    {
+      "fold": "fold-2",
+      "files": 6,
+      "manifest_sha256": "980d393f469cce67314cf9ab2e81f7d15bfbf7c5b53c7fe266d66e76c59ea69d"
+    },
+    {
+      "fold": "fold-3",
+      "files": 6,
+      "manifest_sha256": "a544fb4807088e83a64d13940c41fb10b1f261e2bc12716dd2f10d8696ca8571"
+    }
+  ],
+  "containers": [
+    {
+      "name": "vn_stock_api",
+      "image": "sha256:32701272565e7b4a4ed1972c80b35c03ac7c02e245b81c3aa5266193be33bfc2",
+      "running": true,
+      "health": "healthy"
+    },
+    {
+      "name": "vn_stock_training_api",
+      "image": "sha256:32701272565e7b4a4ed1972c80b35c03ac7c02e245b81c3aa5266193be33bfc2",
+      "running": true,
+      "health": "healthy"
+    },
+    {
+      "name": "vn_stock_retrain_worker",
+      "image": "sha256:1fe9f4d7ffff2fbb3c68889d97e9e96836d7552378b4a04c41f02007d1519656",
+      "running": true,
+      "health": null
+    },
+    {
+      "name": "vn_stock_web",
+      "image": "sha256:130c95389d34793483b74773f2ca965c321125aab4f398fb332cf97ba19ed8d3",
+      "running": true,
+      "health": null
+    }
+  ],
+  "git_head": "8127d31d102a30949db5e5fb5d95035e2d11c828",
+  "remaining": [],
+  "authenticated_acceptance": "final-authenticated-ui.json"
+}

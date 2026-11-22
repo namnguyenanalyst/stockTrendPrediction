@@ -1,0 +1,21 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+______ test_live_sync_requires_vendor_refresh_even_if_cache_covers_today _______
+
+    def test_live_sync_requires_vendor_refresh_even_if_cache_covers_today():
+        import pandas as pd
+        from app.services.prediction_service import sync_live_and_predict
+        with patch('vn_stock.data_ingestion.fetch_stock_data',return_value=pd.DataFrame()) as fetch:
+            with pytest.raises(HTTPException):
+                sync_live_and_predict('VIC','lightgbm')
+>       assert fetch.call_args.kwargs.get('require_fresh') is True
+E       AssertionError: assert None is True
+E        +  where None = <built-in method get of dict object at 0x141748280>('require_fresh')
+E        +    where <built-in method get of dict object at 0x141748280> = {}.get
+E        +      where {} = call('VIC').kwargs
+E        +        where call('VIC') = <MagicMock name='fetch_stock_data' id='5390396592'>.call_args
+
+tests/test_prediction_audit.py:60: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_prediction_audit.py::test_live_sync_requires_vendor_refresh_even_if_cache_covers_today
+1 failed, 17 deselected in 0.33s

@@ -1,0 +1,64 @@
+{
+  "rows": [
+    {
+      "symbol": "VIC",
+      "model": "lightgbm",
+      "seconds": 11.104,
+      "date": "2026-11-20",
+      "price": 241.9,
+      "snapshot_rows": 1216,
+      "source": {
+        "historical_adjustment_status": "unverified",
+        "source_provenance": "SSI_request_snapshot"
+      },
+      "artifact_generation": "78b54b04ae9c3fee"
+    },
+    {
+      "symbol": "VIC",
+      "model": "lstm",
+      "seconds": 12.059,
+      "date": "2026-11-20",
+      "price": 241.9,
+      "snapshot_rows": 1216,
+      "source": {
+        "historical_adjustment_status": "unverified",
+        "source_provenance": "SSI_request_snapshot"
+      },
+      "artifact_generation": "71d398842a1f2650"
+    },
+    {
+      "symbol": "HPG",
+      "model": "lightgbm",
+      "seconds": 10.029,
+      "date": "2026-11-20",
+      "price": 20.45,
+      "snapshot_rows": 1216,
+      "source": {
+        "historical_adjustment_status": "unverified",
+        "source_provenance": "SSI_request_snapshot"
+      },
+      "artifact_generation": "78b54b04ae9c3fee"
+    },
+    {
+      "symbol": "HPG",
+      "model": "lstm",
+      "seconds": 9.29,
+      "date": "2026-11-20",
+      "price": 20.45,
+      "snapshot_rows": 1216,
+      "source": {
+        "historical_adjustment_status": "unverified",
+        "source_provenance": "SSI_request_snapshot"
+      },
+      "artifact_generation": "71d398842a1f2650"
+    }
+  ],
+  "data_files_checked": 90,
+  "model_files_checked": 13,
+  "shared_data_unchanged": true,
+  "models_unchanged": true,
+  "limitations": [
+    "Uses actual SSI and current model artifacts; not an out-of-sample quality evaluation.",
+    "Service invoked inside the serving container; HTTP authentication is covered separately by route tests."
+  ]
+}

@@ -1,0 +1,29 @@
+..F                                                                      [100%]
+=================================== FAILURES ===================================
+____________ test_panel_build_resolves_one_current_cutoff_per_call _____________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x11d5b6920>
+
+    def test_panel_build_resolves_one_current_cutoff_per_call(monkeypatch):
+        from vn_stock.data_ingestion import build_panel_dataset
+        frame = prices(10).assign(Symbol='VIC')
+        index = frame[['Date']].assign(VNINDEX_Return_1d=0.)
+        cutoffs = iter(['2024-01-09', '2024-01-10'])
+        monkeypatch.setattr('vn_stock.data_ingestion.get_default_end_date', lambda: next(cutoffs))
+        with patch('vn_stock.data_ingestion.fetch_stock_data', return_value=frame) as stock, \
+             patch('vn_stock.data_ingestion.fetch_daily_index', return_value=index) as market, \
+             patch('vn_stock.data_ingestion.check_cache_coverage', return_value=True):
+            first = build_panel_dataset(['VIC'], start_date='2024-01-01', save_to_interim=False)
+            second = build_panel_dataset(['VIC'], start_date='2024-01-01', save_to_interim=False)
+>       assert first.Date.max() == pd.Timestamp('2024-01-09')
+E       AssertionError: assert Timestamp('2024-01-10 00:00:00') == Timestamp('2024-01-09 00:00:00')
+E        +  where Timestamp('2024-01-10 00:00:00') = max()
+E        +    where max = 0   2024-01-01\n1   2024-01-02\n2   2024-01-03\n3   2024-01-04\n4   2024-01-05\n5   2024-01-08\n6   2024-01-09\n7   2024-01-10\nName: Date, dtype: datetime64[ns].max
+E        +      where 0   2024-01-01\n1   2024-01-02\n2   2024-01-03\n3   2024-01-04\n4   2024-01-05\n5   2024-01-08\n6   2024-01-09\n7   2024-01-10\nName: Date, dtype: datetime64[ns] =         Date  Open  High  Low  Close  Volume Symbol  VNINDEX_Return_1d\n0 2024-01-01    10    10   10     10     100   ...10   10     10     100    VIC                0.0\n7 2024-01-10    10    10   10     10     100    VIC                0.0.Date
+E        +  and   Timestamp('2024-01-09 00:00:00') = <class 'pandas._libs.tslibs.timestamps.Timestamp'>('2024-01-09')
+E        +    where <class 'pandas._libs.tslibs.timestamps.Timestamp'> = pd.Timestamp
+
+apps/ml/tests/test_data_refresh_provenance.py:41: AssertionError
+=========================== short test summary info ============================
+FAILED apps/ml/tests/test_data_refresh_provenance.py::test_panel_build_resolves_one_current_cutoff_per_call
+1 failed, 2 passed in 1.12s

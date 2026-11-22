@@ -1,0 +1,33 @@
+{
+  "git_head": "8127d31d102a30949db5e5fb5d95035e2d11c828",
+  "git_status": " M DESIGN.md\n M apps/api/alembic/env.py\n M apps/api/app/models/schemas.py\n M apps/api/app/routers/prediction.py\n M apps/api/app/routers/stocks.py\n M apps/api/app/services/prediction_service.py\n M apps/api/app/services/stock_service.py\n M apps/api/tests/test_api.py\n M apps/api/tests/test_phase3_integrity.py\n M apps/ml/tests/test_artifact_bundles.py\n M apps/ml/tests/test_market_session.py\n M apps/ml/tests/test_preprocessing_integrity.py\n M apps/ml/vn_stock/backtest.py\n M apps/ml/vn_stock/data_ingestion.py\n M apps/ml/vn_stock/market_session.py\n M apps/ml/vn_stock/modeling/artifacts.py\n M apps/ml/vn_stock/modeling/predict.py\n M apps/ml/vn_stock/modeling/train.py\n M apps/ml/vn_stock/splitting_data.py\n M apps/web/src/components/DashboardApp.tsx\n M apps/web/src/components/charts/FireAntTrajectoryChart.tsx\n M apps/web/src/components/market/FinancialDetailModal.tsx\n M apps/web/src/components/tabs/AIPredictionTab.tsx\n M apps/web/src/components/tabs/MarketOverviewTab.tsx\n M apps/web/src/lib/api.ts\n M apps/web/src/lib/predictionPresentation.ts\n M apps/web/src/lib/types.ts\n M infra/tests/test_docker_adversarial.py\n M infra/tests/test_docker_deployment.py\n M infra/tests/test_retrain_worker.py\n?? apps/api/tests/test_chart_indicators.py\n?? apps/api/tests/test_prediction_audit.py\n?? apps/ml/tests/test_calendar_2026.py\n?? apps/ml/tests/test_chart_indicators.py\n?? apps/ml/tests/test_data_refresh_provenance.py\n?? apps/ml/tests/test_live_prediction_snapshot.py\n?? apps/ml/tests/test_prediction_remaining_audit.py\n?? apps/ml/tests/test_price_history_quality.py\n?? apps/ml/vn_stock/chart_indicators.py\n?? apps/web/src/components/DashboardApp.audit.test.tsx\n?? apps/web/src/components/charts/DetailIndicatorChart.tsx\n?? apps/web/src/components/charts/FireAntTrajectoryChart.lifecycle.test.tsx\n?? apps/web/src/components/market/IndicatorSearch.test.tsx\n?? apps/web/src/components/market/IndicatorSearch.tsx\n?? apps/web/src/components/tabs/AIPredictionTab.accessibility.test.tsx\n?? apps/web/src/components/tabs/AIPredictionTab.storage.test.tsx\n?? apps/web/src/lib/chartIndicators.test.ts\n?? apps/web/src/lib/chartIndicators.ts\n?? apps/web/src/lib/chartIndicatorsApi.test.ts\n?? apps/web/src/lib/marketMetricPresentation.test.ts\n?? apps/web/src/lib/marketMetricPresentation.ts\n?? apps/web/src/lib/predictionAudit.test.ts\n?? apps/web/src/lib/predictionHistory.ts\n?? apps/web/src/lib/predictionTimeout.test.ts\n?? apps/web/src/lib/predictionTrajectory.ts\n?? infra/tests/test_prediction_operations.py\n?? reports/\n?? scripts/audit/\n",
+  "artifact_hashes": {
+    "apps/ml/models/production_lgb_t3.txt": "4b82b772ab8f72a04af749abe89d98b82f5558b2b60f92a2c292e1e52dd034d5",
+    "apps/ml/models/production_training_info_t3.json": "50f52abc884801cf9c002b6b5b291e1957860be8c04f90e1b1664b35182e6fe4",
+    "apps/ml/models/production_lstm_t3.pth": "27618f9497c6cfb2aee5b7243ac36cbbf0d6249fb9840072ceb37f8f17e369bb",
+    "apps/ml/models/scaler_window3.pkl": "7eedd5d9f3cfb8c7372d50e6010692af85d49d6569d112c3a8459c85aacbefdf",
+    "apps/ml/models/production_training_info.json": "50f52abc884801cf9c002b6b5b291e1957860be8c04f90e1b1664b35182e6fe4",
+    "apps/ml/models/production_lgb_t3.pkl": "0ab6eda5d3d532225e8a618963bbec8461d59f1238055550f5eb5f72f68fa604",
+    "apps/ml/models/feature_importance.json": "df993ae72124798ff3fd15302d133b4fd9a7879490764a9a3ade19917da0338a",
+    "apps/ml/models/lightgbm_classifier.pkl": "0ab6eda5d3d532225e8a618963bbec8461d59f1238055550f5eb5f72f68fa604",
+    "apps/ml/models/training_metrics.json": "14e8072ed0e10023b148f17206391678a8359a2c2bbcc5121899cf2c681be694",
+    "apps/ml/models/global_lstm_classifier.pth": "27618f9497c6cfb2aee5b7243ac36cbbf0d6249fb9840072ceb37f8f17e369bb",
+    "apps/ml/models/production_scaler_t3.pkl": "7eedd5d9f3cfb8c7372d50e6010692af85d49d6569d112c3a8459c85aacbefdf",
+    "apps/ml/models/lightgbm_classifier.txt": "4b82b772ab8f72a04af749abe89d98b82f5558b2b60f92a2c292e1e52dd034d5"
+  },
+  "input_sha256": "6f56ff49a1229a197837cc13265920d545ce5aa9d067b2ee3870004724670f81",
+  "feature_rows": 30450,
+  "source_panel_sha256": "47eb774e563b5d4fdb9a72f28ad7f3d453bb1aede349437a7d9e7144ccd932a8",
+  "python": "3.10.14",
+  "versions": {
+    "scikit-learn": "1.7.2",
+    "numpy": "1.26.4",
+    "pandas": "2.3.3",
+    "lightgbm": "4.7.0",
+    "torch": "2.14.0"
+  },
+  "limitations": [
+    "Uses SSI source as supplied; corporate-action adjustment limitations accepted.",
+    "No production artifact promotion or data writes."
+  ]
+}

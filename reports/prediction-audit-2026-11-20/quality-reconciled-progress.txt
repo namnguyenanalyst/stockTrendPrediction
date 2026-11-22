@@ -1,0 +1,277 @@
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/lightgbm/sklearn.py:1106: LGBMDeprecationWarning: The argument 'eval_set' is deprecated, use 'eval_X' and 'eval_y' instead.
+  eval_set = _validate_eval_set_Xy(eval_set=eval_set, eval_X=eval_X, eval_y=eval_y)
+
+[OK] Đã lưu Artifacts mô hình thực chiến T+3 tại: /Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/reports/prediction-audit-2026-11-20/quality-reconciled/fold-1/artifacts
+ - Dữ liệu thị trường chốt tới: 2026-08-18
+ - LightGBM Validation Macro F1: 0.3937
+ - PyTorch LSTM Validation Macro F1: 0.4022
+Completed fold 1
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/lightgbm/sklearn.py:1106: LGBMDeprecationWarning: The argument 'eval_set' is deprecated, use 'eval_X' and 'eval_y' instead.
+  eval_set = _validate_eval_set_Xy(eval_set=eval_set, eval_X=eval_X, eval_y=eval_y)
+
+[OK] Đã lưu Artifacts mô hình thực chiến T+3 tại: /Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/reports/prediction-audit-2026-11-20/quality-reconciled/fold-2/artifacts
+ - Dữ liệu thị trường chốt tới: 2026-09-18
+ - LightGBM Validation Macro F1: 0.4075
+ - PyTorch LSTM Validation Macro F1: 0.4044
+Completed fold 2
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/lightgbm/sklearn.py:1106: LGBMDeprecationWarning: The argument 'eval_set' is deprecated, use 'eval_X' and 'eval_y' instead.
+  eval_set = _validate_eval_set_Xy(eval_set=eval_set, eval_X=eval_X, eval_y=eval_y)
+
+[OK] Đã lưu Artifacts mô hình thực chiến T+3 tại: /Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/reports/prediction-audit-2026-11-20/quality-reconciled/fold-3/artifacts
+ - Dữ liệu thị trường chốt tới: 2026-10-16
+ - LightGBM Validation Macro F1: 0.3888
+ - PyTorch LSTM Validation Macro F1: 0.3433
+Completed fold 3
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/.venv/lib/python3.10/site-packages/sklearn/metrics/_classification.py:259: UserWarning: The y_prob values do not sum to one. Make sure to pass probabilities.
+  warnings.warn(
+{
+  "lightgbm": {
+    "n": 1800,
+    "classification": {
+      "0": {
+        "precision": 0.2981132075471698,
+        "recall": 0.3623853211009174,
+        "f1-score": 0.32712215320910976,
+        "support": 436.0
+      },
+      "1": {
+        "precision": 0.6681222707423581,
+        "recall": 0.5806451612903226,
+        "f1-score": 0.6213197969543147,
+        "support": 1054.0
+      },
+      "2": {
+        "precision": 0.22033898305084745,
+        "recall": 0.25161290322580643,
+        "f1-score": 0.23493975903614459,
+        "support": 310.0
+      },
+      "accuracy": 0.4711111111111111,
+      "macro avg": {
+        "precision": 0.3955248204467918,
+        "recall": 0.3982144618723488,
+        "f1-score": 0.3944605697331897,
+        "support": 1800.0
+      },
+      "weighted avg": {
+        "precision": 0.5013796203326524,
+        "recall": 0.4711111111111111,
+        "f1-score": 0.4835153611612358,
+        "support": 1800.0
+      }
+    },
+    "log_loss": 1.0738949585841673,
+    "multiclass_brier": 0.6482369011052678,
+    "roc_auc_ovr_macro": 0.5697054238833905,
+    "calibration_bins": [
+      {
+        "lower": 0.3,
+        "n": 1031,
+        "confidence": 0.3727796752953491,
+        "accuracy": 0.42870999030067897
+      },
+      {
+        "lower": 0.4,
+        "n": 733,
+        "confidence": 0.4298352031491808,
+        "accuracy": 0.529331514324693
+      },
+      {
+        "lower": 0.5,
+        "n": 34,
+        "confidence": 0.5257109396768214,
+        "accuracy": 0.5294117647058824
+      },
+      {
+        "lower": 0.6,
+        "n": 2,
+        "confidence": 0.6042877746726818,
+        "accuracy": 0.0
+      }
+    ],
+    "accuracy_day_bootstrap_95ci": [
+      0.44666666666666666,
+      0.49444444444444446
+    ]
+  },
+  "lstm": {
+    "n": 1800,
+    "classification": {
+      "0": {
+        "precision": 0.2533136966126657,
+        "recall": 0.3944954128440367,
+        "f1-score": 0.30852017937219733,
+        "support": 436.0
+      },
+      "1": {
+        "precision": 0.6593673965936739,
+        "recall": 0.5142314990512334,
+        "f1-score": 0.5778251599147122,
+        "support": 1054.0
+      },
+      "2": {
+        "precision": 0.20735785953177258,
+        "recall": 0.2,
+        "f1-score": 0.20361247947454844,
+        "support": 310.0
+      },
+      "accuracy": 0.4311111111111111,
+      "macro avg": {
+        "precision": 0.37334631757937076,
+        "recall": 0.36957563729842335,
+        "f1-score": 0.363319272920486,
+        "support": 1800.0
+      },
+      "weighted avg": {
+        "precision": 0.48316608010428,
+        "recall": 0.4311111111111111,
+        "f1-score": 0.4481457696630526,
+        "support": 1800.0
+      }
+    },
+    "log_loss": 1.0825699021284576,
+    "multiclass_brier": 0.6518193375985765,
+    "roc_auc_ovr_macro": 0.572601134995325,
+    "calibration_bins": [
+      {
+        "lower": 0.3,
+        "n": 1153,
+        "confidence": 0.37130593219634667,
+        "accuracy": 0.3720728534258456
+      },
+      {
+        "lower": 0.4,
+        "n": 525,
+        "confidence": 0.4337089896769751,
+        "accuracy": 0.4819047619047619
+      },
+      {
+        "lower": 0.5,
+        "n": 122,
+        "confidence": 0.5361901194345756,
+        "accuracy": 0.7704918032786885
+      }
+    ],
+    "accuracy_day_bootstrap_95ci": [
+      0.40555555555555556,
+      0.45666666666666667
+    ]
+  },
+  "train_prior_baseline": {
+    "n": 1800,
+    "classification": {
+      "0": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 436.0
+      },
+      "1": {
+        "precision": 0.5855555555555556,
+        "recall": 1.0,
+        "f1-score": 0.7386124737210932,
+        "support": 1054.0
+      },
+      "2": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 310.0
+      },
+      "accuracy": 0.5855555555555556,
+      "macro avg": {
+        "precision": 0.1951851851851852,
+        "recall": 0.3333333333333333,
+        "f1-score": 0.24620415790703107,
+        "support": 1800.0
+      },
+      "weighted avg": {
+        "precision": 0.34287530864197535,
+        "recall": 0.5855555555555556,
+        "f1-score": 0.4324986373900179,
+        "support": 1800.0
+      }
+    },
+    "log_loss": 0.9704217371826105,
+    "multiclass_brier": 0.5732066087577095,
+    "roc_auc_ovr_macro": 0.5251890847436398,
+    "calibration_bins": [
+      {
+        "lower": 0.5,
+        "n": 1800,
+        "confidence": 0.5878353771779906,
+        "accuracy": 0.5855555555555556
+      }
+    ],
+    "accuracy_day_bootstrap_95ci": [
+      0.5461111111111111,
+      0.6197361111111112
+    ]
+  }
+}

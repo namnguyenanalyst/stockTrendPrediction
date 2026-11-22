@@ -1,0 +1,523 @@
+{
+  "rows": [
+    {
+      "symbol": "VIC",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 3.3470804579992546,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "VIC",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 3.965411375000258,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "HPG",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.038367167000615154,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "HPG",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.043962540999928024,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "FPT",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.03653983399999561,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "FPT",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.04188158299984934,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "VNM",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.04317558399998234,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "VNM",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.04746170799990068,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "MWG",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.05673941599889076,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "MWG",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.07648333299948717,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "VHM",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.09401683299984143,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "VHM",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.09248329200090666,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "SSI",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.08874445800029207,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "SSI",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.14095675000135088,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "ACB",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.0863907080001809,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "ACB",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.07967458400162286,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "BID",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.09198287499930302,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "BID",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.07326300000022457,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "CTG",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.05703041599917924,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "CTG",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.05306108299919288,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "MBB",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.0444071250003617,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "MBB",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.045268583000506624,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "TCB",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.04344966700045916,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "TCB",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.0475734999999986,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "VCB",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.04939483399903111,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "VCB",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.0686855830008426,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "VPB",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.06193037500088394,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "VPB",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.07156762500017066,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "MSN",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.07591962500009686,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "MSN",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.08976179199999024,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "PLX",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.09964975000002596,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "PLX",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.09640445900004124,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "POW",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.1954605420014559,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "POW",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.09484187499947438,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "SAB",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.06255641700045089,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "SAB",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.05398883400084742,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "SHB",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.0449376670003403,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "SHB",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.044527916999868467,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "STB",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.040611041000374826,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "STB",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.04123287499896833,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "TPB",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.043287041000439785,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "TPB",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.10312850000082108,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "VIB",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.07072166699981608,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "VIB",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.09432299999934912,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "VRE",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.07584999999926367,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "VRE",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.06337570799951209,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "GAS",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.05639516600058414,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "GAS",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.06102450000071258,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "GVR",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.05694887500067125,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "GVR",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.06552458300029684,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "BCM",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.06885579099980532,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "BCM",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.07140366699968581,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "BVH",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.08408783300001232,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "BVH",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.09352229199976136,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "HDB",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.1148677500004851,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "HDB",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.09658679099993606,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "SSB",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.0992073329998675,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "SSB",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.09957241700067243,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "VJC",
+      "model": "lightgbm",
+      "status": 200,
+      "seconds": 0.07293887500054552,
+      "errors": [],
+      "date": "2026-11-20"
+    },
+    {
+      "symbol": "VJC",
+      "model": "lstm",
+      "status": 200,
+      "seconds": 0.0784682920002524,
+      "errors": [],
+      "date": "2026-11-20"
+    }
+  ],
+  "checks": [
+    {
+      "path": "/api/predict/signal?symbol=../bad",
+      "status": 400,
+      "seconds": 0.004551125000944012
+    },
+    {
+      "path": "/api/predict/signal?symbol=VIC&model_type=bad",
+      "status": 400,
+      "seconds": 0.004164291998677072
+    },
+    {
+      "path": "/api/v1/predict/status",
+      "status": 401,
+      "seconds": 0.007316791999983252
+    },
+    {
+      "path": "/api/predict/retrain",
+      "status": 403,
+      "seconds": 0.005238082998403115
+    },
+    {
+      "path": "/api/stocks/sync",
+      "status": 401,
+      "seconds": 0.004361415998573648
+    },
+    {
+      "model": "lightgbm",
+      "get_post_equal": true,
+      "single_batch_equal": true,
+      "batch_errors": []
+    },
+    {
+      "model": "lstm",
+      "get_post_equal": true,
+      "single_batch_equal": true,
+      "batch_errors": []
+    }
+  ]
+}

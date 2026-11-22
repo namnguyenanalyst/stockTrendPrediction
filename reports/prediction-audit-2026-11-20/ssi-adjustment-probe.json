@@ -1,0 +1,271 @@
+{
+  "endpoint": "/api/v2/Market/DailyStockPrice",
+  "range": [
+    "01/11/2026",
+    "20/11/2026"
+  ],
+  "results": [
+    {
+      "symbol": "VIC",
+      "http_status": 200,
+      "api_status": "Success",
+      "rows": 15,
+      "fields": [
+        "AveragePrice",
+        "CeilingPrice",
+        "ClosePrice",
+        "ClosePriceAdjusted",
+        "FloorPrice",
+        "ForeignBuyValTotal",
+        "ForeignBuyVolTotal",
+        "ForeignCurrentRoom",
+        "ForeignSellValTotal",
+        "ForeignSellVolTotal",
+        "HighestPrice",
+        "LowestPrice",
+        "NetBuySellVal",
+        "NetBuySellVol",
+        "OpenPrice",
+        "PerPriceChange",
+        "PriceChange",
+        "RefPrice",
+        "Symbol",
+        "Time",
+        "TotalBuyTrade",
+        "TotalBuyTradeVol",
+        "TotalDealVal",
+        "TotalDealVol",
+        "TotalMatchVal",
+        "TotalMatchVol",
+        "TotalSellTrade",
+        "TotalSellTradeVol",
+        "TotalTradedValue",
+        "TotalTradedVol",
+        "TradingDate"
+      ],
+      "prices": [
+        {
+          "TradingDate": "20/11/2026",
+          "ClosePrice": "241900",
+          "ClosePriceAdjusted": "241900",
+          "Symbol": "VIC"
+        },
+        {
+          "TradingDate": "19/11/2026",
+          "ClosePrice": "240000",
+          "ClosePriceAdjusted": "240000",
+          "Symbol": "VIC"
+        },
+        {
+          "TradingDate": "18/11/2026",
+          "ClosePrice": "245000",
+          "ClosePriceAdjusted": "245000",
+          "Symbol": "VIC"
+        },
+        {
+          "TradingDate": "17/11/2026",
+          "ClosePrice": "248000",
+          "ClosePriceAdjusted": "248000",
+          "Symbol": "VIC"
+        },
+        {
+          "TradingDate": "16/11/2026",
+          "ClosePrice": "248000",
+          "ClosePriceAdjusted": "248000",
+          "Symbol": "VIC"
+        },
+        {
+          "TradingDate": "13/11/2026",
+          "ClosePrice": "243000",
+          "ClosePriceAdjusted": "243000",
+          "Symbol": "VIC"
+        },
+        {
+          "TradingDate": "12/11/2026",
+          "ClosePrice": "243000",
+          "ClosePriceAdjusted": "243000",
+          "Symbol": "VIC"
+        },
+        {
+          "TradingDate": "11/11/2026",
+          "ClosePrice": "245200",
+          "ClosePriceAdjusted": "245200",
+          "Symbol": "VIC"
+        },
+        {
+          "TradingDate": "10/11/2026",
+          "ClosePrice": "242000",
+          "ClosePriceAdjusted": "242000",
+          "Symbol": "VIC"
+        },
+        {
+          "TradingDate": "09/11/2026",
+          "ClosePrice": "234400",
+          "ClosePriceAdjusted": "234400",
+          "Symbol": "VIC"
+        },
+        {
+          "TradingDate": "06/11/2026",
+          "ClosePrice": "234500",
+          "ClosePriceAdjusted": "234500",
+          "Symbol": "VIC"
+        },
+        {
+          "TradingDate": "05/11/2026",
+          "ClosePrice": "238000",
+          "ClosePriceAdjusted": "238000",
+          "Symbol": "VIC"
+        },
+        {
+          "TradingDate": "04/11/2026",
+          "ClosePrice": "234000",
+          "ClosePriceAdjusted": "234000",
+          "Symbol": "VIC"
+        },
+        {
+          "TradingDate": "03/11/2026",
+          "ClosePrice": "234000",
+          "ClosePriceAdjusted": "234000",
+          "Symbol": "VIC"
+        },
+        {
+          "TradingDate": "02/11/2026",
+          "ClosePrice": "242000",
+          "ClosePriceAdjusted": "242000",
+          "Symbol": "VIC"
+        }
+      ]
+    },
+    {
+      "symbol": "HPG",
+      "http_status": 200,
+      "api_status": "Success",
+      "rows": 15,
+      "fields": [
+        "AveragePrice",
+        "CeilingPrice",
+        "ClosePrice",
+        "ClosePriceAdjusted",
+        "FloorPrice",
+        "ForeignBuyValTotal",
+        "ForeignBuyVolTotal",
+        "ForeignCurrentRoom",
+        "ForeignSellValTotal",
+        "ForeignSellVolTotal",
+        "HighestPrice",
+        "LowestPrice",
+        "NetBuySellVal",
+        "NetBuySellVol",
+        "OpenPrice",
+        "PerPriceChange",
+        "PriceChange",
+        "RefPrice",
+        "Symbol",
+        "Time",
+        "TotalBuyTrade",
+        "TotalBuyTradeVol",
+        "TotalDealVal",
+        "TotalDealVol",
+        "TotalMatchVal",
+        "TotalMatchVol",
+        "TotalSellTrade",
+        "TotalSellTradeVol",
+        "TotalTradedValue",
+        "TotalTradedVol",
+        "TradingDate"
+      ],
+      "prices": [
+        {
+          "TradingDate": "20/11/2026",
+          "ClosePrice": "20450",
+          "ClosePriceAdjusted": "20450",
+          "Symbol": "HPG"
+        },
+        {
+          "TradingDate": "19/11/2026",
+          "ClosePrice": "20450",
+          "ClosePriceAdjusted": "20450",
+          "Symbol": "HPG"
+        },
+        {
+          "TradingDate": "18/11/2026",
+          "ClosePrice": "20450",
+          "ClosePriceAdjusted": "20450",
+          "Symbol": "HPG"
+        },
+        {
+          "TradingDate": "17/11/2026",
+          "ClosePrice": "21000",
+          "ClosePriceAdjusted": "21000",
+          "Symbol": "HPG"
+        },
+        {
+          "TradingDate": "16/11/2026",
+          "ClosePrice": "21050",
+          "ClosePriceAdjusted": "21050",
+          "Symbol": "HPG"
+        },
+        {
+          "TradingDate": "13/11/2026",
+          "ClosePrice": "21050",
+          "ClosePriceAdjusted": "21050",
+          "Symbol": "HPG"
+        },
+        {
+          "TradingDate": "12/11/2026",
+          "ClosePrice": "21050",
+          "ClosePriceAdjusted": "21050",
+          "Symbol": "HPG"
+        },
+        {
+          "TradingDate": "11/11/2026",
+          "ClosePrice": "21350",
+          "ClosePriceAdjusted": "21350",
+          "Symbol": "HPG"
+        },
+        {
+          "TradingDate": "10/11/2026",
+          "ClosePrice": "21250",
+          "ClosePriceAdjusted": "21250",
+          "Symbol": "HPG"
+        },
+        {
+          "TradingDate": "09/11/2026",
+          "ClosePrice": "20900",
+          "ClosePriceAdjusted": "20900",
+          "Symbol": "HPG"
+        },
+        {
+          "TradingDate": "06/11/2026",
+          "ClosePrice": "21200",
+          "ClosePriceAdjusted": "21200",
+          "Symbol": "HPG"
+        },
+        {
+          "TradingDate": "05/11/2026",
+          "ClosePrice": "21500",
+          "ClosePriceAdjusted": "21500",
+          "Symbol": "HPG"
+        },
+        {
+          "TradingDate": "04/11/2026",
+          "ClosePrice": "21700",
+          "ClosePriceAdjusted": "21700",
+          "Symbol": "HPG"
+        },
+        {
+          "TradingDate": "03/11/2026",
+          "ClosePrice": "21250",
+          "ClosePriceAdjusted": "21250",
+          "Symbol": "HPG"
+        },
+        {
+          "TradingDate": "02/11/2026",
+          "ClosePrice": "20400",
+          "ClosePriceAdjusted": "20400",
+          "Symbol": "HPG"
+        }
+      ]
+    }
+  ]
+}

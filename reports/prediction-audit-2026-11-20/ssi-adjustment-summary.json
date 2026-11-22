@@ -1,0 +1,24 @@
+{
+  "symbols": 30,
+  "total_rows": 36420,
+  "matched_dates": 36420,
+  "adjusted_close_matches": 32852,
+  "tolerance_kvnd": 0.011,
+  "disagreements": [
+    {
+      "symbol": "GVR",
+      "rows": 1164,
+      "raw_price_on_adjusted_dates": 243
+    },
+    {
+      "symbol": "TCB",
+      "rows": 1199,
+      "raw_price_on_adjusted_dates": 269
+    },
+    {
+      "symbol": "VNM",
+      "rows": 1205,
+      "raw_price_on_adjusted_dates": 92
+    }
+  ]
+}

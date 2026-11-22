@@ -1,0 +1,3 @@
+Mã VIC thiếu 1 ngày so với lịch VNINDEX trong dải ngày: [Timestamp('2024-01-10 00:00:00')]
+Lỗi cập nhật panel interim sau đồng bộ: isolated panel failure
+{"dynamic_cutoff": "passed", "panel_failure_reported": "passed", "training_rejects_failed_sync": "passed", "production_artifacts_written": false}

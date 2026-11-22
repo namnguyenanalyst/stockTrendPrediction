@@ -1,0 +1,50 @@
+.........s.............................................................. [ 28%]
+........................................................................ [ 57%]
+.......................F................................................ [ 85%]
+....................................                                     [100%]
+=================================== FAILURES ===================================
+__________ test_prediction_logs_link_symbol_model_date_and_generation __________
+
+caplog = <_pytest.logging.LogCaptureFixture object at 0x700fd38af0>
+
+    def test_prediction_logs_link_symbol_model_date_and_generation(caplog):
+        import logging
+        from app.services.prediction_service import predict_stock_signal
+        result = dict(symbol='VIC', date='2026-11-20', current_price=241.9,
+                      model_type='lightgbm', predicted_label=0, class_name='GIẢM',
+                      signal='BÁN (SELL)', probabilities={'GIẢM':.6,'ĐI NGANG':.3,'TĂNG':.1},
+                      training_info={'artifact_generation':'audit-generation','serving_status':'healthy'})
+        with caplog.at_level(logging.INFO), patch('vn_stock.modeling.predict_trend',return_value=result):
+            predict_stock_signal(' vic ', 'lightgbm')
+        records=[r for r in caplog.records if getattr(r,'event',None)=='prediction_completed']
+>       assert len(records)==1
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tests/test_prediction_audit.py:17: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/fastapi/testclient.py:1
+  /Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/api/.venv/lib/python3.10/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_db_adversarial.py::test_adversarial_deterministic_uuid_pk_collision
+  sys:1: SAWarning: New instance <User at 0x7012087700> with identity key (<class 'app.db.models.user.User'>, (UUID('df055f07-ceaa-4b9c-ae6a-969199342f9f'),), None) conflicts with persistent instance <User at 0x7012085b40>
+
+tests/test_phase3_integrity.py::test_refresh_session_migration_round_trip
+tests/test_phase3_integrity.py::test_refresh_session_migration_round_trip
+  /Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/api/.venv/lib/python3.10/site-packages/alembic/config.py:604: DeprecationWarning: No path_separator found in configuration; falling back to legacy splitting on spaces, commas, and colons for prepend_sys_path.  Consider adding path_separator=os to Alembic config.
+    util.warn_deprecated(
+
+tests/test_phase3_integrity.py::test_refresh_session_migration_round_trip
+tests/test_phase3_integrity.py::test_refresh_session_migration_round_trip
+  /Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/api/.venv/lib/python3.10/site-packages/alembic/config.py:552: DeprecationWarning: The version_path_separator configuration parameter is deprecated; please use path_separator
+    util.warn_deprecated(
+
+tests/test_tier5_adversarial_backend.py::test_token_algorithm_substitution_attacks
+  /Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/api/.venv/lib/python3.10/site-packages/jwt/api_jwt.py:149: InsecureKeyLengthWarning: The HMAC key is 52 bytes long, which is below the minimum recommended length of 64 bytes for SHA512. See RFC 7518 Section 3.2.
+    return self._jws.encode(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_prediction_audit.py::test_prediction_logs_link_symbol_model_date_and_generation
+1 failed, 250 passed, 1 skipped, 7 warnings in 122.60s (0:02:02)

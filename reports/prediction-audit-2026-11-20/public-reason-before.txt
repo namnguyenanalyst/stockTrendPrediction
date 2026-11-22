@@ -1,0 +1,134 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_ test_price_history_reason_survives_http_handler_without_exposing_other_service_errors _
+
+scope = {'type': 'http', 'asgi': {'version': '3.0'}, 'http_version': '1.1', 'method': 'GET', ...}
+receive = <function ASGITransport.handle_async_request.<locals>.receive at 0x11d2d1090>
+send = <function wrap_app_handling_exceptions.<locals>.wrapped_app.<locals>.sender at 0x11d97f0a0>
+
+    async def wrapped_app(scope: Scope, receive: Receive, send: Send) -> None:
+        response_started = False
+    
+        async def sender(message: Message) -> None:
+            nonlocal response_started
+    
+            if message["type"] == "http.response.start":
+                response_started = True
+            await send(message)
+    
+        try:
+>           await app(scope, receive, sender)
+
+.venv/lib/python3.10/site-packages/starlette/_exception_handler.py:42: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.venv/lib/python3.10/site-packages/fastapi/routing.py:151: in app
+    response = await f(request)
+.venv/lib/python3.10/site-packages/fastapi/routing.py:727: in app
+    raw_response = await run_endpoint_function(
+.venv/lib/python3.10/site-packages/fastapi/routing.py:362: in run_endpoint_function
+    return await run_in_threadpool(
+.venv/lib/python3.10/site-packages/starlette/concurrency.py:34: in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+.venv/lib/python3.10/site-packages/anyio/to_thread.py:65: in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+.venv/lib/python3.10/site-packages/anyio/_backends/_asyncio.py:2706: in run_sync_in_worker_thread
+    return await future
+/opt/anaconda3/lib/python3.10/asyncio/tasks.py:304: in __wakeup
+    future.result()
+.venv/lib/python3.10/site-packages/anyio/_backends/_asyncio.py:1100: in run
+    result = context.run(func, *args)
+.venv/lib/python3.10/site-packages/fastapi/telemetry/_api.py:244: in _run_sync_endpoint
+    return function(**arguments)
+app/routers/prediction.py:39: in predict_signal
+    return prediction_service.predict_stock_signal(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+symbol = 'TCB', model_type = 'lightgbm'
+
+    def predict_stock_signal(
+        symbol: str = "VIC",
+        model_type: str = "lightgbm",
+    ) -> PredictionResponse:
+        """
+        Thực hiện suy luận dự báo xu hướng chu kỳ T+3 và Quỹ đạo 3 phiên cho một mã cổ phiếu.
+    
+        Args:
+            symbol: Mã cổ phiếu (ví dụ: VIC, HPG, FPT).
+            model_type: 'lightgbm' hoặc 'lstm'.
+    
+        Returns:
+            PredictionResponse chứa nhãn, tên xu hướng, khuyến nghị Mua/Bán, xác suất 3 lớp và Quỹ đạo 3 phiên (T+1 -> T+3).
+        """
+        clean_sym = normalize_symbol(symbol)
+        model_clean = model_type.strip().lower()
+        if model_clean not in ["lightgbm", "lstm"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Mô hình '{model_type}' không hợp lệ. Hệ thống chỉ hỗ trợ 'lightgbm' hoặc 'lstm'.",
+            )
+    
+        started = perf_counter()
+        try:
+            from vn_stock.modeling import predict_trend
+    
+            res = predict_trend(
+                symbol=clean_sym,
+                model_type=model_clean,
+                models_dir=settings.MODELS_DIR,
+            )
+    
+            session_info = get_market_sync_status()
+            session_label = session_info.get("status_label", "")
+    
+            response = PredictionResponse(
+                symbol=res["symbol"],
+                date=res["date"],
+                data_as_of_date=res.get("data_as_of_date", res["date"]),
+                current_price=res["current_price"],
+                model_type=res["model_type"],
+                predicted_label=res["predicted_label"],
+                class_name=res["class_name"],
+                signal=res["signal"],
+                probabilities=res["probabilities"],
+                horizon=res.get("horizon", "T+3"),
+                horizon_days=res.get("horizon_days", 3),
+                is_live_synced=res.get("is_live_synced", False),
+                market_session_label=res.get("market_session_label", session_label),
+                session_info=session_info,
+                trajectory=res.get("trajectory", []),
+                summary_guidance=res.get("summary_guidance", ""),
+                training_info=res.get("training_info"),
+                data_quality=res.get("data_quality"),
+            )
+            _log_prediction(response, started)
+            return response
+        except UnverifiedPriceHistoryError as quality_error:
+            logger.warning('prediction_rejected symbol=%s model=%s reason=%s', clean_sym, model_clean, quality_error)
+>           raise HTTPException(503, str(quality_error)) from None
+E           fastapi.exceptions.HTTPException: 503: Dữ liệu giá của TCB có biến động lớn chưa được xác minh tại 2026-10-29. Chưa thể tạo dự báo; cần đối chiếu điều chỉnh cổ tức/chia tách.
+
+app/services/prediction_service.py:96: HTTPException
+
+During handling of the above exception, another exception occurred:
+
+async_client = <httpx.AsyncClient object at 0x11d1fe560>
+
+    @pytest.mark.asyncio
+    async def test_price_history_reason_survives_http_handler_without_exposing_other_service_errors(async_client):
+        from vn_stock.data_quality import UnverifiedPriceHistoryError
+        with patch('vn_stock.modeling.predict_trend',side_effect=UnverifiedPriceHistoryError('TCB','2026-10-29')):
+            response=await async_client.get('/api/predict/signal?symbol=TCB')
+        assert response.status_code==503
+>       assert '2026-10-29' in response.json()['detail']
+E       AssertionError: assert '2026-10-29' in 'Dịch vụ hiện không thể xử lý yêu cầu.'
+
+tests/test_prediction_audit.py:80: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-11-21 22:09:12,570 - app.services.prediction_service - WARNING - prediction_rejected symbol=TCB model=lightgbm reason=Dữ liệu giá của TCB có biến động lớn chưa được xác minh tại 2026-10-29. Chưa thể tạo dự báo; cần đối chiếu điều chỉnh cổ tức/chia tách.
+2026-11-21 22:09:12,570 - httpx - INFO - HTTP Request: GET http://test/api/predict/signal?symbol=TCB "HTTP/1.1 503 Service Unavailable"
+------------------------------ Captured log call -------------------------------
+WARNING  app.services.prediction_service:prediction_service.py:95 prediction_rejected symbol=TCB model=lightgbm reason=Dữ liệu giá của TCB có biến động lớn chưa được xác minh tại 2026-10-29. Chưa thể tạo dự báo; cần đối chiếu điều chỉnh cổ tức/chia tách.
+INFO     httpx:_client.py:1740 HTTP Request: GET http://test/api/predict/signal?symbol=TCB "HTTP/1.1 503 Service Unavailable"
+=========================== short test summary info ============================
+FAILED tests/test_prediction_audit.py::test_price_history_reason_survives_http_handler_without_exposing_other_service_errors
+1 failed, 19 deselected in 0.65s

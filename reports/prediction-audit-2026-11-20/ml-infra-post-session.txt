@@ -1,0 +1,15 @@
+
+==================================== ERRORS ====================================
+_________________ ERROR collecting test_docker_adversarial.py __________________
+ImportError while importing test module '/Users/huongnguyen/Desktop/Học Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/infra/tests/test_docker_adversarial.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/opt/anaconda3/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+infra/tests/test_docker_adversarial.py:18: in <module>
+    from sqlalchemy.engine import make_url
+E   ModuleNotFoundError: No module named 'sqlalchemy'
+=========================== short test summary info ============================
+ERROR apps/ml/test_docker_adversarial.py
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 7.59s

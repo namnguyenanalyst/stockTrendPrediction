@@ -1,0 +1,26 @@
+[
+  {
+    "name": "vn_stock_api",
+    "image_id": "sha256:32701272565e7b4a4ed1972c80b35c03ac7c02e245b81c3aa5266193be33bfc2",
+    "running": true,
+    "health": "healthy"
+  },
+  {
+    "name": "vn_stock_training_api",
+    "image_id": "sha256:32701272565e7b4a4ed1972c80b35c03ac7c02e245b81c3aa5266193be33bfc2",
+    "running": true,
+    "health": "healthy"
+  },
+  {
+    "name": "vn_stock_retrain_worker",
+    "image_id": "sha256:1fe9f4d7ffff2fbb3c68889d97e9e96836d7552378b4a04c41f02007d1519656",
+    "running": true,
+    "health": null
+  },
+  {
+    "name": "vn_stock_web",
+    "image_id": "sha256:130c95389d34793483b74773f2ca965c321125aab4f398fb332cf97ba19ed8d3",
+    "running": true,
+    "health": null
+  }
+]

@@ -1,0 +1,10 @@
+{"kind": "index", "symbol": "VNINDEX", "start_date": "2026-11-19", "end_date": "2026-11-20", "status": "error", "error_type": "RuntimeError", "seconds": 0.0}
+{"kind": "index", "symbol": "VNINDEX", "start_date": "2022-01-01", "end_date": "2026-11-20", "status": "error", "error_type": "RuntimeError", "seconds": 0.0}
+{"kind": "index", "symbol": "VN30", "start_date": "2026-11-17", "end_date": "2026-11-20", "status": "error", "error_type": "RuntimeError", "seconds": 0.0}
+{"kind": "index", "symbol": "VN30", "start_date": "2022-01-01", "end_date": "2026-11-20", "status": "error", "error_type": "RuntimeError", "seconds": 0.0}
+{"kind": "stock", "symbol": "FPT", "start_date": "2026-11-19", "end_date": "2026-11-20", "status": "error", "error_type": "RuntimeError", "seconds": 0.0}
+{"kind": "stock", "symbol": "HPG", "start_date": "2026-11-19", "end_date": "2026-11-20", "status": "error", "error_type": "RuntimeError", "seconds": 0.0}
+{"kind": "stock", "symbol": "MWG", "start_date": "2026-11-19", "end_date": "2026-11-20", "status": "error", "error_type": "RuntimeError", "seconds": 0.0}
+{"kind": "stock", "symbol": "VIC", "start_date": "2026-11-19", "end_date": "2026-11-20", "status": "error", "error_type": "RuntimeError", "seconds": 0.0}
+{"kind": "stock", "symbol": "VNM", "start_date": "2026-11-19", "end_date": "2026-11-20", "status": "error", "error_type": "RuntimeError", "seconds": 0.0}
+{"kind": "stock", "symbol": "FPT", "start_date": "2026-11-19", "end_date": "2026-11-20", "status": "error", "error_type": "RuntimeError", "seconds": 0.0}

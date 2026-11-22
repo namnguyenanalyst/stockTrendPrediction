@@ -1,0 +1,17 @@
+...F.                                                                    [100%]
+=================================== FAILURES ===================================
+____ test_unverified_split_like_jump_is_rejected_before_feature_computation ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x12e389810>
+
+    def test_unverified_split_like_jump_is_rejected_before_feature_computation(monkeypatch):
+        frame=history();frame.loc[290:,'Close']=20.
+        monkeypatch.setattr('vn_stock.modeling.predict.load_panel_dataset',lambda **_:frame)
+        monkeypatch.setattr('vn_stock.modeling.predict.get_target_market_date',lambda:str(frame.Date.max().date()))
+>       with pytest.raises(UnverifiedPriceHistoryError,match='TCB'):
+E       Failed: DID NOT RAISE UnverifiedPriceHistoryError
+
+tests/test_price_history_quality.py:23: Failed
+=========================== short test summary info ============================
+FAILED tests/test_price_history_quality.py::test_unverified_split_like_jump_is_rejected_before_feature_computation
+1 failed, 4 passed in 2.03s

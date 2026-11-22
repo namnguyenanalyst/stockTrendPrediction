@@ -1,0 +1,7 @@
+{"kind": "stock", "symbol": "VIC", "start_date": "2026-11-19", "end_date": "2026-11-20", "status": "success", "rows": 2, "seconds": 0.435}
+{"kind": "index", "symbol": "VNINDEX", "start_date": "2026-11-19", "end_date": "2026-11-20", "status": "success", "rows": 2, "seconds": 1.665}
+{"kind": "index", "symbol": "VN30", "start_date": "2026-11-17", "end_date": "2026-11-20", "status": "success", "rows": 4, "seconds": 1.413}
+{"kind": "stock", "symbol": "HPG", "start_date": "2026-11-19", "end_date": "2026-11-20", "status": "success", "rows": 2, "seconds": 0.304}
+{"kind": "stock", "symbol": "FPT", "start_date": "2026-11-19", "end_date": "2026-11-20", "status": "success", "rows": 2, "seconds": 0.39}
+{"kind": "stock", "symbol": "VNM", "start_date": "2026-11-19", "end_date": "2026-11-20", "status": "success", "rows": 2, "seconds": 0.377}
+{"kind": "stock", "symbol": "MWG", "start_date": "2026-11-19", "end_date": "2026-11-20", "status": "success", "rows": 2, "seconds": 0.384}

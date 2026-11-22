@@ -1,0 +1,225 @@
+[
+  {
+    "name": "vn_stock_api",
+    "image_id": "sha256:32701272565e7b4a4ed1972c80b35c03ac7c02e245b81c3aa5266193be33bfc2",
+    "state": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 1311,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-11-22T09:23:40.609265425Z",
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "Status": "healthy",
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "Start": "2026-11-22T09:24:11.206989842Z",
+            "End": "2026-11-22T09:24:11.451550217Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-22T09:24:21.45732493Z",
+            "End": "2026-11-22T09:24:21.77950343Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-22T09:24:31.780783296Z",
+            "End": "2026-11-22T09:24:32.290552963Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-22T09:24:42.295680176Z",
+            "End": "2026-11-22T09:24:42.576433176Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-22T09:24:52.582208333Z",
+            "End": "2026-11-22T09:24:52.819342625Z",
+            "ExitCode": 0,
+            "Output": ""
+          }
+        ]
+      }
+    },
+    "user": "apiuser",
+    "mounts": [
+      {
+        "Type": "bind",
+        "Source": "/Users/huongnguyen/Desktop/Ho\u0323c Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/api/alembic",
+        "Destination": "/app/apps/api/alembic",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/huongnguyen/Desktop/Ho\u0323c Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/api/app",
+        "Destination": "/app/apps/api/app",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/huongnguyen/Desktop/Ho\u0323c Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/data",
+        "Destination": "/app/apps/ml/data",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/huongnguyen/Desktop/Ho\u0323c Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/models",
+        "Destination": "/app/apps/ml/models",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      }
+    ],
+    "published_ports": {
+      "8000/tcp": [
+        {
+          "HostIp": "0.0.0.0",
+          "HostPort": "8000"
+        },
+        {
+          "HostIp": "::",
+          "HostPort": "8000"
+        }
+      ]
+    },
+    "sklearn": "1.7.2"
+  },
+  {
+    "name": "vn_stock_training_api",
+    "image_id": "sha256:32701272565e7b4a4ed1972c80b35c03ac7c02e245b81c3aa5266193be33bfc2",
+    "state": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 1462,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-11-22T09:23:50.385288555Z",
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "Status": "healthy",
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "Start": "2026-11-22T09:24:15.974871678Z",
+            "End": "2026-11-22T09:24:16.220372178Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-22T09:24:26.218412543Z",
+            "End": "2026-11-22T09:24:26.460415293Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-22T09:24:36.464199881Z",
+            "End": "2026-11-22T09:24:36.708524381Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-22T09:24:46.713856386Z",
+            "End": "2026-11-22T09:24:47.05999222Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-11-22T09:24:57.061697794Z",
+            "End": "2026-11-22T09:24:57.298421044Z",
+            "ExitCode": 0,
+            "Output": ""
+          }
+        ]
+      }
+    },
+    "user": "501:20",
+    "mounts": [
+      {
+        "Type": "bind",
+        "Source": "/Users/huongnguyen/Desktop/Ho\u0323c Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/infra/scripts/training_api_entrypoint.py",
+        "Destination": "/app/training_api_entrypoint.py",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/huongnguyen/Desktop/Ho\u0323c Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/api/app",
+        "Destination": "/app/apps/api/app",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/huongnguyen/Desktop/Ho\u0323c Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/data",
+        "Destination": "/app/apps/ml/data",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/huongnguyen/Desktop/Ho\u0323c Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/apps/ml/models",
+        "Destination": "/app/apps/ml/models",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": "rprivate"
+      }
+    ],
+    "published_ports": {
+      "8000/tcp": null
+    },
+    "sklearn": "1.7.2"
+  },
+  {
+    "name": "vn_stock_retrain_worker",
+    "image_id": "sha256:1fe9f4d7ffff2fbb3c68889d97e9e96836d7552378b4a04c41f02007d1519656",
+    "state": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 1590,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-11-22T09:23:56.023990293Z",
+      "FinishedAt": "0001-01-01T00:00:00Z"
+    },
+    "user": "",
+    "mounts": [
+      {
+        "Type": "bind",
+        "Source": "/Users/huongnguyen/Desktop/Ho\u0323c Python/Project/Machine Learning/machine_learning_projects/stockTrendPrediction/infra/scripts/retrain_worker.py",
+        "Destination": "/app/retrain_worker.py",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      }
+    ],
+    "published_ports": {},
+    "log": "[2026-11-22 16:23:56] [INFO] [RetrainWorker] Kh\u1edfi \u0111\u1ed9ng Autonomous Retrain Worker (Ph\u01b0\u01a1ng \u00e1n A: Docker Container ri\u00eang)\n[2026-11-22 16:23:56] [INFO] [RetrainWorker] API URL: http://vn_stock_training_api:8000\n[2026-11-22 16:23:56] [INFO] [RetrainWorker] L\u1ecbch \u0111\u1ecbnh k\u1ef3: Th\u1ee9 Ch\u1ee7 Nh\u1eadt l\u00fac 02:00 (Gi\u1edd Vi\u1ec7t Nam UTC+7)\n"
+  }
+]
