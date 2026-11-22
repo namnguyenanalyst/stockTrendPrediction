@@ -20,7 +20,8 @@ dependencies = [
     "fastparquet",
     "python-dotenv",
     "requests",
-    "scikit-learn",
+    # Pickled serving scalers were produced with this serialization runtime.
+    "scikit-learn==1.7.2",
     "scipy<1.14",
     "shap>=0.49.1",
     "torch",
