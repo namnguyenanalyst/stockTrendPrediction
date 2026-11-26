@@ -44,14 +44,7 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
   const [selectedSymbol, setSelectedSymbol] = useState<string>("VIC");
   const [modelType, setModelType] = useState<"lightgbm" | "lstm">("lightgbm");
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
-
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 767px)");
-    const compact = () => { if (media.matches) setIsCollapsed(true); };
-    const timer = setTimeout(compact, 0);
-    media.addEventListener("change", compact);
-    return () => { clearTimeout(timer); media.removeEventListener("change", compact); };
-  }, []);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   // Dữ liệu Thị trường
   const [bars, setBars] = useState<StockBar[]>([]);
@@ -234,13 +227,15 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100">
-      {/* Thanh điều hướng Dọc (Vertical Collapsible Sidebar) */}
+    <div className="flex min-h-screen w-full max-w-full overflow-x-hidden bg-slate-950 text-slate-100">
+      {/* Thanh điều hướng Dọc (Vertical Collapsible Sidebar + Mobile Drawer) */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
+        isMobileOpen={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
 
       {/* Khung nội dung chính */}
@@ -250,6 +245,8 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
           activeTab={activeTab}
           selectedSymbol={selectedSymbol}
           setSelectedSymbol={setSelectedSymbol}
+          isMobileMenuOpen={isMobileMenuOpen}
+          onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
 
         {/* Nội dung Màn hình chính theo Active Tab */}

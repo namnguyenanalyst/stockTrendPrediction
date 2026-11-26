@@ -6,6 +6,7 @@ import {
   BrainCircuit,
   ChevronDown,
   History,
+  Menu,
   Search,
   ShieldCheck,
 } from "lucide-react";
@@ -18,6 +19,8 @@ interface TopHeaderProps {
   activeTab: DashboardTab;
   selectedSymbol: string;
   setSelectedSymbol: (symbol: string) => void;
+  isMobileMenuOpen?: boolean;
+  onOpenMobileMenu?: () => void;
 }
 
 const TAB_TITLES = {
@@ -43,6 +46,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   activeTab,
   selectedSymbol,
   setSelectedSymbol,
+  isMobileMenuOpen = false,
+  onOpenMobileMenu,
 }) => {
   const currentTabInfo = TAB_TITLES[activeTab];
   const Icon = currentTabInfo.icon;
@@ -136,31 +141,41 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   ];
 
   return (
-    <header className="sticky top-0 z-30 flex min-h-[73px] items-center border-b border-slate-800 bg-slate-950/85 backdrop-blur-md">
-      <div className="mx-auto flex w-full flex-col gap-2.5 px-4 py-2.5 sm:px-6 md:flex-row md:items-center md:justify-between">
-        {/* Bên Trái: Tiêu đề Tab & Badge Phiên giao dịch */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+    <header className="sticky top-0 z-30 flex min-h-[73px] w-full items-center border-b border-slate-800 bg-slate-950/85 backdrop-blur-md">
+      <div className="mx-auto flex w-full min-w-0 flex-col gap-2.5 px-3 py-2.5 sm:px-6 md:flex-row md:items-center md:justify-between">
+        {/* Bên Trái: Nút mở Mobile Drawer + Tiêu đề Tab */}
+        <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+          {onOpenMobileMenu && (
+            <button
+              type="button"
+              onClick={onOpenMobileMenu}
+              aria-label="Mở menu điều hướng"
+              aria-expanded={isMobileMenuOpen}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-800 bg-slate-900/90 text-slate-300 hover:border-slate-700 hover:bg-slate-800 hover:text-white transition-all md:hidden"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+          )}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
               <Icon className="h-4 w-4" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="text-sm font-bold tracking-tight text-slate-100 sm:text-base">
+                <h1 className="text-sm font-bold tracking-tight text-slate-100 sm:text-base truncate">
                   {currentTabInfo.title}
                 </h1>
               </div>
             </div>
           </div>
-
         </div>
 
         {/* Bên Phải: Bộ chọn mã cổ phiếu & Menu tài khoản người dùng */}
-        <div className="flex items-center gap-3 self-end md:self-auto">
+        <div className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
           {activeTab === "prediction" && (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-1 min-w-0 items-center gap-2 sm:flex-initial">
               {/* Ô Tìm Kiếm Mã Cổ Phiếu / Chỉ Số Mở Rộng */}
-              <div ref={searchRef} className="relative">
+              <div ref={searchRef} className="relative flex-1 min-w-0 sm:flex-initial">
                 <div className="relative flex items-center">
                   <Search className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-slate-400" />
                   <input
@@ -174,7 +189,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                     onKeyDown={handleSearchKeyDown}
                     aria-label="Chọn mã cổ phiếu hoặc chỉ số"
                     placeholder={`Chọn mã cổ phiếu (${selectedSymbol})...`}
-                    className="h-8 w-44 rounded-lg border border-slate-800 bg-slate-900/90 pl-8 pr-7 text-xs font-bold uppercase text-slate-100 placeholder:text-slate-500 placeholder:font-normal placeholder:normal-case focus:border-emerald-500/60 focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 sm:w-56 transition-all"
+                    className="h-8 w-full min-w-0 rounded-lg border border-slate-800 bg-slate-900/90 pl-8 pr-7 text-xs font-bold uppercase text-slate-100 placeholder:text-slate-500 placeholder:font-normal placeholder:normal-case focus:border-emerald-500/60 focus:bg-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 sm:w-56 transition-all"
                   />
                   <button
                     type="button"
@@ -189,7 +204,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
                 {/* Dropdown gợi ý mã cổ phiếu & chỉ số */}
                 {isSearchOpen && (
-                  <div className="absolute right-0 mt-1 max-h-80 w-80 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-2 shadow-2xl backdrop-blur-xl z-50">
+                  <div className="absolute left-0 sm:left-auto sm:right-0 mt-1 max-h-80 w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-2 shadow-2xl backdrop-blur-xl z-50">
                     {/* Header gợi ý */}
                     <div className="px-1.5 py-1 text-[10px] font-semibold text-slate-400 border-b border-slate-800/80 mb-1.5">
                       <span>Gợi ý mã giao dịch</span>
