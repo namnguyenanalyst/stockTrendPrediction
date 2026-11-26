@@ -20,7 +20,7 @@ import pytest
 from sklearn.preprocessing import StandardScaler
 import torch
 
-from vn_stock.features import ALL_FEATURE_COLS
+from vn_stock.features import ALL_FEATURE_COLS, FEATURE_COLS, JsonStandardScaler
 from vn_stock.modeling.model import GlobalLSTMClassifier
 from vn_stock.modeling.predict import (
     clear_model_cache,
@@ -41,13 +41,11 @@ def test_lightgbm_hot_reload_and_corrupted_fallback(tmp_path: Path):
     """Kiểm tra quy trình hot-reload LightGBM và fallback an toàn khi file artifact bị hỏng."""
     import lightgbm as lgb
 
-    # 1. Khởi tạo Scaler chuẩn hóa
+    # 1. Khởi tạo Scaler chuẩn hóa dạng JSON
     scaler = StandardScaler()
-    dummy_features = np.ones((10, len(ALL_FEATURE_COLS) - 1))
+    dummy_features = np.ones((10, len(FEATURE_COLS)))
     scaler.fit(dummy_features)
-    scaler_path = tmp_path / "production_scaler_t3.pkl"
-    with open(scaler_path, "wb") as f:
-        pickle.dump(scaler, f)
+    JsonStandardScaler(scaler.mean_, scaler.scale_, FEATURE_COLS).to_json(tmp_path / "production_scaler_t3.json")
 
     # 2. Tạo Mô hình V1: LightGBM huấn luyện dự báo nhãn 2 (TĂNG)
     X_v1 = np.random.randn(30, len(ALL_FEATURE_COLS))
@@ -111,12 +109,10 @@ def test_lightgbm_hot_reload_and_corrupted_fallback(tmp_path: Path):
 
 def test_lstm_hot_reload_and_corrupted_fallback(tmp_path: Path):
     """Kiểm tra quy trình hot-reload PyTorch LSTM và fallback an toàn khi file state_dict bị hỏng."""
-    # 1. Scaler
+    # 1. Scaler JSON
     scaler = StandardScaler()
-    scaler.fit(np.zeros((5, len(ALL_FEATURE_COLS) - 1)))
-    scaler_path = tmp_path / "production_scaler_t3.pkl"
-    with open(scaler_path, "wb") as f:
-        pickle.dump(scaler, f)
+    scaler.fit(np.zeros((5, len(FEATURE_COLS))))
+    JsonStandardScaler(scaler.mean_, scaler.scale_, FEATURE_COLS).to_json(tmp_path / "production_scaler_t3.json")
 
     # 2. LSTM Model V1
     model_v1 = GlobalLSTMClassifier(
@@ -183,10 +179,8 @@ def test_lstm_hot_reload_and_corrupted_fallback(tmp_path: Path):
 def test_first_time_corrupted_artifact_raises(tmp_path: Path):
     """Khi chưa có model trong RAM mà file trên đĩa đã bị hỏng, phải raise exception hợp lệ."""
     scaler = StandardScaler()
-    scaler.fit(np.zeros((5, len(ALL_FEATURE_COLS) - 1)))
-    scaler_path = tmp_path / "production_scaler_t3.pkl"
-    with open(scaler_path, "wb") as f:
-        pickle.dump(scaler, f)
+    scaler.fit(np.zeros((5, len(FEATURE_COLS))))
+    JsonStandardScaler(scaler.mean_, scaler.scale_, FEATURE_COLS).to_json(tmp_path / "production_scaler_t3.json")
 
     corrupt_pth = tmp_path / "production_lstm_t3.pth"
     with open(corrupt_pth, "wb") as f:

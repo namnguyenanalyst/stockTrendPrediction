@@ -18,10 +18,14 @@ def _digest(path: Path) -> str:
 
 
 def _validate_names(names, horizon):
-    required = {f"production_scaler_t{horizon}.pkl", f"production_lstm_t{horizon}.pth",
-                f"production_training_info_t{horizon}.json"}
+    scaler_names = {
+        f"production_scaler_t{horizon}.json",
+        "scaler_params.json",
+        f"production_scaler_t{horizon}.pkl",
+    }
+    required = {f"production_lstm_t{horizon}.pth", f"production_training_info_t{horizon}.json"}
     model_names = {f"production_lgb_t{horizon}.txt", f"production_lgb_t{horizon}.pkl"}
-    if not required.issubset(names) or not model_names.intersection(names):
+    if not required.issubset(names) or not scaler_names.intersection(names) or not model_names.intersection(names):
         raise ValueError("Incomplete model/scaler/metadata bundle.")
 
 

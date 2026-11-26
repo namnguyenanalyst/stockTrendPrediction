@@ -51,6 +51,7 @@ from vn_stock.config import (
 from vn_stock.data_ingestion import build_panel_dataset
 from vn_stock.features import (
     ALL_FEATURE_COLS,
+    JsonStandardScaler,
     compute_features_per_symbol,
     create_multivariate_sequences,
 )
@@ -403,11 +404,12 @@ def train_production_model(
 
         from vn_stock.modeling.artifacts import publish_training_bundle
 
+        scaler_json = JsonStandardScaler.from_scaler(scaler)
         writers = {
             f"production_lgb_t{horizon}.txt": lambda p: lgb_model.booster_.save_model(str(p)),
             f"production_lgb_t{horizon}.pkl": lambda p: _write_pkl(p, lgb_model),
             f"production_lstm_t{horizon}.pth": lambda p: torch.save(lstm_model.state_dict(), p),
-            f"production_scaler_t{horizon}.pkl": lambda p: _write_pkl(p, scaler),
+            f"production_scaler_t{horizon}.json": lambda p: _write_json(p, scaler_json.to_dict()),
             "feature_importance.json": lambda p: _write_json(p, {
                 col: int(imp) for col, imp in zip(ALL_FEATURE_COLS, lgb_model.feature_importances_)
             }),
@@ -418,7 +420,8 @@ def train_production_model(
             "lightgbm_classifier.txt": f"production_lgb_t{horizon}.txt",
             "lightgbm_classifier.pkl": f"production_lgb_t{horizon}.pkl",
             "global_lstm_classifier.pth": f"production_lstm_t{horizon}.pth",
-            "scaler_window3.pkl": f"production_scaler_t{horizon}.pkl",
+            "scaler_params.json": f"production_scaler_t{horizon}.json",
+            "scaler_window3.json": f"production_scaler_t{horizon}.json",
             "production_training_info.json": f"production_training_info_t{horizon}.json",
         })
         summary["artifact_publication"] = publish_training_bundle(

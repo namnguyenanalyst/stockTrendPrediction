@@ -51,6 +51,7 @@ from vn_stock.data_ingestion import (
 from vn_stock.features import (
     ALL_FEATURE_COLS,
     FEATURE_COLS,
+    JsonStandardScaler,
     compute_features_per_symbol,
     transform_model_features,
 )
@@ -73,10 +74,18 @@ def _resolve_artifact_paths(
             f"Loại mô hình không hợp lệ: '{model_type}'. Chỉ hỗ trợ 'lstm' hoặc 'lightgbm'."
         )
 
-    scaler_path = models_dir / f"production_scaler_t{horizon}.pkl"
-    if not scaler_path.exists() and horizon == 3:
-        scaler_path = models_dir / "scaler_window3.pkl"
-    if not scaler_path.exists():
+    scaler_candidates = [
+        models_dir / f"production_scaler_t{horizon}.json",
+        models_dir / "scaler_params.json",
+    ]
+    if horizon == 3:
+        scaler_candidates.append(models_dir / "scaler_window3.json")
+    scaler_candidates.append(models_dir / f"production_scaler_t{horizon}.pkl")
+    if horizon == 3:
+        scaler_candidates.append(models_dir / "scaler_window3.pkl")
+
+    scaler_path = next((p for p in scaler_candidates if p.exists()), None)
+    if scaler_path is None:
         raise FileNotFoundError(
             f"Chưa tìm thấy scaler tại {models_dir}. Hãy chạy huấn luyện trước bằng `uv run python -m vn_stock.modeling.train --production`."
         )
@@ -111,9 +120,12 @@ def _load_raw_artifacts(
     hidden_size: int,
     num_layers: int,
 ) -> tuple[Any, Any]:
-    """Đọc dữ liệu nhị phân từ đĩa để sinh model và scaler."""
-    with open(scaler_path, "rb") as f:
-        scaler = pickle.load(f)
+    """Đọc tham số chuẩn hóa JSON (hoặc legacy pickle) và mô hình từ đĩa."""
+    if scaler_path.suffix.lower() == ".json":
+        scaler = JsonStandardScaler.from_json(scaler_path)
+    else:
+        with open(scaler_path, "rb") as f:
+            scaler = pickle.load(f)
 
     m_type = model_type.lower()
     if m_type == "lstm":
@@ -167,7 +179,11 @@ def load_prediction_snapshot(
             pointer = models_dir / f"production_bundle_t{horizon}.json"
             if pointer.exists():
                 files = resolve_bundle(models_dir, horizon)
-                scaler_path = files[f"production_scaler_t{horizon}.pkl"]
+                scaler_path = (
+                    files.get(f"production_scaler_t{horizon}.json")
+                    or files.get("scaler_params.json")
+                    or files[f"production_scaler_t{horizon}.pkl"]
+                )
                 name = f"production_lstm_t{horizon}.pth" if model_type == "lstm" else f"production_lgb_t{horizon}.txt"
                 model_path = files.get(name) or files[f"production_lgb_t{horizon}.pkl"]
                 info_path = files[f"production_training_info_t{horizon}.json"]

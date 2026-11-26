@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler
 import torch
 
 from vn_stock.config import NUM_CLASSES
-from vn_stock.features import ALL_FEATURE_COLS, FEATURE_COLS
+from vn_stock.features import ALL_FEATURE_COLS, FEATURE_COLS, JsonStandardScaler
 from vn_stock.modeling.model import (
     GlobalLSTMClassifier,
     create_lightgbm_model,
@@ -295,8 +295,41 @@ def test_train_production_model(tmp_path):
         assert stored_info["runtime_versions"] == res["runtime_versions"]
         assert (tmp_path / "production_lgb_t3.txt").exists()
         assert (tmp_path / "production_lstm_t3.pth").exists()
-        assert (tmp_path / "production_scaler_t3.pkl").exists()
+        assert (tmp_path / "production_scaler_t3.json").exists()
+        assert (tmp_path / "scaler_params.json").exists()
         assert (tmp_path / "production_training_info_t3.json").exists()
+
+
+def test_json_scaler_loads_without_pickle_or_sklearn_warning(tmp_path, mock_panel_data):
+    """Đảm bảo suy luận đọc tham số chuẩn hóa từ JSON bằng NumPy, không dùng pickle.load và không phát InconsistentVersionWarning."""
+    import warnings
+    from sklearn.exceptions import InconsistentVersionWarning
+    from vn_stock.modeling.predict import clear_model_cache, load_prediction_snapshot
+
+    clear_model_cache()
+    sk_scaler = StandardScaler().fit(mock_panel_data[FEATURE_COLS])
+    json_scaler = JsonStandardScaler.from_scaler(sk_scaler)
+    json_scaler.to_json(tmp_path / "production_scaler_t3.json")
+
+    lgb_model = create_lightgbm_model({"n_estimators": 5, "min_child_samples": 2})
+    lgb_model.fit(mock_panel_data[ALL_FEATURE_COLS], mock_panel_data["Label"])
+    lgb_model.booster_.save_model(str(tmp_path / "production_lgb_t3.txt"))
+
+    with (
+        warnings.catch_warnings(record=True) as caught,
+        patch("vn_stock.modeling.predict.pickle.load", side_effect=AssertionError("pickle.load must not be called for JSON scaler/booster")),
+    ):
+        warnings.simplefilter("always")
+        model, loaded_scaler, _ = load_prediction_snapshot("lightgbm", models_dir=tmp_path, horizon=3)
+        assert isinstance(loaded_scaler, JsonStandardScaler)
+        assert not any(issubclass(w.category, InconsistentVersionWarning) for w in caught)
+        np.testing.assert_allclose(
+            loaded_scaler.transform(mock_panel_data[FEATURE_COLS]),
+            sk_scaler.transform(mock_panel_data[FEATURE_COLS]),
+            rtol=1e-12,
+            atol=1e-12,
+        )
+    clear_model_cache()
 
 
 def test_train_lstm_model_wrapper(tmp_path):

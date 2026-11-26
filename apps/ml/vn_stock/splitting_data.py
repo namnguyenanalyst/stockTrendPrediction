@@ -9,7 +9,7 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 from vn_stock.config import DEFAULT_HORIZON_DAYS, DEFAULT_SEQ_LENGTH, STUDY_START_DATE
-from vn_stock.features import FEATURE_COLS
+from vn_stock.features import FEATURE_COLS, JsonStandardScaler
 
 logger = logging.getLogger(__name__)
 
@@ -125,12 +125,13 @@ def scale_window(
     val_df: pd.DataFrame,
     test_df: pd.DataFrame,
     feature_cols: list[str] = FEATURE_COLS,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, StandardScaler]:
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, JsonStandardScaler]:
     """
     Chuẩn hóa StandardScaler độc lập chống rò rỉ thông tin (Leak-free Preprocessing).
 
     Quy tắc:
     - StandardScaler CHỈ được fit trên train_df[feature_cols].
+    - Lưu tham số mean_, scale_, feature_names dưới dạng JsonStandardScaler thuần NumPy.
     - Transform cho cả 3 tập (train, val, test) bằng scaler đã fit từ train.
     - Cột 'Symbol_Code' (và các cột định danh khác: Symbol, Date, Label, Valid_Label) TUYỆT ĐỐI KHÔNG SCALE,
       được giữ nguyên vẹn giá trị và kiểu dữ liệu gốc.
@@ -148,8 +149,9 @@ def scale_window(
     if missing_cols:
         raise ValueError(f"Tập Train thiếu các cột đặc trưng bắt buộc: {missing_cols}")
 
-    scaler = StandardScaler()
-    scaler.fit(train_df[feature_cols])
+    sk_scaler = StandardScaler()
+    sk_scaler.fit(train_df[feature_cols])
+    scaler = JsonStandardScaler.from_scaler(sk_scaler)
 
     train_scaled = train_df.copy()
     val_scaled = val_df.copy()

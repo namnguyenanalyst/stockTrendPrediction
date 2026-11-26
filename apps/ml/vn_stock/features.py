@@ -1,6 +1,9 @@
 """Module tính toán bộ 13 đặc trưng tương đối và tạo chuỗi 3D đa biến có Warm-up cho mô hình Global Model."""
 
+import json
 import logging
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -30,8 +33,72 @@ FEATURE_COLS = [
 ALL_FEATURE_COLS = FEATURE_COLS + ["Symbol_Code"]
 
 
+class JsonStandardScaler:
+    """Bộ chuẩn hóa Z-score thuần NumPy lưu tham số dưới dạng JSON, loại bỏ phụ thuộc phiên bản scikit-learn."""
+
+    def __init__(
+        self,
+        mean_: np.ndarray | list[float],
+        scale_: np.ndarray | list[float],
+        feature_names_in_: list[str] | tuple[str, ...],
+    ) -> None:
+        self.mean_ = np.asarray(mean_, dtype=float)
+        self.scale_ = np.asarray(scale_, dtype=float)
+        self.feature_names_in_ = list(feature_names_in_)
+        self.n_features_in_ = len(self.feature_names_in_)
+        if self.mean_.shape != (self.n_features_in_,) or self.scale_.shape != (self.n_features_in_,):
+            raise ValueError("Scaler mean_/scale_ length must match feature_names.")
+
+    @classmethod
+    def from_scaler(cls, scaler: Any) -> "JsonStandardScaler":
+        if isinstance(scaler, cls):
+            return scaler
+        if isinstance(scaler, dict):
+            return cls.from_dict(scaler)
+        names = list(getattr(scaler, "feature_names_in_", FEATURE_COLS))
+        return cls(mean_=scaler.mean_, scale_=scaler.scale_, feature_names_in_=names)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": 1,
+            "scaler_type": "StandardScaler",
+            "feature_names": list(self.feature_names_in_),
+            "mean_": [float(x) for x in self.mean_],
+            "scale_": [float(x) for x in self.scale_],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "JsonStandardScaler":
+        if "mean_" not in data or "scale_" not in data:
+            raise ValueError("Invalid JSON scaler payload: missing mean_ or scale_.")
+        names = data.get("feature_names") or data.get("feature_names_in_")
+        if not isinstance(names, list) or not names:
+            raise ValueError("Invalid JSON scaler payload: missing feature_names.")
+        return cls(mean_=data["mean_"], scale_=data["scale_"], feature_names_in_=names)
+
+    def to_json(self, path: Path | str) -> None:
+        Path(path).write_text(json.dumps(self.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+
+    @classmethod
+    def from_json(cls, path: Path | str) -> "JsonStandardScaler":
+        return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
+
+    def transform(self, X: pd.DataFrame | np.ndarray) -> np.ndarray:
+        arr = (
+            X[self.feature_names_in_].to_numpy(dtype=float)
+            if isinstance(X, pd.DataFrame)
+            else np.asarray(X, dtype=float)
+        )
+        if arr.ndim != 2 or arr.shape[1] != self.n_features_in_:
+            raise ValueError(f"Expected {self.n_features_in_} features, got {arr.shape}.")
+        safe_scale = np.where(self.scale_ == 0.0, 1.0, self.scale_)
+        return (arr - self.mean_) / safe_scale
+
+
 def transform_model_features(df: pd.DataFrame, scaler) -> pd.DataFrame:
     """Apply the fitted training schema without imputing from future observations."""
+    if isinstance(scaler, dict):
+        scaler = JsonStandardScaler.from_dict(scaler)
     missing = set(ALL_FEATURE_COLS) - set(df.columns)
     if missing:
         raise ValueError(f"Missing model features: {sorted(missing)}")
@@ -41,7 +108,16 @@ def transform_model_features(df: pd.DataFrame, scaler) -> pd.DataFrame:
     if not np.isfinite(df[ALL_FEATURE_COLS].to_numpy(dtype=float)).all():
         raise ValueError("Model features must be finite; no future/backward filling is allowed.")
     result = df.copy()
-    result[FEATURE_COLS] = scaler.transform(df[FEATURE_COLS])
+    if isinstance(scaler, JsonStandardScaler):
+        result[FEATURE_COLS] = scaler.transform(df[FEATURE_COLS])
+    else:
+        arr = df[FEATURE_COLS].to_numpy(dtype=float)
+        if hasattr(scaler, "mean_") and hasattr(scaler, "scale_"):
+            mean = np.asarray(scaler.mean_, dtype=float)
+            scale = np.where(np.asarray(scaler.scale_, dtype=float) == 0.0, 1.0, np.asarray(scaler.scale_, dtype=float))
+            result[FEATURE_COLS] = (arr - mean) / scale
+        else:
+            result[FEATURE_COLS] = scaler.transform(df[FEATURE_COLS])
     if not np.isfinite(result[FEATURE_COLS].to_numpy()).all():
         raise ValueError("Scaler produced nonfinite model features.")
     return result
