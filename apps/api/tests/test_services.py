@@ -33,8 +33,8 @@ def test_get_presets_service_success():
     assert first.id
     assert first.name
     assert first.category
-    assert first.cumulative_pnl_pct is not None
-    assert first.win_rate_pct is not None
+    assert first.cumulative_pnl_pct is None
+    assert first.win_rate_pct is None
 
 
 def test_get_presets_service_exception_raises_http_500():
@@ -126,17 +126,17 @@ def test_run_advanced_backtest_scope_sector_success():
     assert res.symbols_count >= 1
 
 
-def test_run_advanced_backtest_unknown_sector_fallback_default_symbols():
-    """Kiểm tra run_advanced_backtest khi tên ngành không tồn tại -> fallback danh sách mặc định."""
+def test_run_advanced_backtest_unknown_sector_rejects_422():
+    """Ngành không tồn tại phải bị từ chối với HTTP 422 thay vì âm thầm fallback sang cổ phiếu ngân hàng."""
     req = AdvancedBacktestRequest(
         scope_type=BacktestScopeType.SECTOR,
         sector_name="Ngành Không Tồn Tại XYZ",
         start_date="2024-01-01",
         end_date="2024-04-01",
     )
-    res = backtest_service.run_advanced_backtest(req)
-    assert res.scope_type == "sector"
-    assert res.symbols_count >= 1
+    with pytest.raises(HTTPException) as exc_info:
+        backtest_service.run_advanced_backtest(req)
+    assert exc_info.value.status_code == 422
 
 
 def test_run_advanced_backtest_engine_failure_raises_http_500():

@@ -7,10 +7,11 @@ Bao gồm:
 4. Kiểm thử chiến lược: BacktestRequest, BacktestMetricsSchema, EquityCurvePoint, TradeLogItem, BacktestResponse, BacktestSummaryResponse
 """
 
+from datetime import date
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 # ============================================================================
@@ -226,23 +227,23 @@ class BacktestRequest(BaseModel):
     slippage_rate: float = Field(default=0.0005, ge=0, lt=1, description="Tỷ lệ trượt giá khớp lệnh (0.05%)")
     fee_rate: float = Field(default=0.0015, ge=0, lt=1, description="Phí môi giới mỗi chiều (0.15%)")
     tax_rate: float = Field(default=0.0010, ge=0, lt=1, description="Thuế chuyển nhượng khi bán (0.10%)")
-    lot_size: int = Field(default=100, description="Quy cách lô chẵn (100 cổ phiếu)")
-    settlement_delay: int = Field(default=2, description="Chu kỳ thanh toán (T+2)")
-    execution_price: str = Field(default="open", description="Giá khớp lệnh ('open' hoặc 'close')")
+    lot_size: int = Field(default=100, ge=1, strict=True, description="Quy cách lô chẵn (100 cổ phiếu)")
+    settlement_delay: int = Field(default=2, ge=0, strict=True, description="Chu kỳ thanh toán (T+2)")
+    execution_price: Literal["open", "close"] = Field(default="open", description="Giá khớp lệnh ('open' hoặc 'close')")
     buy_prob_threshold: float = Field(
-        default=0.40, description="Ngưỡng xác suất kích hoạt lệnh Mua"
+        default=0.40, ge=0, le=1, description="Ngưỡng xác suất kích hoạt lệnh Mua"
     )
     sell_prob_threshold: float = Field(
-        default=0.40, description="Ngưỡng xác suất kích hoạt lệnh Bán"
+        default=0.40, ge=0, le=1, description="Ngưỡng xác suất kích hoạt lệnh Bán"
     )
     take_profit_pct: float | None = Field(
-        default=None, description="Tỷ lệ chốt lời Take Profit (ví dụ: 0.10 cho 10%)"
+        default=None, ge=0, description="Tỷ lệ chốt lời Take Profit (ví dụ: 0.10 cho 10%)"
     )
     stop_loss_pct: float | None = Field(
-        default=None, description="Tỷ lệ cắt lỗ Stop Loss (ví dụ: 0.07 cho 7%)"
+        default=None, ge=0, description="Tỷ lệ cắt lỗ Stop Loss (ví dụ: 0.07 cho 7%)"
     )
     trailing_stop_pct: float | None = Field(
-        default=None, description="Tỷ lệ Trailing Stop bảo toàn lãi từ đỉnh (ví dụ: 0.05 cho 5%)"
+        default=None, ge=0, description="Tỷ lệ Trailing Stop bảo toàn lãi từ đỉnh (ví dụ: 0.05 cho 5%)"
     )
     preset_id: str | None = Field(
         default=None, description="Mã định danh chiến thuật mẫu nếu áp dụng từ preset"
@@ -253,30 +254,30 @@ class BacktestMetricsSchema(BaseModel):
     initial_capital: float = Field(..., description="Vốn ban đầu (VNĐ)")
     final_equity: float = Field(..., description="Tài sản ròng kết thúc (VNĐ)")
     total_return_pct: float = Field(..., description="Tỷ suất sinh lời tổng thể (ROI %)")
-    cagr_pct: float = Field(..., description="Tỷ suất sinh lời kép năm hóa (CAGR %)")
+    cagr_pct: float | None = Field(..., description="Tỷ suất sinh lời kép năm hóa (CAGR %)")
     buy_and_hold_return_pct: float = Field(..., description="Lợi nhuận chiến lược Buy & Hold (%)")
     excess_return_pct: float = Field(..., description="Lợi nhuận vượt trội Alpha (%)")
-    annualized_volatility_pct: float = Field(..., description="Độ biến động năm hóa (%)")
-    sharpe_ratio: float = Field(..., description="Tỷ số Sharpe năm hóa (Rf=4%)")
-    sortino_ratio: float = Field(..., description="Tỷ số Sortino năm hóa")
+    annualized_volatility_pct: float | None = Field(..., description="Độ biến động năm hóa (%)")
+    sharpe_ratio: float | None = Field(..., description="Tỷ số Sharpe năm hóa (Rf=4%)")
+    sortino_ratio: float | None = Field(..., description="Tỷ số Sortino năm hóa")
     max_drawdown_pct: float = Field(..., description="Mức sụt giảm vốn lớn nhất từ đỉnh (MDD %)")
-    calmar_ratio: float = Field(..., description="Tỷ số Calmar (CAGR / MDD)")
-    var_95_pct: float = Field(..., description="Giá trị chịu rủi ro VaR 95% 1 ngày (%)")
-    cvar_95_pct: float = Field(..., description="Kỳ vọng tổn thất vượt mức CVaR 95% (%)")
-    win_rate_pct: float = Field(..., description="Tỷ lệ lệnh có lãi Win Rate (%)")
-    profit_factor: float = Field(..., description="Hệ số lợi nhuận Profit Factor")
+    calmar_ratio: float | None = Field(..., description="Tỷ số Calmar (CAGR / MDD)")
+    var_95_pct: float | None = Field(..., description="Giá trị chịu rủi ro VaR 95% 1 ngày (%)")
+    cvar_95_pct: float | None = Field(..., description="Kỳ vọng tổn thất vượt mức CVaR 95% (%)")
+    win_rate_pct: float | None = Field(..., description="Tỷ lệ lệnh có lãi Win Rate (%)")
+    profit_factor: float | None = Field(..., description="Hệ số lợi nhuận Profit Factor")
     total_trades: int = Field(..., description="Tổng số vòng giao dịch đã đóng")
     winning_trades: int = Field(..., description="Số vòng giao dịch có lãi")
     losing_trades: int = Field(..., description="Số vòng giao dịch hòa/lỗ")
-    avg_trade_return_pct: float = Field(..., description="Lợi nhuận bình quân mỗi lệnh (%)")
-    avg_holding_days: float = Field(..., description="Thời gian nắm giữ bình quân (phiên)")
+    avg_trade_return_pct: float | None = Field(..., description="Lợi nhuận bình quân mỗi lệnh (%)")
+    avg_holding_days: float | None = Field(..., description="Thời gian nắm giữ bình quân (phiên)")
     total_fees_paid: float = Field(..., description="Tổng phí môi giới đã trả (VNĐ)")
     total_taxes_paid: float = Field(..., description="Tổng thuế chuyển nhượng đã nộp (VNĐ)")
     total_costs: float = Field(..., description="Tổng chi phí thuế phí (VNĐ)")
     cost_impact_pct: float = Field(..., description="Tác động chi phí trên vốn ban đầu (%)")
-    max_gain_pct: float = Field(default=0.0, description="Tỷ lệ % deal lãi cao nhất (%)")
-    max_loss_pct: float = Field(default=0.0, description="Tỷ lệ % deal lỗ sâu nhất (%)")
-    reward_risk_ratio: float = Field(default=0.0, description="Tỷ lệ Lợi nhuận / Rủi ro")
+    max_gain_pct: float | None = Field(default=None, description="Tỷ lệ % deal lãi cao nhất (%)")
+    max_loss_pct: float | None = Field(default=None, description="Tỷ lệ % deal lỗ sâu nhất (%)")
+    reward_risk_ratio: float | None = Field(default=None, description="Tỷ lệ Lợi nhuận / Rủi ro")
 
 
 class EquityCurvePoint(BaseModel):
@@ -291,7 +292,7 @@ class TradeLogItem(BaseModel):
     trade_id: int = Field(..., description="Mã định danh lệnh")
     order_type: str = Field(..., description="Loại lệnh ('BUY' hoặc 'SELL')")
     exec_date: str = Field(..., description="Ngày thực thi lệnh trên sàn")
-    exec_price: float = Field(..., description="Giá khớp lệnh thực tế (nghìn VNĐ)")
+    exec_price: float = Field(..., description="Giá khớp lệnh thực tế (VNĐ)")
     shares: int = Field(..., description="Số lượng cổ phiếu (lô 100)")
     fee: float = Field(..., description="Phí môi giới (VNĐ)")
     tax: float = Field(..., description="Thuế chuyển nhượng (VNĐ)")
@@ -323,11 +324,11 @@ class BacktestSummaryItem(BaseModel):
     roi_pct: float = Field(..., description="ROI (%)")
     bh_roi_pct: float = Field(..., description="Buy & Hold ROI (%)")
     excess_pct: float = Field(..., description="Alpha (%)")
-    sharpe: float = Field(..., description="Tỷ số Sharpe")
-    sortino: float = Field(..., description="Tỷ số Sortino")
+    sharpe: float | None = Field(..., description="Tỷ số Sharpe")
+    sortino: float | None = Field(..., description="Tỷ số Sortino")
     mdd_pct: float = Field(..., description="Max Drawdown (%)")
-    win_rate_pct: float = Field(..., description="Tỷ lệ thắng (%)")
-    profit_factor: float = Field(..., description="Profit Factor")
+    win_rate_pct: float | None = Field(..., description="Tỷ lệ thắng (%)")
+    profit_factor: float | None = Field(..., description="Profit Factor")
     trades: int = Field(..., description="Tổng số lệnh đóng")
     costs: float = Field(..., description="Tổng chi phí (VNĐ)")
 
@@ -345,10 +346,10 @@ class StrategyPresetItem(BaseModel):
     target_symbols: list[str] = Field(..., description="Danh sách cổ phiếu khuyến nghị")
     default_symbol: str = Field(..., description="Mã cổ phiếu mặc định")
     conditions_summary: str = Field(..., description="Tóm tắt bộ điều kiện")
-    win_rate_pct: float = Field(..., description="Tỷ lệ thắng mẫu (%)")
-    cumulative_pnl_pct: float = Field(..., description="Lãi/lỗ lũy kế mẫu (%)")
-    risk_reward_ratio: str = Field(..., description="Tỷ lệ Rủi ro / Lợi nhuận")
-    copy_count: int = Field(..., description="Số lượt sao chép")
+    win_rate_pct: float | None = Field(default=None, description="Tỷ lệ thắng mẫu (%)")
+    cumulative_pnl_pct: float | None = Field(default=None, description="Lãi/lỗ lũy kế mẫu (%)")
+    risk_reward_ratio: str | None = Field(default=None, description="Tỷ lệ Rủi ro / Lợi nhuận")
+    copy_count: int | None = Field(default=None, description="Số lượt sao chép")
     take_profit_pct: float = Field(..., description="Mức chốt lời mặc định")
     stop_loss_pct: float = Field(..., description="Mức cắt lỗ mặc định")
     trailing_stop_pct: float = Field(..., description="Mức trailing stop mặc định")
@@ -388,7 +389,8 @@ class BacktestScopeType(str, Enum):
 
 
 class BacktestConditionFilter(BaseModel):
-    condition_logic: str = Field(default="AND", description="Toán tử logic kết nối ('AND' hoặc 'OR')")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    condition_logic: Literal["AND", "OR"] = Field(default="AND", description="Toán tử logic kết nối ('AND' hoặc 'OR')")
     market_condition: str | None = Field(default="all", description="Điều kiện VN-Index ('all', 'uptrend', 'sideways', 'downtrend')")
     
     # 1. Thông tin Cổ phiếu & Khối lượng
@@ -399,11 +401,11 @@ class BacktestConditionFilter(BaseModel):
     min_market_cap: float | None = Field(default=None, description="Vốn hóa tối thiểu (Tỷ)")
     max_market_cap: float | None = Field(default=None, description="Vốn hóa tối đa (Tỷ)")
     use_avg_trading_val: bool = Field(default=False, description="GTGD trung bình (Tỷ)")
-    avg_trading_val_period: int = Field(default=10, description="Chu kỳ tính GTGD trung bình (5, 10, 20 phiên)")
+    avg_trading_val_period: Literal[5, 10, 20] = Field(default=10, description="Chu kỳ tính GTGD trung bình (5, 10, 20 phiên)")
     min_avg_trading_val: float | None = Field(default=None, description="GTGD trung bình tối thiểu")
     max_avg_trading_val: float | None = Field(default=None, description="GTGD trung bình tối đa")
     use_volume_spike: bool = Field(default=False, description="Khối lượng đột biến %")
-    vol_spike_period: int = Field(default=10, description="Chu kỳ tính % KLGD đột biến (5, 10, 20 phiên)")
+    vol_spike_period: Literal[5, 10, 20] = Field(default=10, description="Chu kỳ tính % KLGD đột biến (5, 10, 20 phiên)")
     min_vol_spike_pct: float | None = Field(default=None, description="% KLGD đột biến tối thiểu (VD: 20%)")
     max_vol_spike_pct: float | None = Field(default=None, description="% KLGD đột biến tối đa")
 
@@ -420,10 +422,10 @@ class BacktestConditionFilter(BaseModel):
     min_rs: float | None = Field(default=None, description="Ngưỡng RS tối thiểu")
     max_rs: float | None = Field(default=None, description="Ngưỡng RS tối đa")
     use_rsi: bool = Field(default=False, description="Điều kiện RSI")
-    rsi_threshold: float = Field(default=45.0, description="Ngưỡng RSI mua cũ (<=)")
-    rsi_min: float | None = Field(default=None, description="Ngưỡng RSI tối thiểu")
-    rsi_max: float | None = Field(default=None, description="Ngưỡng RSI tối đa")
-    rsi_sell_threshold: float = Field(default=70.0, description="Ngưỡng RSI bán (>=)")
+    rsi_threshold: float = Field(ge=0, le=100, default=45.0, description="Ngưỡng RSI mua cũ (<=)")
+    rsi_min: float | None = Field(ge=0, le=100, default=None, description="Ngưỡng RSI tối thiểu")
+    rsi_max: float | None = Field(ge=0, le=100, default=None, description="Ngưỡng RSI tối đa")
+    rsi_sell_threshold: float = Field(ge=0, le=100, default=70.0, description="Ngưỡng RSI bán (>=)")
     use_price_cross: bool = Field(default=False, description="Giá cắt đường MA/EMA/BB")
     price_cross_operator: str = Field(default="Cắt lên", description="Toán tử giá cắt ('Cắt lên', 'Cắt xuống', 'Nằm trên', 'Nằm dưới')")
     price_cross_target: str = Field(default="MA 10", description="Mục tiêu giá cắt ('MA 10', 'MA 20', 'EMA 20', 'BB Trên', 'BB Dưới')")
@@ -513,13 +515,39 @@ class BacktestConditionFilter(BaseModel):
     max_prop_sell_vol: float | None = Field(default=None, description="KLGD tự doanh bán ròng tối đa (triệu cp)")
 
     # Quản trị vị thế & Bán
-    take_profit_pct: float | None = Field(default=None, description="Chốt lời (%)")
-    stop_loss_pct: float | None = Field(default=None, description="Cắt lỗ (%)")
-    trailing_stop_pct: float | None = Field(default=None, description="Trailing Stop (%)")
+    take_profit_pct: float | None = Field(default=None, ge=0, description="Chốt lời (%)")
+    stop_loss_pct: float | None = Field(default=None, ge=0, description="Cắt lỗ (%)")
+    trailing_stop_pct: float | None = Field(default=None, ge=0, description="Trailing Stop (%)")
 
+
+
+    @model_validator(mode="after")
+    def validate_condition_ranges(self):
+        values = self.model_dump()
+        if self.market_condition not in (None, "all"):
+            raise ValueError("market_condition other than 'all' is not supported without historical regime data.")
+        cross_ops = {"Cắt lên", "Cắt xuống", "Nằm trên", "Nằm dưới", ">", "<", "="}
+        for op_field, active_field in (
+            ("ma_operator", "use_ma"),
+            ("ema_operator", "use_ema"),
+            ("macd_operator", "use_macd"),
+            ("price_cross_operator", "use_price_cross"),
+        ):
+            if values.get(active_field) and values.get(op_field) not in cross_ops:
+                raise ValueError(f"Unsupported {op_field}: {values.get(op_field)}")
+        if self.use_price_increase and self.price_t0_operator not in {">", "<", "=", ">=", "<="}:
+            raise ValueError(f"Unsupported price_t0_operator: {self.price_t0_operator}")
+        pairs = [(key, "max_" + key[4:]) for key in values if key.startswith("min_")]
+        pairs.append(("rsi_min", "rsi_max"))
+        for lower, upper in pairs:
+            lo, hi = values.get(lower), values.get(upper)
+            if lo is not None and hi is not None and lo > hi:
+                raise ValueError(f"{lower} must not exceed {upper}.")
+        return self
 
 
 class AdvancedBacktestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     scope_type: BacktestScopeType = Field(default=BacktestScopeType.STOCK, description="Phạm vi kiểm thử")
     symbol: str = Field(default="VIC", description="Mã cổ phiếu đơn lẻ nếu scope_type == 'stock'")
     index_name: str | None = Field(default="VN30", description="Tên rổ chỉ số nếu scope_type == 'index'")
@@ -532,11 +560,28 @@ class AdvancedBacktestRequest(BaseModel):
     slippage_rate: float = Field(default=0.0005, ge=0, lt=1, description="Tỷ lệ trượt giá (0.05%)")
     fee_rate: float = Field(default=0.0015, ge=0, lt=1, description="Phí môi giới mỗi chiều (0.15%)")
     tax_rate: float = Field(default=0.0010, ge=0, lt=1, description="Thuế chuyển nhượng khi bán (0.10%)")
-    lot_size: int = Field(default=100, description="Quy cách lô chẵn (100 cổ phiếu)")
-    settlement_delay: int = Field(default=2, description="Chu kỳ thanh toán (T+2)")
+    lot_size: int = Field(default=100, ge=1, strict=True, description="Quy cách lô chẵn (100 cổ phiếu)")
+    settlement_delay: int = Field(default=2, ge=0, strict=True, description="Chu kỳ thanh toán (T+2)")
     use_advanced_settings: bool = Field(default=False, description="Chỉ áp dụng cài đặt nâng cao khi cờ này là True")
     buy_conditions: BacktestConditionFilter = Field(default_factory=BacktestConditionFilter, description="Bộ điều kiện Mua")
     sell_conditions: BacktestConditionFilter = Field(default_factory=BacktestConditionFilter, description="Bộ điều kiện Bán")
+
+
+    @field_validator("start_date", "end_date")
+    @classmethod
+    def validate_backtest_date(cls, value: str) -> str:
+        parsed = date.fromisoformat(value)
+        if parsed.isoformat() != value:
+            raise ValueError("Backtest dates must use YYYY-MM-DD.")
+        return value
+
+    @field_validator("model_type")
+    @classmethod
+    def validate_backtest_model(cls, value: str) -> str:
+        model = value.lower()
+        if model not in ("none", "lightgbm", "lgb", "lstm"):
+            raise ValueError("Unsupported backtest model.")
+        return model
 
 
 class SymbolBreakdownItem(BaseModel):
@@ -546,11 +591,11 @@ class SymbolBreakdownItem(BaseModel):
     roi_pct: float = Field(..., description="Tỷ suất sinh lời ROI (%)")
     bh_roi_pct: float = Field(..., description="Buy & Hold ROI (%)")
     excess_pct: float = Field(..., description="Alpha vượt trội (%)")
-    sharpe: float = Field(..., description="Tỷ số Sharpe")
-    sortino: float = Field(..., description="Tỷ số Sortino")
+    sharpe: float | None = Field(..., description="Tỷ số Sharpe")
+    sortino: float | None = Field(..., description="Tỷ số Sortino")
     mdd_pct: float = Field(..., description="Mức sụt giảm tối đa MDD (%)")
-    win_rate_pct: float = Field(..., description="Tỷ lệ thắng (%)")
-    profit_factor: float = Field(..., description="Profit Factor")
+    win_rate_pct: float | None = Field(..., description="Tỷ lệ thắng (%)")
+    profit_factor: float | None = Field(..., description="Profit Factor")
     trades: int = Field(..., description="Tổng số lệnh")
     costs: float = Field(..., description="Tổng chi phí giao dịch (VNĐ)")
 
@@ -562,6 +607,7 @@ class IndividualResultItem(BaseModel):
 
 
 class PortfolioBacktestResponse(BaseModel):
+    config: dict[str, Any] = Field(default_factory=dict, description="Cấu hình thực thi và nguồn dữ liệu; không chứng thực OOS")
     scope_type: str = Field(..., description="Phạm vi đã kiểm thử ('stock', 'index', 'sector', 'portfolio')")
     scope_target: str = Field(..., description="Mục tiêu kiểm thử (tên mã, tên rổ, tên ngành)")
     start_date: str = Field(..., description="Ngày bắt đầu")

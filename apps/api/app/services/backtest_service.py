@@ -53,17 +53,14 @@ def run_backtest_simulation(req: BacktestRequest) -> BacktestResponse:
             detail=f"Mô hình '{req.model_type}' không hợp lệ. Chỉ hỗ trợ 'lightgbm' hoặc 'lstm'.",
         )
 
-    # Tự động đảm bảo nến lịch sử có sẵn cho mã kiểm thử
-    from vn_stock.data_ingestion import fetch_stock_data, load_local_data
-    if load_local_data(clean_sym) is None:
-        try:
-            fetch_stock_data(clean_sym)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Không tìm thấy dữ liệu cho mã '{clean_sym}': {exc}",
-            )
-
+    # Backtesting reads a fixed local snapshot; data refresh is a separate operation.
+    from vn_stock.data_ingestion import load_local_data
+    local_data = load_local_data(clean_sym)
+    if local_data is None or local_data.empty:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Thiếu dữ liệu cục bộ cho {clean_sym}. Hãy đồng bộ dữ liệu trước khi kiểm thử.",
+        )
 
     try:
         from vn_stock.backtest import backtest_symbol_oos
@@ -87,6 +84,16 @@ def run_backtest_simulation(req: BacktestRequest) -> BacktestResponse:
         )
 
         m = res.metrics
+        reward_risk_ratio = None
+        if not res.trades_df.empty:
+            sells = res.trades_df[res.trades_df["order_type"] == "SELL"]
+            wins = sells.loc[sells["realized_pnl"].fillna(0) > 0, "realized_return_pct"].dropna().astype(float)
+            losses = sells.loc[sells["realized_pnl"].fillna(0) < 0, "realized_return_pct"].dropna().astype(float)
+            if not wins.empty and not losses.empty:
+                avg_loss = abs(float(losses.mean()))
+                if avg_loss > 1e-9:
+                    reward_risk_ratio = round(float(wins.mean()) / avg_loss, 2)
+
         metrics_schema = BacktestMetricsSchema(
             initial_capital=m.initial_capital,
             final_equity=m.final_equity,
@@ -106,6 +113,9 @@ def run_backtest_simulation(req: BacktestRequest) -> BacktestResponse:
             total_trades=m.total_trades,
             winning_trades=m.winning_trades,
             losing_trades=m.losing_trades,
+            max_gain_pct=m.best_trade_return_pct,
+            max_loss_pct=m.worst_trade_return_pct,
+            reward_risk_ratio=reward_risk_ratio,
             avg_trade_return_pct=m.avg_trade_return_pct,
             avg_holding_days=m.avg_holding_days,
             total_fees_paid=m.total_fees_paid,
@@ -170,6 +180,8 @@ def run_backtest_simulation(req: BacktestRequest) -> BacktestResponse:
             equity_curve=equity_curve_points,
             trades=trade_items,
         )
+    except ValueError as err:
+        raise HTTPException(status_code=422, detail=str(err)) from err
     except Exception as err:
         logger.exception("Lỗi thực thi Backtest cho %s", clean_sym)
         raise HTTPException(
@@ -213,11 +225,11 @@ def get_backtest_summary(
                 roi_pct=round(float(row["ROI %"]), 2),
                 bh_roi_pct=round(float(row["B&H ROI %"]), 2),
                 excess_pct=round(float(row["Excess %"]), 2),
-                sharpe=round(float(row["Sharpe"]), 4),
-                sortino=round(float(row["Sortino"]), 4),
+                sharpe=round(float(row["Sharpe"]), 4) if pd.notna(row["Sharpe"]) else None,
+                sortino=round(float(row["Sortino"]), 4) if pd.notna(row["Sortino"]) else None,
                 mdd_pct=round(float(row["MDD %"]), 2),
-                win_rate_pct=round(float(row["Win Rate %"]), 2),
-                profit_factor=round(float(row["Profit Factor"]), 4),
+                win_rate_pct=round(float(row["Win Rate %"]), 2) if pd.notna(row["Win Rate %"]) else None,
+                profit_factor=round(float(row["Profit Factor"]), 4) if pd.notna(row["Profit Factor"]) else None,
                 trades=int(row["Trades"]),
                 costs=round(float(row["Costs (VND)"]), 2),
             )
@@ -315,13 +327,18 @@ def run_advanced_backtest(req: AdvancedBacktestRequest) -> PortfolioBacktestResp
                 if s.sector.lower() == sec_name.lower()
             ]
         if not target_symbols:
-            target_symbols = ["VCB", "BID", "CTG", "TCB", "MBB"]
+            raise HTTPException(
+                status_code=422,
+                detail=f"Không tìm thấy mã cổ phiếu cho ngành '{sec_name}'.",
+            )
         scope_target = f"Ngành {sec_name}"
     elif req.scope_type == BacktestScopeType.PORTFOLIO:
-        if req.portfolio_symbols and len(req.portfolio_symbols) > 0:
-            target_symbols = [s.strip().upper() for s in req.portfolio_symbols if s.strip()]
-        else:
-            target_symbols = ["VIC", "HPG", "FPT"]
+        target_symbols = [s.strip().upper() for s in (req.portfolio_symbols or []) if s.strip()]
+        if not target_symbols:
+            raise HTTPException(
+                status_code=422,
+                detail="Danh mục kiểm thử phải có ít nhất 1 mã cổ phiếu.",
+            )
         scope_target = f"Danh mục ({len(target_symbols)} mã)"
 
     target_symbols = [normalize_symbol(symbol) for symbol in target_symbols]
@@ -431,6 +448,7 @@ def run_advanced_backtest(req: AdvancedBacktestRequest) -> PortfolioBacktestResp
             )
 
         return PortfolioBacktestResponse(
+            config=res.get("config", {}),
             scope_type=req.scope_type.value,
             scope_target=scope_target,
             start_date=req.start_date,
@@ -447,6 +465,8 @@ def run_advanced_backtest(req: AdvancedBacktestRequest) -> PortfolioBacktestResp
         )
     except HTTPException:
         raise
+    except ValueError as err:
+        raise HTTPException(status_code=422, detail=str(err)) from err
     except Exception as err:
         logger.exception("Lỗi chạy kiểm thử danh mục")
         raise HTTPException(

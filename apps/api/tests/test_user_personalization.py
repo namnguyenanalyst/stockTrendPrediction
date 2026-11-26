@@ -355,3 +355,27 @@ async def test_unauthenticated_access_denied_401(async_client: httpx.AsyncClient
     assert (
         await async_client.post("/api/v1/user/backtests", json={"symbol": "VIC"})
     ).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_backtest_history_preserves_undefined_metrics(async_client):
+    _, token = await _register_and_login(async_client, "nullable_metrics")
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = {
+        "symbol": "VIC", "strategy_name": "No trades fixture", "strategy_type": "rule_based",
+        "start_date": "2026-01-05", "end_date": "2026-01-06", "initial_capital": 100000,
+        "total_return": 0, "sharpe_ratio": None, "max_drawdown": 0, "win_rate": None,
+        "equity_curve": [{"date": "2026-01-05", "total_equity": 100000}],
+        "config": {"model_type": "none", "data_fingerprints": {"VIC": "fixture"}},
+    }
+    result = await async_client.post("/api/v1/user/backtests", json=payload, headers=headers)
+    assert result.status_code == 201, result.text
+    saved = result.json()
+    assert saved["config"] == payload["config"]
+    assert saved["sharpe_ratio"] is None
+    assert saved["win_rate"] is None
+    histories = (await async_client.get("/api/v1/user/backtests", headers=headers)).json()
+    entry = next(item for item in histories if item["id"] == saved["id"])
+    assert entry["config"] == payload["config"]
+    assert entry["sharpe_ratio"] is None
+    assert entry["win_rate"] is None

@@ -305,6 +305,7 @@ async def save_backtest(
         max_drawdown=req.max_drawdown,
         win_rate=req.win_rate,
         equity_curve=req.equity_curve,
+        config=req.config,
     )
     db.add(item)
     await commit_or_conflict(db)

@@ -60,23 +60,26 @@ class BacktestHistory(Base):
         Float,
         nullable=False,
     )
-    sharpe_ratio: Mapped[float] = mapped_column(
+    sharpe_ratio: Mapped[float | None] = mapped_column(
         Float,
-        nullable=False,
+        nullable=True,
     )
     max_drawdown: Mapped[float] = mapped_column(
         Float,
         nullable=False,
     )
-    win_rate: Mapped[float] = mapped_column(
+    win_rate: Mapped[float | None] = mapped_column(
         Float,
-        nullable=False,
+        nullable=True,
     )
     # Chuỗi dữ liệu Equity Curve theo thời gian phục vụ vẽ biểu đồ
     equity_curve: Mapped[list[dict[str, Any]]] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"),
         nullable=False,
         default=list,
+    )
+    config: Mapped[dict[str, Any]] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=False, default=dict,
     )
     executed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

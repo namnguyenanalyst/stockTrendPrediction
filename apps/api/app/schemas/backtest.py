@@ -21,12 +21,19 @@ class BacktestHistoryCreateRequest(BaseModel):
     end_date: date = Field(..., description="Ngày kết thúc kiểm thử")
     initial_capital: float = Field(..., gt=0, description="Vốn ban đầu (phải > 0)")
     total_return: float = Field(..., description="Tổng tỷ suất sinh lời")
-    sharpe_ratio: float = Field(..., description="Chỉ số Sharpe")
+    sharpe_ratio: float | None = Field(..., description="Chỉ số Sharpe")
     max_drawdown: float = Field(..., ge=-100, le=100, description="Mức sụt giảm tối đa (%); nhận dấu âm từ client cũ")
-    win_rate: float = Field(..., ge=0, le=100, description="Tỷ lệ giao dịch thắng (%)")
+    win_rate: float | None = Field(..., ge=0, le=100, description="Tỷ lệ giao dịch thắng (%)")
     equity_curve: list[dict[str, Any]] = Field(
         default_factory=list, max_length=5000, description="Chuỗi giá trị tài sản ròng"
     )
+
+    config: dict[str, Any] = Field(default_factory=dict, description="Cấu hình và provenance do client gửi, chưa chứng thực")
+
+    @field_validator("config")
+    @classmethod
+    def validate_config(cls, value):
+        return validate_json_payload(value)
 
     @model_validator(mode="after")
     def validate_dates(self):
@@ -62,10 +69,11 @@ class BacktestHistoryResponse(BaseModel):
     end_date: date | str
     initial_capital: float
     total_return: float
-    sharpe_ratio: float
+    sharpe_ratio: float | None
     max_drawdown: float
-    win_rate: float
+    win_rate: float | None
     equity_curve: list[dict[str, Any]]
+    config: dict[str, Any] = Field(default_factory=dict)
     executed_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
