@@ -1073,7 +1073,7 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
               {/* Khối hiển thị thị giá */}
               <div className="flex items-baseline gap-2.5 border-l border-slate-800 pl-4">
                 <span className="text-2xl font-black text-slate-100">
-                  {summary ? (summary.latest_close * 1000).toLocaleString("vi-VN") : "---"}{" "}
+                  {summary ? (summary.latest_close * 1000).toLocaleString("vi-VN") : "—"}{" "}
                   <span className="text-xs font-normal text-slate-400">VNĐ</span>
                 </span>
                 {summary && (
@@ -1148,7 +1148,7 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                   className={`text-sm font-bold tabular-nums ${(summary?.sma_20_dev ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
                     }`}
                 >
-                  {summary ? formatSmaDeviation(summary.sma_20_dev) : "---"}
+                  {summary ? formatSmaDeviation(summary.sma_20_dev) : "—"}
                 </span>
               </div>
               <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">{summary ? describeSmaDeviation(summary.sma_20_dev, 20) : "Chưa có dữ liệu"}</p>
@@ -1165,7 +1165,7 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                   className={`text-sm font-bold tabular-nums ${(summary?.sma_50_dev ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
                     }`}
                 >
-                  {summary ? formatSmaDeviation(summary.sma_50_dev) : "---"}
+                  {summary ? formatSmaDeviation(summary.sma_50_dev) : "—"}
                 </span>
               </div>
               <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">{summary ? describeSmaDeviation(summary.sma_50_dev, 50) : "Chưa có dữ liệu"}</p>
@@ -1179,7 +1179,7 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
               </div>
               <div className="mt-1">
                 <span className="text-sm font-bold text-slate-200 tabular-nums">
-                  {latestInd ? `${(latestInd.cv_50 * 100).toFixed(2)}%` : "---"}
+                  {latestInd ? `${(latestInd.cv_50 * 100).toFixed(2)}%` : "—"}
                 </span>
               </div>
               <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">Số càng lớn, giá dao động càng mạnh</p>
@@ -1200,7 +1200,7 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                       : "text-slate-200"
                     }`}
                 >
-                  {latestInd ? describeVolumeRatio(latestInd.vol_ratio).replace(" so với TB 20 phiên", "") : "---"}
+                  {latestInd ? describeVolumeRatio(latestInd.vol_ratio).replace(" so với TB 20 phiên", "") : "—"}
                 </span>
               </div>
               <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">Số cổ phiếu giao dịch trong phiên gần nhất</p>
@@ -1214,7 +1214,7 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
               </div>
               <div className="mt-1">
                 <span className="text-sm font-bold text-slate-200 tabular-nums">
-                  {summary ? (summary.volume / 1000).toLocaleString("vi-VN") : "---"}{" "}
+                  {summary ? (summary.volume / 1000).toLocaleString("vi-VN") : "—"}{" "}
                   <span className="text-[10px] font-normal text-slate-400">nghìn CP</span>
                 </span>
               </div>
@@ -1240,7 +1240,7 @@ export const MarketOverviewTab: React.FC<MarketOverviewTabProps> = ({
                 >
                   {latestInd
                     ? `${((latestInd.vnindex_return_1d ?? 0) * 100).toFixed(2)}%`
-                    : "---"}
+                    : "—"}
                 </span>
               </div>
               <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">So với phiên giao dịch trước</p>

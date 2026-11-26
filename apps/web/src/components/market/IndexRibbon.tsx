@@ -251,7 +251,7 @@ const DEFAULT_FALLBACK_CARDS: Record<string, DisplayRibbonCard> = {
         value: 20.0,
         change: 0.0,
         changePct: 0.0,
-        volumeStr: "---",
+        volumeStr: "—",
         valueStr: "HOSE",
         sparkline: [20.0, 20.0],
         isStock: true,

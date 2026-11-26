@@ -1,6 +1,6 @@
 "use client";
 import { buildTrajectory, trajectoryProblem } from "@/lib/predictionTrajectory";
-import { formatPriceVnd } from "@/lib/predictionPresentation";
+import { formatPercentVi, formatPriceVnd } from "@/lib/predictionPresentation";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -117,6 +117,11 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
         textColor: "#94a3b8",
         fontSize: 11,
       },
+      localization: {
+        locale: "vi-VN",
+        priceFormatter: (price: number) =>
+          Math.round(price * 1000).toLocaleString("vi-VN"),
+      },
       grid: {
         vertLines: { color: "rgba(30, 41, 59, 0.45)" },
         horzLines: { color: "rgba(30, 41, 59, 0.45)" },
@@ -223,6 +228,11 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
       lineType: LineType.Curved, // Đường cong uốn lượn mượt mà chuẩn FireAnt
       pointMarkersVisible: true, // Hiển thị các chấm tròn tại các mốc T+1, T+2, T+3
       pointMarkersRadius: 5,
+      priceFormat: {
+        type: "price",
+        precision: 2,
+        minMove: 0.01,
+      },
       priceLineVisible: false,
       lastValueVisible: false,
       priceLineWidth: 1,
@@ -266,9 +276,17 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
       }
     };
     window.addEventListener("resize", handleResize);
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => handleResize())
+        : null;
+    if (resizeObserver && containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
 
     return () => {
       window.removeEventListener("resize", handleResize);
+      resizeObserver?.disconnect();
       chart.remove();
       targetPriceLineRef.current = null;
       chartRef.current = null;
@@ -415,20 +433,20 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
           </div>
 
           {currentInspectBar && (
-            <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px]">
               <span className="text-slate-400">
-                O: <strong className="text-slate-200">{currentInspectBar.open.toLocaleString()}</strong>
+                O: <strong className="text-slate-200">{formatPriceVnd(currentInspectBar.open, false)}</strong>
               </span>
               <span className="text-slate-400">
-                H: <strong className="text-slate-200">{currentInspectBar.high.toLocaleString()}</strong>
+                H: <strong className="text-slate-200">{formatPriceVnd(currentInspectBar.high, false)}</strong>
               </span>
               <span className="text-slate-400">
-                L: <strong className="text-slate-200">{currentInspectBar.low.toLocaleString()}</strong>
+                L: <strong className="text-slate-200">{formatPriceVnd(currentInspectBar.low, false)}</strong>
               </span>
               <span className="text-slate-400">
                 C:{" "}
                 <strong className={isUp ? "text-emerald-400" : "text-rose-400"}>
-                  {currentInspectBar.close.toLocaleString()}
+                  {formatPriceVnd(currentInspectBar.close)}
                 </strong>
               </span>
               <span
@@ -436,11 +454,11 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
                   }`}
               >
                 {isUp ? "+" : ""}
-                {inspectChange.toFixed(1)} ({isUp ? "+" : ""}
-                {inspectChangePct.toFixed(2)}%)
+                {Math.round(inspectChange * 1000).toLocaleString("vi-VN")} đ ({isUp ? "+" : ""}
+                {formatPercentVi(inspectChangePct, 2)})
               </span>
               <span className="text-slate-400">
-                Vol: {(currentInspectBar.volume / 1_000_000).toFixed(2)}M
+                Vol: {(currentInspectBar.volume / 1_000_000).toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}M
               </span>
             </div>
           )}
@@ -518,7 +536,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
 
         {/* Nhãn Mục tiêu Dự phóng T+3 nổi bật */}
         {targetT3 && showTrajectory && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-slate-400">Giá minh họa T+3 ({modelType.toUpperCase()}):</span>
             <span
               className={`font-mono font-bold px-2 py-0.5 rounded border text-xs shadow-sm ${targetT3.changePct >= 0
@@ -527,7 +545,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
                 }`}
             >
               {formatPriceVnd(targetT3.price)} ({targetT3.changePct >= 0 ? "+" : ""}
-              {targetT3.changePct}%)
+              {formatPercentVi(targetT3.changePct, 2)})
             </span>
           </div>
         )}
@@ -540,15 +558,15 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
       <div className="border-t border-slate-800/80 bg-slate-900/60 p-3 sm:p-4">
         <div className="mb-2.5 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-xs">
           <div className="flex items-center gap-1.5 font-bold text-slate-200">
-            <Sparkles className="h-4 w-4 text-sky-400" />
+            <Sparkles className="h-4 w-4 text-sky-400 shrink-0" />
             <span>Chi tiết Tọa độ Quỹ đạo Đường đi Xu hướng ({modelType.toUpperCase()})</span>
           </div>
           <span className="text-[11px] text-slate-400">
-            Trục giá: nghìn VNĐ. Đường giá do quy tắc minh họa tạo ra, không phải dự báo giá hoặc khoảng tin cậy. {prediction?.trajectory?.length === 3 && prediction.trajectory.every(step => step.holiday_calendar_verified) ? "Ngày tương lai đã đối chiếu lịch nghỉ giao dịch 2026." : "Lịch nghỉ lễ của các ngày tương lai chưa được xác minh đầy đủ."}
+            Đơn vị giá: VNĐ. Đường giá do quy tắc minh họa tạo ra, không phải dự báo giá hoặc khoảng tin cậy. {prediction?.trajectory?.length === 3 && prediction.trajectory.every(step => step.holiday_calendar_verified) ? "Ngày tương lai đã đối chiếu lịch nghỉ giao dịch 2026." : "Lịch nghỉ lễ của các ngày tương lai chưa được xác minh đầy đủ."}
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2.5 min-[420px]:grid-cols-2 sm:grid-cols-4">
           {trajectoryPoints.map((point, idx) => {
             const isPointUp = point.changePct > 0;
             const isPointDown = point.changePct < 0;
@@ -563,13 +581,13 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
             return (
               <div
                 key={point.date + idx}
-                className={`flex flex-col justify-between rounded-lg border p-3 transition-all ${idx === 0
+                className={`flex min-w-0 flex-col justify-between rounded-lg border p-3 transition-all ${idx === 0
                     ? "border-slate-800 bg-slate-950/70"
                     : "border-slate-800/80 bg-slate-900/50"
                   }`}
               >
                 <div>
-                  <div className="flex items-center justify-between border-b border-slate-800/60 pb-1.5 mb-2">
+                  <div className="flex flex-wrap items-center justify-between gap-1 border-b border-slate-800/60 pb-1.5 mb-2">
                     <span className="font-bold text-slate-200 text-xs">
                       {idx === 0 ? "Phiên T (Chốt)" : `Phiên ${point.dayName}`}
                     </span>
@@ -578,13 +596,13 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
                     </span>
                   </div>
 
-                  <div className="flex items-baseline justify-between mb-1">
-                    <span className="font-mono text-base font-black text-slate-100">
+                  <div className="flex flex-wrap items-baseline justify-between gap-1 mb-1">
+                    <span className="font-mono text-sm sm:text-base font-black text-slate-100 whitespace-nowrap">
                       {formatPriceVnd(point.price)}
                     </span>
                     {idx > 0 ? (
                       <span
-                        className={`font-mono text-xs font-bold flex items-center ${isPointUp
+                        className={`font-mono text-xs font-bold flex items-center whitespace-nowrap ${isPointUp
                             ? "text-emerald-400"
                             : isPointDown
                               ? "text-rose-400"
@@ -599,7 +617,7 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
                           <Minus className="h-3.5 w-3.5 inline mr-0.5" />
                         )}
                         {point.changePct > 0 ? "+" : ""}
-                        {point.changePct}%
+                        {formatPercentVi(point.changePct, 2)}
                       </span>
                     ) : (
                       <span className="text-[10px] text-slate-400 uppercase font-semibold">
@@ -613,11 +631,11 @@ export const FireAntTrajectoryChart: React.FC<FireAntTrajectoryChartProps> = ({
                   </div>
                 </div>
 
-                <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-300 border-t border-slate-800/40 pt-1.5">
+                <div className="mt-2.5 flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-300 border-t border-slate-800/40 pt-1.5">
                   <span className="font-semibold">{idx === 0 ? "Chốt phiên" : point.signal}</span>
                   {idx > 0 && (
                     <span className="font-semibold text-sky-400 font-mono text-[10px]">
-                      {(point.confidence * 100).toFixed(1)}% xác suất lớp
+                      {formatPercentVi(point.confidence * 100, 1)} xác suất lớp
                     </span>
                   )}
                 </div>

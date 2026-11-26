@@ -19,6 +19,41 @@ export function matchesPrediction(prediction: PredictionResponse | null, symbol:
     && probabilities[prediction.predicted_label] >= Math.max(...probabilities) - 0.0001;
 }
 
-export function formatPriceVnd(priceInThousands: number): string {
-  return Number.isFinite(priceInThousands) ? `${(priceInThousands * 1000).toLocaleString("vi-VN")} VNĐ` : "—";
+export function formatPriceVnd(priceInThousands: number, withUnit = true): string {
+  if (!Number.isFinite(priceInThousands)) return "—";
+  const formatted = Math.round(priceInThousands * 1000).toLocaleString("vi-VN");
+  return withUnit ? `${formatted} VNĐ` : formatted;
+}
+
+export function formatPercentVi(value: number, digits = 1): string {
+  if (!Number.isFinite(value)) return "—";
+  return `${value.toLocaleString("vi-VN", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })}%`;
+}
+
+export function formatIsoDateTimeVi(
+  timestamp: string | Date | null | undefined,
+  includeSeconds = false
+): string {
+  if (!timestamp) return "—";
+  const dt = timestamp instanceof Date ? timestamp : new Date(timestamp);
+  if (isNaN(dt.getTime())) return typeof timestamp === "string" ? timestamp : "—";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(dt);
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  const datePart = `${map.year}-${map.month}-${map.day}`;
+  const timePart = includeSeconds
+    ? `${map.hour}:${map.minute}:${map.second}`
+    : `${map.hour}:${map.minute}`;
+  return `${timePart} ${datePart}`;
 }
