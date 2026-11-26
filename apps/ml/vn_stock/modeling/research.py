@@ -21,6 +21,7 @@ from vn_stock.backtest import (
     trading_prices_vnd,
 )
 from vn_stock.config import MODELS_DIR
+from vn_stock.data_ingestion import _atomic_save_parquet
 from vn_stock.data_quality import CORE_COLUMNS, audit_panel
 from vn_stock.modeling.evaluation import EvaluationConfig, run_temporal_evaluation
 
@@ -134,7 +135,7 @@ def run_research(output_dir: Path, allow_unverified_prices=False):
     output_dir.mkdir(parents=True, exist_ok=False)
     _write_json(output_dir / "data_audit.json", audit)
     panel = panel[CORE_COLUMNS].copy()
-    panel.to_parquet(output_dir / "panel_snapshot.parquet", index=False)
+    _atomic_save_parquet(panel, output_dir / "panel_snapshot.parquet")
     torch.set_num_threads(1)
     protocol = {"windows": [asdict(EvaluationConfig(a, b)) for a, b in WINDOWS],
         "seed": 42, "monte_carlo_simulations": 100, "trading": TRADING,

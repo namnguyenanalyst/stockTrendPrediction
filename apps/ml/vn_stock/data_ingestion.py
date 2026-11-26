@@ -1,9 +1,11 @@
 import logging
+import os
 from pathlib import Path
 import shutil
 import threading
 import time
 from typing import Any
+from uuid import uuid4
 
 import pandas as pd
 import numpy as np
@@ -135,15 +137,18 @@ def check_cache_coverage(df: pd.DataFrame, start_date: str, end_date: str | None
 
 
 def _atomic_save_parquet(df: pd.DataFrame, target_path: Path) -> None:
-    """Ghi DataFrame ra file Parquet theo cơ chế nguyên tử (atomic write qua file tạm .tmp)."""
-    tmp_path = target_path.with_name(f"{target_path.name}.tmp_{int(time.time() * 1000)}")
+    """Ghi DataFrame ra file Parquet theo cơ chế nguyên tử: ghi file tạm rồi hoán đổi bằng os.replace."""
     target_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = target_path.with_name(f".{target_path.name}.{uuid4().hex}.tmp")
     try:
         df.to_parquet(tmp_path, index=False, engine="pyarrow")
-        tmp_path.replace(target_path)
+        os.replace(tmp_path, target_path)
     finally:
         if tmp_path.exists():
-            tmp_path.unlink()
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
 
 def clean_stock_data(df: pd.DataFrame, symbol: str | None = None) -> pd.DataFrame:
@@ -619,33 +624,30 @@ def build_panel_dataset(
     )
 
     if save_to_interim:
-        PANEL_DATA_DIR.parent.mkdir(parents=True, exist_ok=True)
-        tmp_panel_dir = PANEL_DATA_DIR.parent / f"panel_tmp_{int(time.time() * 1000)}"
-        old_panel_dir = PANEL_DATA_DIR.parent / f"panel_old_{int(time.time() * 1000)}"
-        try:
-            tmp_panel_dir.mkdir(parents=True, exist_ok=True)
-            panel_df.to_parquet(
-                tmp_panel_dir,
-                partition_cols=["Symbol"],
-                engine="pyarrow",
-                index=False,
+        PANEL_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        target_partition_names = {f"Symbol={sym}" for sym in target_symbols}
+        for sym, sym_group in panel_df.groupby("Symbol", sort=True):
+            part_dir = PANEL_DATA_DIR / f"Symbol={sym}"
+            part_file = part_dir / "part-0.parquet"
+            sym_payload = sym_group.drop(columns=["Symbol"]).reset_index(drop=True)
+            _atomic_save_parquet(sym_payload, part_file)
+            for stale in part_dir.glob("*.parquet"):
+                if stale.name != part_file.name:
+                    stale.unlink(missing_ok=True)
+
+        for existing_dir in PANEL_DATA_DIR.iterdir():
+            if (
+                existing_dir.is_dir()
+                and existing_dir.name.startswith("Symbol=")
+                and existing_dir.name not in target_partition_names
+            ):
+                shutil.rmtree(existing_dir)
+
+        check_df = load_panel_dataset(symbols=target_symbols, panel_dir=PANEL_DATA_DIR)
+        if len(check_df) != len(panel_df):
+            raise RuntimeError(
+                f"Phân vùng panel ghi thiếu dữ liệu: {len(check_df)} != {len(panel_df)} dòng."
             )
-            # Kiểm tra đọc lại từ thư mục tạm trước khi hoán đổi
-            check_df = pd.read_parquet(tmp_panel_dir, engine="pyarrow")
-            if len(check_df) != len(panel_df):
-                raise RuntimeError(
-                    f"Thư mục tạm panel ghi thiếu dữ liệu: {len(check_df)} != {len(panel_df)} dòng."
-                )
-
-            if PANEL_DATA_DIR.exists():
-                PANEL_DATA_DIR.rename(old_panel_dir)
-            tmp_panel_dir.rename(PANEL_DATA_DIR)
-
-            if old_panel_dir.exists():
-                shutil.rmtree(old_panel_dir)
-        finally:
-            if tmp_panel_dir.exists():
-                shutil.rmtree(tmp_panel_dir)
 
     return panel_df
 

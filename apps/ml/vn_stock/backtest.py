@@ -13,6 +13,7 @@ import os
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 import argparse
+import hashlib
 from dataclasses import dataclass, field
 import logging
 from pathlib import Path
@@ -28,27 +29,6 @@ from vn_stock.config import (
     TAX_RATE,
     TRANSACTION_FEE_RATE,
 )
-
-try:
-    from vn_stock.config import (
-        DEFAULT_FOREIGN_VAL_PROXY_RATIO,
-        DEFAULT_FOREIGN_VOL_PROXY_RATIO,
-        DEFAULT_GROWTH_NP_PREV,
-        DEFAULT_GROWTH_NP_TTM,
-        DEFAULT_GROWTH_REV_PREV,
-        DEFAULT_GROWTH_REV_TTM,
-        DEFAULT_PROP_VAL_PROXY_RATIO,
-        DEFAULT_PROP_VOL_PROXY_RATIO,
-    )
-except ImportError:
-    DEFAULT_FOREIGN_VAL_PROXY_RATIO = 0.08
-    DEFAULT_FOREIGN_VOL_PROXY_RATIO = 0.08
-    DEFAULT_PROP_VAL_PROXY_RATIO = 0.05
-    DEFAULT_PROP_VOL_PROXY_RATIO = 0.05
-    DEFAULT_GROWTH_REV_PREV = 10.0
-    DEFAULT_GROWTH_NP_PREV = 12.0
-    DEFAULT_GROWTH_REV_TTM = 8.5
-    DEFAULT_GROWTH_NP_TTM = 11.0
 
 logger = logging.getLogger(__name__)
 
@@ -95,25 +75,25 @@ class BacktestMetrics:
     initial_capital: float
     final_equity: float
     total_return_pct: float  # ROI (%)
-    cagr_pct: float  # Annualized Return / CAGR (%)
+    cagr_pct: float | None  # Annualized Return / CAGR (%)
     buy_and_hold_return_pct: float  # Lợi nhuận chiến lược Buy & Hold (%)
     excess_return_pct: float  # Lợi nhuận vượt trội so với Buy & Hold (alpha %)
-    annualized_volatility_pct: float  # Độ biến động năm hóa (%)
-    sharpe_ratio: float  # Tỷ số Sharpe năm hóa (với lãi suất phi rủi ro Rf)
-    sortino_ratio: float  # Tỷ số Sortino năm hóa (độ biến động giảm giá Downside Dev)
+    annualized_volatility_pct: float | None  # Độ biến động năm hóa (%)
+    sharpe_ratio: float | None  # Tỷ số Sharpe năm hóa (với lãi suất phi rủi ro Rf)
+    sortino_ratio: float | None  # Tỷ số Sortino năm hóa (độ biến động giảm giá Downside Dev)
     max_drawdown_pct: float  # Mức sụt giảm vốn lớn nhất từ đỉnh (MDD %)
-    calmar_ratio: float  # Tỷ số Calmar (CAGR / MDD)
-    var_95_pct: float  # Giá trị chịu rủi ro VaR 95% 1 ngày theo lịch sử (%)
-    cvar_95_pct: float  # Kỳ vọng tổn thất vượt mức CVaR 95% (Expected Shortfall %)
-    win_rate_pct: float  # Tỷ lệ lệnh có lãi Win Rate (%)
-    profit_factor: float  # Hệ số lợi nhuận Profit Factor (Tổng lãi / Tổng lỗ)
+    calmar_ratio: float | None  # Tỷ số Calmar (CAGR / MDD)
+    var_95_pct: float | None  # Giá trị chịu rủi ro VaR 95% 1 ngày theo lịch sử (%)
+    cvar_95_pct: float | None  # Kỳ vọng tổn thất vượt mức CVaR 95% (Expected Shortfall %)
+    win_rate_pct: float | None  # Tỷ lệ lệnh có lãi Win Rate (%)
+    profit_factor: float | None  # Hệ số lợi nhuận Profit Factor (Tổng lãi / Tổng lỗ)
     total_trades: int  # Tổng số vòng giao dịch đã đóng
     winning_trades: int  # Số vòng giao dịch có lãi
     losing_trades: int  # Số vòng giao dịch hòa/lỗ
-    avg_trade_return_pct: float  # Tỷ suất sinh lời trung bình mỗi lệnh (%)
-    best_trade_return_pct: float  # Lợi nhuận của lệnh thắng lớn nhất (%)
-    worst_trade_return_pct: float  # Mức lỗ của lệnh lỗ lớn nhất (%)
-    avg_holding_days: float  # Thời gian nắm giữ trung bình mỗi lệnh (ngày)
+    avg_trade_return_pct: float | None  # Tỷ suất sinh lời trung bình mỗi lệnh (%)
+    best_trade_return_pct: float | None  # Lợi nhuận của lệnh thắng lớn nhất (%)
+    worst_trade_return_pct: float | None  # Mức lỗ của lệnh lỗ lớn nhất (%)
+    avg_holding_days: float | None  # Thời gian nắm giữ trung bình mỗi lệnh (ngày)
     total_fees_paid: float  # Tổng chi phí môi giới đã trả (VNĐ)
     total_taxes_paid: float  # Tổng thuế thu nhập chuyển nhượng đã nộp (VNĐ)
     total_costs: float  # Tổng chi phí thuế phí đã khấu trừ (VNĐ)
@@ -154,6 +134,40 @@ class BacktestResult:
         }
 
 
+def _data_fingerprint(frame: pd.DataFrame) -> str:
+    """Content fingerprint; pandas version is recorded in simulation configuration."""
+    digest = hashlib.sha256(str(list(frame.columns)).encode())
+    digest.update(pd.util.hash_pandas_object(frame, index=False).to_numpy().tobytes())
+    return digest.hexdigest()
+
+
+def _load_training_provenance(models_dir: Path, horizon: int = 3) -> dict[str, Any]:
+    """Read-only provenance summary from production_training_info_t{horizon}.json if present."""
+    info_path = models_dir / f"production_training_info_t{horizon}.json"
+    if not info_path.exists():
+        return {}
+    try:
+        import json
+        data = json.loads(info_path.read_text(encoding="utf-8"))
+        return {
+            "training_cutoff_date": data.get("latest_market_date"),
+            "artifact_timestamp": data.get("timestamp"),
+            "val_buffer_days": data.get("val_buffer_days"),
+            "purged_horizon_days": data.get("horizon_days"),
+        }
+    except Exception:
+        return {}
+
+
+def _round_metric(value: float | None, digits: int = 2) -> float | None:
+    """JSON-safe metrics: undefined and nonfinite values are null, never sentinels."""
+    return round(float(value), digits) if value is not None and np.isfinite(value) else None
+
+
+def _display_metric(value: float | None, digits: int = 2) -> str:
+    return f"{value:.{digits}f}" if value is not None and np.isfinite(value) else "N/A"
+
+
 def calculate_financial_metrics(
     equity_series: pd.Series,
     initial_capital: float,
@@ -169,6 +183,17 @@ def calculate_financial_metrics(
     - VaR 95% và CVaR 95%
     - Win Rate, Profit Factor, Thống kê lệnh đóng và tác động thuế phí
     """
+    equity_series = pd.Series(equity_series, dtype=float).reset_index(drop=True)
+    if (equity_series.empty or not np.isfinite(equity_series).all()
+            or (equity_series < 0).any() or (equity_series.iloc[:-1] <= 0).any()):
+        raise ValueError("Equity must be nonempty and finite, with positive pre-terminal values.")
+    if not np.isfinite(initial_capital) or initial_capital <= 0:
+        raise ValueError("initial_capital must be positive and finite.")
+    if not np.isfinite(risk_free_rate) or risk_free_rate <= -1:
+        raise ValueError("risk_free_rate must be finite and greater than -1.")
+    # Standalone callers may supply EOD observations without the pre-investment point.
+    if equity_series.iloc[0] != initial_capital:
+        equity_series = pd.concat([pd.Series([initial_capital]), equity_series], ignore_index=True)
     final_equity = float(equity_series.iloc[-1])
     n_days = len(equity_series)
     total_return_pct = (
@@ -179,17 +204,18 @@ def calculate_financial_metrics(
 
     # 1. CAGR (Annualized Return)
     if final_equity > 0 and n_days > 1 and initial_capital > 0:
-        cagr_pct = ((final_equity / initial_capital) ** (252.0 / (n_days - 1)) - 1.0) * 100.0
+        with np.errstate(over="ignore"):
+            cagr_pct = float(np.expm1(np.log(final_equity / initial_capital) * (252.0 / (n_days - 1))) * 100)
     else:
-        cagr_pct = -100.0 if final_equity <= 0 else 0.0
+        cagr_pct = -100.0 if final_equity <= 0 else None
 
     # 2. Lợi suất hàng ngày & Lãi suất phi rủi ro theo ngày
-    daily_returns = equity_series.pct_change().dropna()
+    daily_returns = equity_series.pct_change(fill_method=None).dropna()
     rf_daily = risk_free_rate / 252.0
 
     # 3. Độ biến động năm hóa
     ann_volatility_pct = (
-        float(daily_returns.std() * np.sqrt(252.0) * 100.0) if len(daily_returns) > 1 else 0.0
+        float(daily_returns.std() * np.sqrt(252.0) * 100.0) if len(daily_returns) > 1 else None
     )
 
     # 4. Tỷ số Sharpe năm hóa
@@ -197,14 +223,14 @@ def calculate_financial_metrics(
     if len(daily_returns) > 1 and daily_returns.std() > 1e-9:
         sharpe_ratio = float(excess_returns.mean() / daily_returns.std() * np.sqrt(252.0))
     else:
-        sharpe_ratio = 0.0
+        sharpe_ratio = None
 
     # 5. Tỷ số Sortino năm hóa (Downside Deviation so với rf_daily)
     downside_std = np.sqrt(np.mean(np.minimum(excess_returns, 0.0)**2)) if len(excess_returns) else 0.0
     if downside_std > 1e-9:
         sortino_ratio = float(excess_returns.mean() / downside_std * np.sqrt(252.0))
     else:
-        sortino_ratio = 0.0
+        sortino_ratio = None
 
     # 6. Maximum Drawdown (MDD)
     peaks = np.maximum.accumulate(equity_series.values)
@@ -213,7 +239,7 @@ def calculate_financial_metrics(
     abs_mdd = abs(max_drawdown_pct)
 
     # 7. Calmar Ratio (CAGR / MDD)
-    calmar_ratio = float(cagr_pct / abs_mdd) if abs_mdd > 1e-6 else 0.0
+    calmar_ratio = float(cagr_pct / abs_mdd) if abs_mdd > 1e-6 and cagr_pct is not None else None
 
     # 8. VaR 95% và CVaR 95% (Historical Daily)
     if len(daily_returns) > 10:
@@ -222,7 +248,7 @@ def calculate_financial_metrics(
         tail_returns = daily_returns[daily_returns <= p5]
         cvar_95_pct = float(-tail_returns.mean() * 100.0) if len(tail_returns) > 0 else var_95_pct
     else:
-        var_95_pct, cvar_95_pct = 0.0, 0.0
+        var_95_pct, cvar_95_pct = None, None
 
     # 9. Thống kê lệnh đóng (SELL orders)
     closed_trades = [t for t in trades if t.order_type == "SELL" and t.realized_pnl is not None]
@@ -230,7 +256,7 @@ def calculate_financial_metrics(
     winning_trades = [t for t in closed_trades if t.realized_pnl > 0]
     losing_trades = [t for t in closed_trades if t.realized_pnl <= 0]
     win_rate_pct = (
-        (len(winning_trades) / total_trades_count * 100.0) if total_trades_count > 0 else 0.0
+        (len(winning_trades) / total_trades_count * 100.0) if total_trades_count > 0 else None
     )
 
     gross_profit = sum(t.realized_pnl for t in winning_trades)
@@ -238,19 +264,19 @@ def calculate_financial_metrics(
     if gross_loss > 1e-6:
         profit_factor = float(gross_profit / gross_loss)
     elif gross_profit > 1e-6:
-        profit_factor = 999.0
+        profit_factor = None
     else:
-        profit_factor = 0.0
+        profit_factor = None
 
     trade_returns = [
         t.realized_return_pct for t in closed_trades if t.realized_return_pct is not None
     ]
-    avg_trade_return_pct = float(np.mean(trade_returns)) if trade_returns else 0.0
-    best_trade_return_pct = float(np.max(trade_returns)) if trade_returns else 0.0
-    worst_trade_return_pct = float(np.min(trade_returns)) if trade_returns else 0.0
+    avg_trade_return_pct = float(np.mean(trade_returns)) if trade_returns else None
+    best_trade_return_pct = float(np.max(trade_returns)) if trade_returns else None
+    worst_trade_return_pct = float(np.min(trade_returns)) if trade_returns else None
 
     holding_durations = [t.holding_days for t in closed_trades if t.holding_days is not None]
-    avg_holding_days = float(np.mean(holding_durations)) if holding_durations else 0.0
+    avg_holding_days = float(np.mean(holding_durations)) if holding_durations else None
 
     total_fees = sum(t.fee for t in trades)
     total_taxes = sum(t.tax for t in trades)
@@ -262,25 +288,25 @@ def calculate_financial_metrics(
         initial_capital=initial_capital,
         final_equity=round(final_equity, 2),
         total_return_pct=round(total_return_pct, 2),
-        cagr_pct=round(cagr_pct, 2),
+        cagr_pct=_round_metric(cagr_pct, 2),
         buy_and_hold_return_pct=round(buy_and_hold_return_pct, 2),
         excess_return_pct=round(total_return_pct - buy_and_hold_return_pct, 2),
-        annualized_volatility_pct=round(ann_volatility_pct, 2),
-        sharpe_ratio=round(sharpe_ratio, 4),
-        sortino_ratio=round(sortino_ratio, 4),
+        annualized_volatility_pct=_round_metric(ann_volatility_pct, 2),
+        sharpe_ratio=_round_metric(sharpe_ratio, 4),
+        sortino_ratio=_round_metric(sortino_ratio, 4),
         max_drawdown_pct=round(abs_mdd, 2),
-        calmar_ratio=round(calmar_ratio, 4),
-        var_95_pct=round(var_95_pct, 2),
-        cvar_95_pct=round(cvar_95_pct, 2),
-        win_rate_pct=round(win_rate_pct, 2),
-        profit_factor=round(profit_factor, 4),
+        calmar_ratio=_round_metric(calmar_ratio, 4),
+        var_95_pct=_round_metric(var_95_pct, 2),
+        cvar_95_pct=_round_metric(cvar_95_pct, 2),
+        win_rate_pct=_round_metric(win_rate_pct, 2),
+        profit_factor=_round_metric(profit_factor, 4),
         total_trades=total_trades_count,
         winning_trades=len(winning_trades),
         losing_trades=len(losing_trades),
-        avg_trade_return_pct=round(avg_trade_return_pct, 2),
-        best_trade_return_pct=round(best_trade_return_pct, 2),
-        worst_trade_return_pct=round(worst_trade_return_pct, 2),
-        avg_holding_days=round(avg_holding_days, 1),
+        avg_trade_return_pct=_round_metric(avg_trade_return_pct, 2),
+        best_trade_return_pct=_round_metric(best_trade_return_pct, 2),
+        worst_trade_return_pct=_round_metric(worst_trade_return_pct, 2),
+        avg_holding_days=_round_metric(avg_holding_days, 1),
         total_fees_paid=round(total_fees, 2),
         total_taxes_paid=round(total_taxes, 2),
         total_costs=round(total_costs, 2),
@@ -332,6 +358,44 @@ def simulate_vietnam_trading(
     5. Khấu trừ chi phí thực tế: Phí mua (0.15%), Phí bán (0.15%), Thuế bán (0.10%).
     6. Khớp lệnh theo lô chẵn 100 cổ phiếu và bảo toàn số dư tiền mặt lẻ.
     """
+    # Validate at the engine boundary, including callers outside the REST API.
+    if not np.isfinite(initial_capital) or initial_capital <= 0:
+        raise ValueError("initial_capital must be positive and finite.")
+    for name, value in (("fee_rate", fee_rate), ("tax_rate", tax_rate),
+                        ("slippage_rate", slippage_rate)):
+        if not np.isfinite(value) or not 0 <= value < 1:
+            raise ValueError(f"{name} must be finite and in [0, 1).")
+    if fee_rate + tax_rate >= 1:
+        raise ValueError("Combined selling costs must be less than 1.")
+    for name, value, minimum in (("lot_size", lot_size, 1),
+                                 ("settlement_delay", settlement_delay, 0)):
+        if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)) or value < minimum:
+            raise ValueError(f"{name} must be an integer >= {minimum}.")
+    if not np.isfinite(risk_free_rate) or risk_free_rate <= -1:
+        raise ValueError("risk_free_rate must be finite and greater than -1.")
+    for name, value in (("take_profit_pct", take_profit_pct),
+                        ("stop_loss_pct", stop_loss_pct),
+                        ("trailing_stop_pct", trailing_stop_pct)):
+        if value is not None and (not np.isfinite(value) or value < 0):
+            raise ValueError(f"{name} must be finite and nonnegative.")
+    required = {"Date", "Open", "Close"}
+    if not required.issubset(df.columns):
+        raise ValueError("Market data requires Date, Open and Close.")
+    price_columns = [c for c in ("Open", "High", "Low", "Close") if c in df]
+    prices = df[price_columns].to_numpy(dtype=float)
+    if not np.isfinite(prices).all() or (prices <= 0).any():
+        raise ValueError("Market prices must be positive and finite.")
+    if "High" in df and (df["High"] < df[["Open", "Close"]].max(axis=1)).any():
+        raise ValueError("High must cover Open and Close.")
+    if "Low" in df and (df["Low"] > df[["Open", "Close"]].min(axis=1)).any():
+        raise ValueError("Low must cover Open and Close.")
+    if "Volume" in df:
+        volume = df["Volume"].to_numpy(dtype=float)
+        if not np.isfinite(volume).all() or (volume < 0).any():
+            raise ValueError("Volume must be finite and nonnegative.")
+    signals = np.asarray(signals)
+    if signals.ndim != 1 or not np.isin(signals, [0, 1, 2]).all():
+        raise ValueError("signals must be a one-dimensional array of classes 0, 1, 2.")
     if df.empty or not pd.to_datetime(df["Date"]).is_monotonic_increasing:
         raise ValueError("Market rows must be nonempty and sorted (tăng dần) by Date.")
     if pd.to_datetime(df["Date"]).duplicated().any():
@@ -352,9 +416,11 @@ def simulate_vietnam_trading(
     )
     opens = df_sorted["Open"].values.astype(float)
     closes = df_sorted["Close"].values.astype(float)
+    volumes = df_sorted["Volume"].values.astype(float) if "Volume" in df_sorted else None
 
     cash = float(initial_capital)
     inventory: list[PositionLot] = []
+    receivables: list[tuple[int, float]] = []  # settlement session, net proceeds
     trades: list[TradeRecord] = []
     trade_id_counter = 1
 
@@ -362,6 +428,7 @@ def simulate_vietnam_trading(
         {
             "Date": dates[0],
             "Cash": cash,
+            "Receivables": 0.0,
             "Shares": 0,
             "Position_Value": 0.0,
             "Total_Equity": cash,
@@ -374,12 +441,20 @@ def simulate_vietnam_trading(
         exec_date = dates[exec_idx]
         sig_date = dates[i]
 
+        # No cash advance: T+2 proceeds become spendable after settlement, not at sale.
+        available_idx = exec_idx - int(execution_price == "open" and settlement_delay > 0)
+        cash += sum(amount for due, amount in receivables if due <= available_idx)
+        receivables = [(due, amount) for due, amount in receivables if due > available_idx]
         base_exec_price = opens[exec_idx] if execution_price == "open" else closes[exec_idx]
 
+        # Close-triggered orders are decided after the previous bar, then executed
+        # at the next close. Open mode is a standing opening-price risk rule;
+        # neither mode infers an intraday High/Low path from a daily candle.
+        risk_price = base_exec_price if execution_price == "open" else closes[i]
         # Cập nhật giá đỉnh cao nhất cho các lô đang nắm giữ (phục vụ Trailing Stop)
         for lot in inventory:
-            if base_exec_price > lot.highest_price:
-                lot.highest_price = base_exec_price
+            if risk_price > lot.highest_price:
+                lot.highest_price = risk_price
 
         # Kiểm tra điều kiện bán đối với các lô đã về tài khoản (T+2)
         # T+2 settles in the afternoon; an open-only engine must wait another bar.
@@ -394,7 +469,7 @@ def simulate_vietnam_trading(
             # 1. Kiểm tra Cắt lỗ (Stop Loss)
             if stop_loss_pct is not None and stop_loss_pct > 0:
                 for lot in settled_lots:
-                    ret_from_buy = (base_exec_price - lot.buy_price) / lot.buy_price
+                    ret_from_buy = (risk_price - lot.buy_price) / lot.buy_price
                     if ret_from_buy <= -abs(stop_loss_pct):
                         should_sell = True
                         sell_reason = "STOP_LOSS"
@@ -403,7 +478,7 @@ def simulate_vietnam_trading(
             # 2. Kiểm tra Chốt lời (Take Profit)
             if not should_sell and take_profit_pct is not None and take_profit_pct > 0:
                 for lot in settled_lots:
-                    ret_from_buy = (base_exec_price - lot.buy_price) / lot.buy_price
+                    ret_from_buy = (risk_price - lot.buy_price) / lot.buy_price
                     if ret_from_buy >= abs(take_profit_pct):
                         should_sell = True
                         sell_reason = "TAKE_PROFIT"
@@ -413,7 +488,7 @@ def simulate_vietnam_trading(
             if not should_sell and trailing_stop_pct is not None and trailing_stop_pct > 0:
                 for lot in settled_lots:
                     if lot.highest_price > lot.buy_price:
-                        drop_from_peak = (lot.highest_price - base_exec_price) / lot.highest_price
+                        drop_from_peak = (lot.highest_price - risk_price) / lot.highest_price
                         if drop_from_peak >= abs(trailing_stop_pct):
                             should_sell = True
                             sell_reason = "TRAILING_STOP"
@@ -425,14 +500,18 @@ def simulate_vietnam_trading(
                 sell_reason = "SIGNAL_SELL"
 
         # Thực thi BÁN nếu thỏa mãn điều kiện và có hàng T+2
-        if should_sell and len(settled_lots) > 0:
+        is_liquid_session = volumes is None or volumes[exec_idx] > 0
+        if is_liquid_session and should_sell and len(settled_lots) > 0:
             sell_shares = sum(lot.shares for lot in settled_lots)
             p_sell = base_exec_price * (1.0 - slippage_rate)
             gross = sell_shares * p_sell
             fee = gross * fee_rate
             tax = gross * tax_rate
             net_proceeds = gross - fee - tax
-            cash += net_proceeds
+            if settlement_delay == 0:
+                cash += net_proceeds
+            else:
+                receivables.append((exec_idx + settlement_delay, net_proceeds))
 
             total_cost_basis = sum(lot.cost_basis for lot in settled_lots)
             realized_pnl = net_proceeds - total_cost_basis
@@ -468,7 +547,7 @@ def simulate_vietnam_trading(
             inventory = unsettled_lots
 
         # Thực thi MUA (curr_sig == 2) nếu có tín hiệu MUA và còn đủ tiền
-        elif curr_sig == 2 and cash > (base_exec_price * lot_size):
+        elif is_liquid_session and curr_sig == 2 and cash >= (base_exec_price * lot_size):
             p_buy = base_exec_price * (1.0 + slippage_rate)
             cost_per_share_with_fee = p_buy * (1.0 + fee_rate)
             max_shares = int(cash // cost_per_share_with_fee)
@@ -510,14 +589,19 @@ def simulate_vietnam_trading(
                 )
                 trade_id_counter += 1
 
+        # Afternoon settlement is reflected in EOD cash, but cannot fund that day's open.
+        cash += sum(amount for due, amount in receivables if due <= exec_idx)
+        receivables = [(due, amount) for due, amount in receivables if due > exec_idx]
+        pending_cash = sum(amount for _, amount in receivables)
         # Định giá tài sản cuối ngày exec_idx
         shares_held = sum(lot.shares for lot in inventory)
         pos_val = shares_held * closes[exec_idx]
-        total_eq = cash + pos_val
+        total_eq = cash + pending_cash + pos_val
         equity_records.append(
             {
                 "Date": exec_date,
                 "Cash": cash,
+                "Receivables": pending_cash,
                 "Shares": shares_held,
                 "Position_Value": pos_val,
                 "Total_Equity": total_eq,
@@ -536,7 +620,10 @@ def simulate_vietnam_trading(
         fee = gross * fee_rate
         tax = gross * tax_rate
         net_proceeds = gross - fee - tax
-        cash += net_proceeds
+        if settlement_delay == 0:
+            cash += net_proceeds
+        else:
+            receivables.append((final_idx + settlement_delay, net_proceeds))
 
         total_cost_basis = sum(lot.cost_basis for lot in final_settled)
         realized_pnl = net_proceeds - total_cost_basis
@@ -574,7 +661,10 @@ def simulate_vietnam_trading(
         equity_records[-1]["Cash"] = cash
         equity_records[-1]["Shares"] = sum(lot.shares for lot in inventory)
         equity_records[-1]["Position_Value"] = equity_records[-1]["Shares"] * closes[final_idx]
-        equity_records[-1]["Total_Equity"] = cash + equity_records[-1]["Position_Value"]
+        equity_records[-1]["Receivables"] = sum(amount for _, amount in receivables)
+        equity_records[-1]["Total_Equity"] = (
+            cash + equity_records[-1]["Receivables"] + equity_records[-1]["Position_Value"]
+        )
 
     eq_df = pd.DataFrame(equity_records)
     eq_df["Open"] = opens
@@ -587,7 +677,8 @@ def simulate_vietnam_trading(
     trades_df = pd.DataFrame([t.__dict__ for t in trades]) if trades else pd.DataFrame()
 
     # Tính chiến lược đối chứng Mua & Nắm giữ (Buy & Hold)
-    p_bh_buy = opens[1] * (1.0 + slippage_rate) if n_bars > 1 else opens[0]
+    entry_prices = opens if execution_price == "open" else closes
+    p_bh_buy = entry_prices[min(1, n_bars - 1)] * (1.0 + slippage_rate)
     bh_shares_max = int((initial_capital // (p_bh_buy * (1.0 + fee_rate)) // lot_size) * lot_size)
     bh_cash = initial_capital - (bh_shares_max * p_bh_buy * (1.0 + fee_rate))
     bh_series = [initial_capital]
@@ -649,6 +740,18 @@ def run_backtest(
     Giao diện chạy Backtest cấp cao hỗ trợ cả nhãn tín hiệu trực tiếp hoặc ma trận xác suất 3 lớp,
     kèm theo bộ quy tắc quản trị rủi ro vị thế (Take Profit, Stop Loss, Trailing Stop).
     """
+    for name, value in (("buy_prob_threshold", buy_prob_threshold),
+                        ("sell_prob_threshold", sell_prob_threshold)):
+        if not np.isfinite(value) or not 0 <= value <= 1:
+            raise ValueError(f"{name} must be finite and in [0, 1].")
+    if probabilities is not None:
+        probabilities = np.asarray(probabilities, dtype=float)
+        if probabilities.shape != (len(df), 3):
+            raise ValueError("probabilities must have shape (number of market rows, 3).")
+        if (not np.isfinite(probabilities).all() or (probabilities < 0).any()
+                or (probabilities > 1).any()
+                or not np.allclose(probabilities.sum(axis=1), 1, rtol=0, atol=1e-6)):
+            raise ValueError("probabilities must be finite, in [0, 1] and sum to 1 per row.")
     if signals is None:
         if probabilities is None:
             raise ValueError(
@@ -686,6 +789,9 @@ def run_backtest(
 
     config = {
         "symbol": symbol,
+        "data_fingerprint": _data_fingerprint(df),
+        "signals_fingerprint": _data_fingerprint(pd.DataFrame({"signal": signals})),
+        "pandas_version": pd.__version__,
         "initial_capital": initial_capital,
         "fee_rate": fee_rate,
         "tax_rate": tax_rate,
@@ -694,6 +800,19 @@ def run_backtest(
         "settlement_delay": settlement_delay,
         "execution_price": execution_price,
         "close_at_end": close_at_end,
+        "cash_settlement": "no_advance_afternoon_T_plus_delay",
+        "settlement_regime_effective_from": "2022-08-29",
+        "settlement_regime_warning": (
+            "Simulation includes dates before 2022-08-29 when afternoon T+2 settlement was not yet effective."
+            if str(pd.to_datetime(df["Date"].iloc[0]).date()) < "2022-08-29"
+            else None
+        ),
+        "price_adjustment_status": "unverified",
+        "corporate_actions_modeled": False,
+        "dividend_modeled": False,
+        "risk_execution": "standing_open_checks" if execution_price == "open" else "previous_close_next_close",
+        "intraday_stops": False,
+        "price_unit": "VND",
         "risk_free_rate": risk_free_rate,
         "take_profit_pct": take_profit_pct,
         "stop_loss_pct": stop_loss_pct,
@@ -819,7 +938,7 @@ def run_monte_carlo_random_test(
         mc_mdds.append(res.metrics.max_drawdown_pct)
 
     arr_ret = np.array(mc_returns)
-    arr_shp = np.array(mc_sharpes)
+    arr_shp = np.array([value for value in mc_sharpes if value is not None], dtype=float)
     arr_mdd = np.array(mc_mdds)
 
     out = {
@@ -839,11 +958,14 @@ def run_monte_carlo_random_test(
             "p95": round(float(np.percentile(arr_ret, 95)), 2),
         },
         "sharpe_stats": {
-            "mean": round(float(arr_shp.mean()), 4),
-            "std": round(float(arr_shp.std()), 4),
-            "p5": round(float(np.percentile(arr_shp, 5)), 4),
-            "median": round(float(np.median(arr_shp)), 4),
-            "p95": round(float(np.percentile(arr_shp, 95)), 4),
+            "defined_count": len(arr_shp),
+            "undefined_count": n_simulations - len(arr_shp),
+            "distribution": "conditional_on_defined_sharpe",
+            "mean": _round_metric(arr_shp.mean(), 4) if len(arr_shp) else None,
+            "std": _round_metric(arr_shp.std(), 4) if len(arr_shp) else None,
+            "p5": _round_metric(np.percentile(arr_shp, 5), 4) if len(arr_shp) else None,
+            "median": _round_metric(np.median(arr_shp), 4) if len(arr_shp) else None,
+            "p95": _round_metric(np.percentile(arr_shp, 95), 4) if len(arr_shp) else None,
         },
         "mdd_stats": {
             "mean": round(float(arr_mdd.mean()), 2),
@@ -856,13 +978,15 @@ def run_monte_carlo_random_test(
         ai_ret = ai_result.metrics.total_return_pct
         ai_shp = ai_result.metrics.sharpe_ratio
         p_val_ret = monte_carlo_tail_probability(arr_ret, ai_ret)
-        p_val_shp = monte_carlo_tail_probability(arr_shp, ai_shp)
+        # Do not silently drop no-trade/constant-return simulations from a p-value.
+        p_val_shp = (monte_carlo_tail_probability(arr_shp, ai_shp)
+                     if ai_shp is not None and len(arr_shp) == n_simulations else None)
         out["ai_comparison"] = {
             "ai_roi": ai_ret,
             "ai_sharpe": ai_shp,
             "p_value_roi": round(p_val_ret, 4),
-            "p_value_sharpe": round(p_val_shp, 4),
-            "statistically_significant_at_5pct": bool(p_val_shp < 0.05),
+            "p_value_sharpe": _round_metric(p_val_shp, 4),
+            "statistically_significant_at_5pct": bool(p_val_shp < 0.05) if p_val_shp is not None else None,
         }
 
     return out
@@ -1047,7 +1171,7 @@ def backtest_symbol_oos(
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
 
-    return run_backtest(
+    result = run_backtest(
         df=trading_prices_vnd(sym_df, price_unit),
         probabilities=probs,
         buy_prob_threshold=buy_prob_threshold,
@@ -1065,6 +1189,16 @@ def backtest_symbol_oos(
         stop_loss_pct=stop_loss_pct,
         trailing_stop_pct=trailing_stop_pct,
     )
+    result.config.update({"model_type": model_type.lower(), "model_info": info,
+                          "training_provenance": _load_training_provenance(models_dir),
+                          "evaluation_kind": "model_selection_validation_simulation",
+                          "independent_oos": False,
+                          "leakage_warning": "Uses model-selection validation buffer with persisted production artifact; not independent OOS.",
+                          "input_price_unit": price_unit,
+                          "buy_prob_threshold": buy_prob_threshold,
+                          "sell_prob_threshold": sell_prob_threshold})
+    return result
+
 
 
 def backtest_all_symbols(
@@ -1129,9 +1263,7 @@ def _get_foreign_buy_val(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None
         return float(df["Foreign_Net_Val"].iloc[idx])
     if "Foreign_Buy_Val" in df.columns and "Foreign_Sell_Val" in df.columns:
         return float(df["Foreign_Buy_Val"].iloc[idx] - df["Foreign_Sell_Val"].iloc[idx])
-    if meta and "foreign_net_val" in meta:
-        return float(meta["foreign_net_val"])
-    return float(df["Close"].iloc[idx] * df["Volume"].iloc[idx] * DEFAULT_FOREIGN_VAL_PROXY_RATIO / 1e6)
+    raise ValueError("Historical order flow observations are required; no volume proxy is allowed.")
 
 
 def _get_foreign_buy_vol(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
@@ -1139,9 +1271,7 @@ def _get_foreign_buy_vol(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None
         return float(df["Foreign_Net_Vol"].iloc[idx])
     if "Foreign_Buy_Vol" in df.columns and "Foreign_Sell_Vol" in df.columns:
         return float(df["Foreign_Buy_Vol"].iloc[idx] - df["Foreign_Sell_Vol"].iloc[idx])
-    if meta and "foreign_net_vol" in meta:
-        return float(meta["foreign_net_vol"])
-    return float(df["Volume"].iloc[idx] * DEFAULT_FOREIGN_VOL_PROXY_RATIO / 1e6)
+    raise ValueError("Historical order flow observations are required; no volume proxy is allowed.")
 
 
 def _get_prop_buy_val(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
@@ -1149,9 +1279,7 @@ def _get_prop_buy_val(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -
         return float(df["Prop_Net_Val"].iloc[idx])
     if "Prop_Buy_Val" in df.columns and "Prop_Sell_Val" in df.columns:
         return float(df["Prop_Buy_Val"].iloc[idx] - df["Prop_Sell_Val"].iloc[idx])
-    if meta and "prop_net_val" in meta:
-        return float(meta["prop_net_val"])
-    return float(df["Close"].iloc[idx] * df["Volume"].iloc[idx] * DEFAULT_PROP_VAL_PROXY_RATIO / 1e6)
+    raise ValueError("Historical order flow observations are required; no volume proxy is allowed.")
 
 
 def _get_prop_buy_vol(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
@@ -1159,9 +1287,7 @@ def _get_prop_buy_vol(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -
         return float(df["Prop_Net_Vol"].iloc[idx])
     if "Prop_Buy_Vol" in df.columns and "Prop_Sell_Vol" in df.columns:
         return float(df["Prop_Buy_Vol"].iloc[idx] - df["Prop_Sell_Vol"].iloc[idx])
-    if meta and "prop_net_vol" in meta:
-        return float(meta["prop_net_vol"])
-    return float(df["Volume"].iloc[idx] * DEFAULT_PROP_VOL_PROXY_RATIO / 1e6)
+    raise ValueError("Historical order flow observations are required; no volume proxy is allowed.")
 
 
 def _get_foreign_sell_val(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
@@ -1169,9 +1295,7 @@ def _get_foreign_sell_val(df: pd.DataFrame, idx: int, meta: dict[str, Any] | Non
         return float(df["Foreign_Sell_Val"].iloc[idx] - df["Foreign_Buy_Val"].iloc[idx])
     if "Foreign_Net_Val" in df.columns:
         return -float(df["Foreign_Net_Val"].iloc[idx])
-    if meta and "foreign_net_sell_val" in meta:
-        return float(meta["foreign_net_sell_val"])
-    return float(df["Close"].iloc[idx] * df["Volume"].iloc[idx] * DEFAULT_FOREIGN_VAL_PROXY_RATIO / 1e6)
+    raise ValueError("Historical order flow observations are required; no volume proxy is allowed.")
 
 
 def _get_prop_sell_vol(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
@@ -1179,9 +1303,7 @@ def _get_prop_sell_vol(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) 
         return float(df["Prop_Sell_Vol"].iloc[idx] - df["Prop_Buy_Vol"].iloc[idx])
     if "Prop_Net_Vol" in df.columns:
         return -float(df["Prop_Net_Vol"].iloc[idx])
-    if meta and "prop_net_sell_vol" in meta:
-        return float(meta["prop_net_sell_vol"])
-    return float(df["Volume"].iloc[idx] * DEFAULT_PROP_VOL_PROXY_RATIO / 1e6)
+    raise ValueError("Historical order flow observations are required; no volume proxy is allowed.")
 
 
 def _get_foreign_sell_vol(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
@@ -1189,9 +1311,7 @@ def _get_foreign_sell_vol(df: pd.DataFrame, idx: int, meta: dict[str, Any] | Non
         return float(df["Foreign_Sell_Vol"].iloc[idx] - df["Foreign_Buy_Vol"].iloc[idx])
     if "Foreign_Net_Vol" in df.columns:
         return -float(df["Foreign_Net_Vol"].iloc[idx])
-    if meta and "foreign_net_sell_vol" in meta:
-        return float(meta["foreign_net_sell_vol"])
-    return float(df["Volume"].iloc[idx] * DEFAULT_FOREIGN_VOL_PROXY_RATIO / 1e6)
+    raise ValueError("Historical order flow observations are required; no volume proxy is allowed.")
 
 
 def _get_prop_sell_val(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) -> float:
@@ -1199,9 +1319,25 @@ def _get_prop_sell_val(df: pd.DataFrame, idx: int, meta: dict[str, Any] | None) 
         return float(df["Prop_Sell_Val"].iloc[idx] - df["Prop_Buy_Val"].iloc[idx])
     if "Prop_Net_Val" in df.columns:
         return -float(df["Prop_Net_Val"].iloc[idx])
-    if meta and "prop_net_sell_val" in meta:
-        return float(meta["prop_net_sell_val"])
-    return float(df["Close"].iloc[idx] * df["Volume"].iloc[idx] * DEFAULT_PROP_VAL_PROXY_RATIO / 1e6)
+    raise ValueError("Historical order flow observations are required; no volume proxy is allowed.")
+
+
+def _historical_fundamental(df: pd.DataFrame, idx: int, column: str) -> float:
+    """Read a historical as-of value; current symbol metadata is not a time series.
+
+    Caller must align observations as-of their publication time, in Vietnam local time.
+    No fabricated fallback or backwards fill is permitted.
+    """
+    if column not in df or "Fundamental_Available_At" not in df:
+        raise ValueError(f"Historical point-in-time {column} and Fundamental_Available_At are required.")
+    available = pd.Timestamp(df["Fundamental_Available_At"].iloc[idx])
+    close_time = pd.Timestamp(df["Date"].iloc[idx]).normalize() + pd.Timedelta(hours=15)
+    if pd.isna(available) or available > close_time:
+        raise ValueError(f"Historical {column} was not available at signal time (future publication).")
+    value = float(df[column].iloc[idx])
+    if not np.isfinite(value):
+        raise ValueError(f"Historical {column} must be finite.")
+    return value
 
 
 def evaluate_strategy_signals(
@@ -1222,6 +1358,11 @@ def evaluate_strategy_signals(
 
     buy_rules = buy_rules or {}
     sell_rules = sell_rules or {}
+
+    for rule_name, rules in (("buy_rules", buy_rules), ("sell_rules", sell_rules)):
+        mc = rules.get("market_condition")
+        if mc not in (None, "all"):
+            raise ValueError(f"{rule_name}.market_condition='{mc}' is not supported without historical VNINDEX regime data.")
 
     buy_logic = str(buy_rules.get("condition_logic", "AND")).upper()
     sell_logic = str(sell_rules.get("condition_logic", "OR")).upper()
@@ -1303,7 +1444,7 @@ def evaluate_strategy_signals(
             if buy_rules.get("use_pb"):
                 min_pb = float(buy_rules.get("min_pb") if buy_rules.get("min_pb") is not None else 0.0)
                 max_pb = float(buy_rules.get("max_pb") if buy_rules.get("max_pb") is not None else 10.0)
-                pb_est = float(symbol_meta.get("pb", 1.2)) if symbol_meta and "pb" in symbol_meta else 1.2
+                pb_est = _historical_fundamental(df, i, "pb")
                 active_buy_flags.append(bool(min_pb <= pb_est <= max_pb))
 
             # 3. Giá cổ phiếu (nghìn đồng)
@@ -1316,7 +1457,7 @@ def evaluate_strategy_signals(
             if buy_rules.get("use_market_cap"):
                 min_cap = float(buy_rules.get("min_market_cap") if buy_rules.get("min_market_cap") is not None else 0.0)
                 max_cap = float(buy_rules.get("max_market_cap") if buy_rules.get("max_market_cap") is not None else 1e12)
-                cap_est = float(symbol_meta.get("market_cap", 25000)) if symbol_meta and "market_cap" in symbol_meta else 15000
+                cap_est = _historical_fundamental(df, i, "market_cap")
                 active_buy_flags.append(bool(min_cap <= cap_est <= max_cap))
 
             # 5. GTGD trung bình (Tỷ)
@@ -1341,7 +1482,7 @@ def evaluate_strategy_signals(
                     col = f"SMA{digits}" if digits else "SMA20"
                     if col in df:
                         return float(df[col].iloc[idx])
-                    return float(df["SMA20"].iloc[idx])
+                    raise ValueError(f"Unsupported MA indicator column: {col}")
 
                 l_curr = get_ma_val(left_key, i)
                 r_curr = get_ma_val(right_key, i)
@@ -1365,7 +1506,7 @@ def evaluate_strategy_signals(
                 elif op in ["Nằm dưới", "<"]:
                     active_buy_flags.append(bool(l_curr < r_curr))
                 else:
-                    active_buy_flags.append(bool(l_curr > r_curr))
+                    raise ValueError(f"Unsupported MA operator: {op}")
 
             # 7. RSI (14)
             if buy_rules.get("use_rsi"):
@@ -1401,8 +1542,10 @@ def evaluate_strategy_signals(
                         active_buy_flags.append(bool(p0 >= p1))
                     elif op == "<=":
                         active_buy_flags.append(bool(p0 <= p1))
-                    else:
+                    elif op == "=":
                         active_buy_flags.append(bool(abs(p0 - p1) < 1e-4))
+                    else:
+                        raise ValueError(f"Unsupported price_t0_operator: {op}")
                 else:
                     active_buy_flags.append(True)
 
@@ -1419,7 +1562,7 @@ def evaluate_strategy_signals(
                     col = f"EMA{digits}" if digits else "EMA20"
                     if col in df:
                         return float(df[col].iloc[idx])
-                    return float(df["EMA20"].iloc[idx])
+                    raise ValueError(f"Unsupported EMA indicator column: {col}")
 
                 el_curr = get_ema_val(left_key, i)
                 er_curr = get_ema_val(right_key, i)
@@ -1443,7 +1586,7 @@ def evaluate_strategy_signals(
                 elif op in ["Nằm dưới", "<"]:
                     active_buy_flags.append(bool(el_curr < er_curr))
                 else:
-                    active_buy_flags.append(bool(el_curr > er_curr))
+                    raise ValueError(f"Unsupported EMA operator: {op}")
 
             # 10. MACD (12,26,9)
             if buy_rules.get("use_macd"):
@@ -1473,7 +1616,7 @@ def evaluate_strategy_signals(
                 elif op in ["Nằm dưới", "<"]:
                     active_buy_flags.append(bool(m_curr < t_curr))
                 else:
-                    active_buy_flags.append(bool(m_curr > t_curr))
+                    raise ValueError(f"Unsupported MACD operator: {op}")
 
             # 11. ADX (14)
             if buy_rules.get("use_adx"):
@@ -1483,9 +1626,11 @@ def evaluate_strategy_signals(
 
             # 12. RS
             if buy_rules.get("use_rs"):
+                if "RS" not in df:
+                    raise ValueError("Historical RS indicator is required.")
                 min_rs = float(buy_rules.get("min_rs") if buy_rules.get("min_rs") is not None else 0.0)
                 max_rs = float(buy_rules.get("max_rs") if buy_rules.get("max_rs") is not None else 100.0)
-                rs_val = float(df["RS"].iloc[i]) if "RS" in df else 50.0
+                rs_val = float(df["RS"].iloc[i])
                 active_buy_flags.append(bool(min_rs <= rs_val <= max_rs))
 
             # 13. Giá cắt đường MA/EMA/BB
@@ -1502,9 +1647,13 @@ def evaluate_strategy_signals(
                     digits = "".join(ch for ch in tgt if ch.isdigit())
                     if "ema" in t_low:
                         col = f"EMA{digits}" if digits else "EMA20"
-                        return float(df[col].iloc[idx]) if col in df else float(df["EMA20"].iloc[idx])
+                        if col in df:
+                            return float(df[col].iloc[idx])
+                        raise ValueError(f"Unsupported cross target column: {col}")
                     col = f"SMA{digits}" if digits else "SMA10"
-                    return float(df[col].iloc[idx]) if col in df else float(df["SMA20"].iloc[idx])
+                    if col in df:
+                        return float(df[col].iloc[idx])
+                    raise ValueError(f"Unsupported cross target column: {col}")
 
                 c_curr = float(df["Close"].iloc[i])
                 t_curr = get_cross_target_val(i)
@@ -1527,7 +1676,7 @@ def evaluate_strategy_signals(
                 elif op in ["Nằm dưới", "<"]:
                     active_buy_flags.append(bool(c_curr < t_curr))
                 else:
-                    active_buy_flags.append(bool(c_curr > t_curr))
+                    raise ValueError(f"Unsupported price_cross_operator: {op}")
 
             # 14. Bollinger Bands
             if buy_rules.get("use_bb"):
@@ -1537,73 +1686,73 @@ def evaluate_strategy_signals(
             if buy_rules.get("use_pe"):
                 min_pe = float(buy_rules.get("min_pe") if buy_rules.get("min_pe") is not None else -100.0)
                 max_pe = float(buy_rules.get("max_pe") if buy_rules.get("max_pe") is not None else 150.0)
-                pe_est = float(symbol_meta.get("pe", 14.5)) if symbol_meta and "pe" in symbol_meta else 12.0
+                pe_est = _historical_fundamental(df, i, "pe")
                 active_buy_flags.append(bool(min_pe <= pe_est <= max_pe))
 
             if buy_rules.get("use_ps"):
                 min_ps = float(buy_rules.get("min_ps") if buy_rules.get("min_ps") is not None else 0.0)
                 max_ps = float(buy_rules.get("max_ps") if buy_rules.get("max_ps") is not None else 20.0)
-                ps_est = float(symbol_meta.get("ps", 1.8)) if symbol_meta and "ps" in symbol_meta else 1.5
+                ps_est = _historical_fundamental(df, i, "ps")
                 active_buy_flags.append(bool(min_ps <= ps_est <= max_ps))
 
             if buy_rules.get("use_roa"):
                 min_roa = float(buy_rules.get("min_roa") if buy_rules.get("min_roa") is not None else -50.0)
                 max_roa = float(buy_rules.get("max_roa") if buy_rules.get("max_roa") is not None else 50.0)
-                roa_est = float(symbol_meta.get("roa", 6.5)) if symbol_meta and "roa" in symbol_meta else 5.0
+                roa_est = _historical_fundamental(df, i, "roa")
                 active_buy_flags.append(bool(min_roa <= roa_est <= max_roa))
 
             if buy_rules.get("use_roe"):
                 min_roe = float(buy_rules.get("min_roe") if buy_rules.get("min_roe") is not None else -50.0)
                 max_roe = float(buy_rules.get("max_roe") if buy_rules.get("max_roe") is not None else 60.0)
-                roe_est = float(symbol_meta.get("roe", 15.0)) if symbol_meta and "roe" in symbol_meta else 14.0
+                roe_est = _historical_fundamental(df, i, "roe")
                 active_buy_flags.append(bool(min_roe <= roe_est <= max_roe))
 
             if buy_rules.get("use_eps"):
                 min_eps = float(buy_rules.get("min_eps") if buy_rules.get("min_eps") is not None else -10000.0)
                 max_eps = float(buy_rules.get("max_eps") if buy_rules.get("max_eps") is not None else 50000.0)
-                eps_est = float(symbol_meta.get("eps", 3200)) if symbol_meta and "eps" in symbol_meta else 2500
+                eps_est = _historical_fundamental(df, i, "eps")
                 active_buy_flags.append(bool(min_eps <= eps_est <= max_eps))
 
             if buy_rules.get("growth_eps"):
                 min_geps = float(buy_rules.get("min_growth_eps") if buy_rules.get("min_growth_eps") is not None else -500.0)
                 max_geps = float(buy_rules.get("max_growth_eps") if buy_rules.get("max_growth_eps") is not None else 500.0)
-                geps_est = float(symbol_meta.get("growth_eps", 18.0)) if symbol_meta and "growth_eps" in symbol_meta else 15.0
+                geps_est = _historical_fundamental(df, i, "growth_eps")
                 active_buy_flags.append(bool(min_geps <= geps_est <= max_geps))
 
             if buy_rules.get("growth_rev_latest"):
                 min_gr = float(buy_rules.get("min_growth_rev_latest") if buy_rules.get("min_growth_rev_latest") is not None else -200.0)
                 max_gr = float(buy_rules.get("max_growth_rev_latest") if buy_rules.get("max_growth_rev_latest") is not None else 500.0)
-                gr_est = float(symbol_meta.get("rev_growth", 12.0)) if symbol_meta and "rev_growth" in symbol_meta else 10.0
+                gr_est = _historical_fundamental(df, i, "rev_growth")
                 active_buy_flags.append(bool(min_gr <= gr_est <= max_gr))
 
             if buy_rules.get("growth_np_latest"):
                 min_np = float(buy_rules.get("min_growth_np_latest") if buy_rules.get("min_growth_np_latest") is not None else -500.0)
                 max_np = float(buy_rules.get("max_growth_np_latest") if buy_rules.get("max_growth_np_latest") is not None else 1000.0)
-                np_est = float(symbol_meta.get("np_growth", 15.0)) if symbol_meta and "np_growth" in symbol_meta else 12.0
+                np_est = _historical_fundamental(df, i, "np_growth")
                 active_buy_flags.append(bool(min_np <= np_est <= max_np))
 
             if buy_rules.get("growth_rev_prev"):
                 min_grp = float(buy_rules.get("min_growth_rev_prev") if buy_rules.get("min_growth_rev_prev") is not None else -200.0)
                 max_grp = float(buy_rules.get("max_growth_rev_prev") if buy_rules.get("max_growth_rev_prev") is not None else 500.0)
-                grp_est = float(symbol_meta.get("growth_rev_prev", symbol_meta.get("rev_growth_prev", DEFAULT_GROWTH_REV_PREV))) if symbol_meta else DEFAULT_GROWTH_REV_PREV
+                grp_est = _historical_fundamental(df, i, "growth_rev_prev")
                 active_buy_flags.append(bool(min_grp <= grp_est <= max_grp))
 
             if buy_rules.get("growth_np_prev"):
                 min_npp = float(buy_rules.get("min_growth_np_prev") if buy_rules.get("min_growth_np_prev") is not None else -500.0)
                 max_npp = float(buy_rules.get("max_growth_np_prev") if buy_rules.get("max_growth_np_prev") is not None else 1000.0)
-                npp_est = float(symbol_meta.get("growth_np_prev", symbol_meta.get("np_growth_prev", DEFAULT_GROWTH_NP_PREV))) if symbol_meta else DEFAULT_GROWTH_NP_PREV
+                npp_est = _historical_fundamental(df, i, "growth_np_prev")
                 active_buy_flags.append(bool(min_npp <= npp_est <= max_npp))
 
             if buy_rules.get("growth_rev_ttm"):
                 min_grt = float(buy_rules.get("min_growth_rev_ttm") if buy_rules.get("min_growth_rev_ttm") is not None else -200.0)
                 max_grt = float(buy_rules.get("max_growth_rev_ttm") if buy_rules.get("max_growth_rev_ttm") is not None else 500.0)
-                grt_est = float(symbol_meta.get("growth_rev_ttm", symbol_meta.get("rev_growth_ttm", DEFAULT_GROWTH_REV_TTM))) if symbol_meta else DEFAULT_GROWTH_REV_TTM
+                grt_est = _historical_fundamental(df, i, "growth_rev_ttm")
                 active_buy_flags.append(bool(min_grt <= grt_est <= max_grt))
 
             if buy_rules.get("growth_np_ttm"):
                 min_npt = float(buy_rules.get("min_growth_np_ttm") if buy_rules.get("min_growth_np_ttm") is not None else -500.0)
                 max_npt = float(buy_rules.get("max_growth_np_ttm") if buy_rules.get("max_growth_np_ttm") is not None else 1000.0)
-                npt_est = float(symbol_meta.get("growth_np_ttm", symbol_meta.get("np_growth_ttm", DEFAULT_GROWTH_NP_TTM))) if symbol_meta else DEFAULT_GROWTH_NP_TTM
+                npt_est = _historical_fundamental(df, i, "growth_np_ttm")
                 active_buy_flags.append(bool(min_npt <= npt_est <= max_npt))
 
             # Khối ngoại & Tự doanh
@@ -1698,7 +1847,9 @@ def evaluate_strategy_signals(
                         return float(df["Close"].iloc[idx])
                     digits = "".join(ch for ch in key if ch.isdigit())
                     col = f"SMA{digits}" if digits else "SMA10"
-                    return float(df[col].iloc[idx]) if col in df else float(df["SMA20"].iloc[idx])
+                    if col in df:
+                        return float(df[col].iloc[idx])
+                    raise ValueError(f"Unsupported sell MA indicator column: {col}")
 
                 l_curr = get_sell_ma_val(l_key, i)
                 r_curr = get_sell_ma_val(r_key, i)
@@ -1723,7 +1874,7 @@ def evaluate_strategy_signals(
                 elif op == "=":
                     active_sell_flags.append(bool(abs(l_curr - r_curr) / (r_curr + 1e-9) < 0.005))
                 else:
-                    active_sell_flags.append(bool(l_curr > r_curr))
+                    raise ValueError(f"Unsupported sell MA operator: {op}")
 
             # 2. Giá cắt đường MA/EMA/BB
             if sell_rules.get("use_price_cross"):
@@ -1739,9 +1890,13 @@ def evaluate_strategy_signals(
                     digits = "".join(ch for ch in tgt if ch.isdigit())
                     if "ema" in t_low:
                         col = f"EMA{digits}" if digits else "EMA20"
-                        return float(df[col].iloc[idx]) if col in df else float(df["EMA20"].iloc[idx])
+                        if col in df:
+                            return float(df[col].iloc[idx])
+                        raise ValueError(f"Unsupported sell cross target column: {col}")
                     col = f"SMA{digits}" if digits else "SMA10"
-                    return float(df[col].iloc[idx]) if col in df else float(df["SMA20"].iloc[idx])
+                    if col in df:
+                        return float(df[col].iloc[idx])
+                    raise ValueError(f"Unsupported sell cross target column: {col}")
 
                 c_curr = float(df["Close"].iloc[i])
                 t_curr = get_sell_cross_target_val(i)
@@ -1764,7 +1919,7 @@ def evaluate_strategy_signals(
                 elif op in ["Nằm dưới", "<"]:
                     active_sell_flags.append(bool(c_curr < t_curr))
                 else:
-                    active_sell_flags.append(bool(c_curr > t_curr))
+                    raise ValueError(f"Unsupported sell price_cross_operator: {op}")
 
             # 3. RSI (14)
             if sell_rules.get("use_rsi"):
@@ -1820,7 +1975,9 @@ def evaluate_strategy_signals(
                         return float(df["Close"].iloc[idx])
                     digits = "".join(ch for ch in key if ch.isdigit())
                     col = f"EMA{digits}" if digits else "EMA10"
-                    return float(df[col].iloc[idx]) if col in df else float(df["EMA20"].iloc[idx])
+                    if col in df:
+                        return float(df[col].iloc[idx])
+                    raise ValueError(f"Unsupported sell EMA indicator column: {col}")
 
                 l_curr = get_sell_ema_val(l_key, i)
                 r_curr = get_sell_ema_val(r_key, i)
@@ -1843,7 +2000,7 @@ def evaluate_strategy_signals(
                 elif op in ["Nằm dưới", "<"]:
                     active_sell_flags.append(bool(l_curr < r_curr))
                 else:
-                    active_sell_flags.append(bool(l_curr > r_curr))
+                    raise ValueError(f"Unsupported sell EMA operator: {op}")
 
             # 8. KLGD nước ngoài bán ròng (triệu cp)
             if sell_rules.get("foreign_net_sell_vol"):
@@ -1855,10 +2012,12 @@ def evaluate_strategy_signals(
 
             # 9. RS
             if sell_rules.get("use_rs"):
+                if "RS" not in df:
+                    raise ValueError("Historical RS indicator is required.")
                 min_rs = float(sell_rules.get("min_rs") if sell_rules.get("min_rs") is not None else 0.0)
                 max_rs = float(sell_rules.get("max_rs") if sell_rules.get("max_rs") is not None else 100.0)
                 if not (min_rs <= 0.0 and max_rs >= 99.9):
-                    rs_val = float(df["RS"].iloc[i]) if "RS" in df else 50.0
+                    rs_val = float(df["RS"].iloc[i])
                     active_sell_flags.append(bool(min_rs <= rs_val <= max_rs))
 
             # 10. MACD (12,26,9)
@@ -1892,7 +2051,7 @@ def evaluate_strategy_signals(
                 elif op in ["Nằm dưới", "<"]:
                     active_sell_flags.append(bool(m_curr < t_curr))
                 else:
-                    active_sell_flags.append(bool(m_curr > t_curr))
+                    raise ValueError(f"Unsupported sell MACD operator: {op}")
 
             # 11. GTGD tự doanh bán ròng (Tỷ)
             if sell_rules.get("prop_net_sell_val"):
@@ -1959,12 +2118,15 @@ def run_portfolio_backtest(
     Thực thi mô phỏng Backtesting cho danh mục đa mã (Rổ chỉ số, Ngành, hoặc Danh mục tự chọn)
     trong dải ngày xác định (tối đa 1 năm theo chuẩn DNSE), chia đều vốn (Equal-Weight).
     """
-    from vn_stock.data_ingestion import fetch_stock_data, load_local_data
+    from vn_stock.data_ingestion import load_local_data
     from vn_stock.features import ALL_FEATURE_COLS
 
     clean_symbols = list(dict.fromkeys(s.strip().upper() for s in symbols if s.strip()))
     if not clean_symbols:
-        clean_symbols = ["VIC"]
+        raise ValueError("A nonempty explicit symbol universe is required.")
+
+    if model_type.lower() not in ("none", "lightgbm", "lgb", "lstm"):
+        raise ValueError(f"Unsupported model type: {model_type}")
 
     # Đảm bảo dải ngày hợp lệ
     end_dt = pd.to_datetime(end_date) if end_date else pd.to_datetime("today")
@@ -1977,12 +2139,15 @@ def run_portfolio_backtest(
     booster = None
     lstm_model = None
     scaler = None
+    model_info: dict[str, Any] = {}
+    data_fingerprints: dict[str, str] = {}
+    signal_fingerprints: dict[str, str] = {}
     m_clean = model_type.lower()
     if m_clean in ("lightgbm", "lgb", "lstm"):
         try:
-            from vn_stock.modeling.predict import load_prediction_artifacts
+            from vn_stock.modeling.predict import load_prediction_snapshot
 
-            loaded_model, scaler = load_prediction_artifacts(
+            loaded_model, scaler, model_info = load_prediction_snapshot(
                 model_type="lightgbm" if m_clean in ("lightgbm", "lgb") else "lstm",
                 models_dir=MODELS_DIR,
                 horizon=3,
@@ -2002,17 +2167,7 @@ def run_portfolio_backtest(
         try:
             df_sym = load_local_data(sym)
             if df_sym is None or df_sym.empty:
-                try:
-                    df_sym = fetch_stock_data(
-                        sym,
-                        start_date=start_dt.strftime("%Y-%m-%d"),
-                        end_date=end_dt.strftime("%Y-%m-%d"),
-                    )
-                except Exception:
-                    df_sym = None
-
-            if df_sym is None or df_sym.empty:
-                continue
+                raise ValueError(f"Missing local market data for {sym}; refresh data separately.")
 
             df_sym = df_sym.copy()
             if not pd.api.types.is_datetime64_any_dtype(df_sym["Date"]):
@@ -2022,9 +2177,10 @@ def run_portfolio_backtest(
             filtered_df = df_sym[mask].copy().sort_values("Date").reset_index(drop=True)
 
             if len(filtered_df) < 5:
-                continue
+                raise ValueError(f"Insufficient market observations for {sym} in requested interval.")
 
             historical_df = df_sym[df_sym["Date"] <= end_dt].sort_values("Date").reset_index(drop=True)
+            data_fingerprints[sym] = _data_fingerprint(historical_df)
             prepared_history = prepare_backtest_df(historical_df)
             df_prepared = prepared_history[prepared_history["Date"] >= start_dt].reset_index(drop=True)
 
@@ -2062,8 +2218,9 @@ def run_portfolio_backtest(
                             from vn_stock.features import create_multivariate_sequences
 
                             pre_mask = computed_feats["Date"] < filtered_df["Date"].iloc[0]
-                            warm_feats = computed_feats[pre_mask].sort_values("Date").tail(19).copy()
-                            if len(warm_feats) < 19:
+                            sequence_length = int(model_info.get("seq_length", 20))
+                            warm_feats = computed_feats[pre_mask].sort_values("Date").tail(sequence_length - 1).copy()
+                            if len(warm_feats) < sequence_length - 1:
                                 raise ValueError(f"Insufficient causal LSTM warm-up for {sym}.")
                             warm_scaled = warm_feats.copy()
                             warm_scaled["Symbol_Code"] = SYMBOL_TO_CODE.get(sym, 0)
@@ -2074,7 +2231,7 @@ def run_portfolio_backtest(
                                 feat_scaled,
                                 warmup_df=warm_scaled,
                                 feature_cols=ALL_FEATURE_COLS,
-                                seq_length=20,
+                                seq_length=sequence_length,
                             )
                             if len(xs) == len(df_prepared):
                                 lstm_model.eval()
@@ -2085,6 +2242,9 @@ def run_portfolio_backtest(
                                     ai_signals = np.argmax(probs, axis=1)
                 except Exception as pred_err:
                     raise ValueError(f"AI preprocessing failed for {sym}: {pred_err}") from pred_err
+
+            if m_clean != "none" and ai_signals is None:
+                raise ValueError(f"AI inference did not produce aligned signals for {sym}.")
 
             meta = (symbol_metadata or {}).get(sym, {})
             name = meta.get("name", f"Công ty Cổ phần {sym}")
@@ -2098,6 +2258,7 @@ def run_portfolio_backtest(
                 symbol_meta=meta,
             )
 
+            signal_fingerprints[sym] = _data_fingerprint(pd.DataFrame({"signal": signals}))
             metrics, eq_df, trades_df = simulate_vietnam_trading(
                 df=trading_prices_vnd(df_prepared, price_unit),
                 signals=signals,
@@ -2121,11 +2282,11 @@ def run_portfolio_backtest(
                     "roi_pct": round(metrics.total_return_pct, 2),
                     "bh_roi_pct": round(metrics.buy_and_hold_return_pct, 2),
                     "excess_pct": round(metrics.excess_return_pct, 2),
-                    "sharpe": round(metrics.sharpe_ratio, 4),
-                    "sortino": round(metrics.sortino_ratio, 4),
+                    "sharpe": _round_metric(metrics.sharpe_ratio, 4),
+                    "sortino": _round_metric(metrics.sortino_ratio, 4),
                     "mdd_pct": round(metrics.max_drawdown_pct, 2),
-                    "win_rate_pct": round(metrics.win_rate_pct, 2),
-                    "profit_factor": round(metrics.profit_factor, 4),
+                    "win_rate_pct": _round_metric(metrics.win_rate_pct, 2),
+                    "profit_factor": _round_metric(metrics.profit_factor, 4),
                     "trades": metrics.total_trades,
                     "costs": round(metrics.total_costs, 0),
                 }
@@ -2166,7 +2327,7 @@ def run_portfolio_backtest(
                 "trades": trades_list,
             }
         except Exception as sym_err:
-            logger.warning("Lỗi chạy kiểm thử cho %s: %s", sym, sym_err)
+            raise ValueError(f"Backtest failed for {sym}: {sym_err}") from sym_err
 
     if not equity_dfs:
         raise ValueError("Không có dữ liệu hợp lệ cho danh sách mã đã chọn trong dải ngày.")
@@ -2222,15 +2383,49 @@ def run_portfolio_backtest(
     aggregate_metrics.pop("equity_curve")
     aggregate_metrics["max_gain_pct"] = metrics.best_trade_return_pct
     aggregate_metrics["max_loss_pct"] = metrics.worst_trade_return_pct
-    wins = [t.realized_return_pct for t in all_trades
-            if t.order_type == "SELL" and t.realized_pnl > 0]
-    losses = [t.realized_return_pct for t in all_trades
-              if t.order_type == "SELL" and t.realized_pnl < 0]
+    wins = [float(t.realized_return_pct) for t in all_trades
+            if t.order_type == "SELL" and t.realized_pnl is not None and t.realized_pnl > 0 and t.realized_return_pct is not None]
+    losses = [float(t.realized_return_pct) for t in all_trades
+              if t.order_type == "SELL" and t.realized_pnl is not None and t.realized_pnl < 0 and t.realized_return_pct is not None]
+    avg_loss = abs(float(np.mean(losses))) if losses else 0.0
     aggregate_metrics["reward_risk_ratio"] = (
-        round(float(np.mean(wins) / abs(np.mean(losses))), 2) if wins and losses else 0.0
+        round(float(np.mean(wins)) / avg_loss, 2) if wins and losses and avg_loss > 1e-9 else None
     )
 
     return {
+        "config": {
+            "engine_contract": "daily_cash_settlement_v2",
+            "symbols": clean_symbols, "universe_kind": "requested_snapshot_not_historical_constituents",
+            "start_date": str(start_dt.date()), "end_date": str(end_dt.date()),
+            "initial_capital": initial_capital, "allocation": "equal_weight_segregated_cash",
+            "model_type": m_clean, "model_info": model_info,
+            "training_provenance": _load_training_provenance(MODELS_DIR) if m_clean != "none" else {},
+            "evaluation_kind": "rule_based_historical_simulation" if m_clean == "none" else "production_model_historical_simulation",
+            "independent_oos": False,
+            "leakage_warning": (
+                None if m_clean == "none"
+                else "Production artifact may overlap the simulated historical window; not independent OOS."
+            ),
+            "buy_rules": buy_rules or {}, "sell_rules": sell_rules or {},
+            "slippage_rate": slippage_rate, "fee_rate": fee_rate, "tax_rate": tax_rate,
+            "lot_size": lot_size, "settlement_delay": settlement_delay,
+            "execution_price": "open", "close_at_end": True,
+            "cash_settlement": "no_advance_afternoon_T_plus_delay", "risk_execution": "standing_open_checks",
+            "settlement_regime_effective_from": "2022-08-29",
+            "settlement_regime_warning": (
+                "Simulation includes dates before 2022-08-29 when afternoon T+2 settlement was not yet effective."
+                if str(start_dt.date()) < "2022-08-29"
+                else None
+            ),
+            "price_adjustment_status": "unverified",
+            "corporate_actions_modeled": False,
+            "dividend_modeled": False,
+            "take_profit_pct": take_profit_pct, "stop_loss_pct": stop_loss_pct,
+            "trailing_stop_pct": trailing_stop_pct, "input_price_unit": price_unit, "price_unit": "VND",
+            "data_fingerprints": data_fingerprints, "signal_fingerprints": signal_fingerprints,
+            "pandas_version": pd.__version__,
+            "benchmark": "same_symbol_equal_weight_buy_and_hold_price_return_after_costs",
+        },
         "aggregate_metrics": aggregate_metrics,
         "portfolio_equity_curve": portfolio_equity_curve,
         "symbols_breakdown": breakdown_list,
@@ -2309,16 +2504,16 @@ if __name__ == "__main__":
         print(f"Tỷ suất sinh lời (ROI): {m.total_return_pct:+.2f}% (CAGR: {m.cagr_pct:+.2f}%)")
         print(f"Chiến lược Buy & Hold:  {m.buy_and_hold_return_pct:+.2f}%")
         print(f"Lợi nhuận vượt trội:    {m.excess_return_pct:+.2f}%")
-        print(f"Tỷ số Sharpe năm hóa:   {m.sharpe_ratio:.4f}")
-        print(f"Tỷ số Sortino năm hóa:  {m.sortino_ratio:.4f}")
+        print(f"Tỷ số Sharpe năm hóa:   {_display_metric(m.sharpe_ratio, 4)}")
+        print(f"Tỷ số Sortino năm hóa:  {_display_metric(m.sortino_ratio, 4)}")
         print(f"Độ sụt giảm tối đa MDD: {m.max_drawdown_pct:.2f}%")
-        print(f"Tỷ số Calmar:           {m.calmar_ratio:.4f}")
-        print(f"VaR 95% / CVaR 95%:     {m.var_95_pct:.2f}% / {m.cvar_95_pct:.2f}%")
+        print(f"Tỷ số Calmar:           {_display_metric(m.calmar_ratio, 4)}")
+        print(f"VaR 95% / CVaR 95%:     {_display_metric(m.var_95_pct, 2)}% / {_display_metric(m.cvar_95_pct, 2)}%")
         print(
-            f"Tỷ lệ thắng (Win Rate): {m.win_rate_pct:.2f}% ({m.winning_trades}/{m.total_trades} lệnh)"
+            f"Tỷ lệ thắng (Win Rate): {_display_metric(m.win_rate_pct, 2)}% ({m.winning_trades}/{m.total_trades} lệnh)"
         )
-        print(f"Hệ số Profit Factor:    {m.profit_factor:.4f}")
-        print(f"Thời gian giữ TB:       {m.avg_holding_days:.1f} phiên")
+        print(f"Hệ số Profit Factor:    {_display_metric(m.profit_factor, 4)}")
+        print(f"Thời gian giữ TB:       {_display_metric(m.avg_holding_days, 1)} phiên")
         print(
             f"Tổng chi phí thuế phí:  {m.total_costs:,.0f} VNĐ (Tác động: {m.cost_impact_pct:.2f}%)"
         )
@@ -2355,12 +2550,12 @@ if __name__ == "__main__":
                 f"ROI ngẫu nhiên:   Mean={mc_res['roi_stats']['mean']:.2f}%, 90% CI=[{mc_res['roi_stats']['p5']:.2f}%, {mc_res['roi_stats']['p95']:.2f}%]"
             )
             print(
-                f"Sharpe ngẫu nhiên: Mean={mc_res['sharpe_stats']['mean']:.4f}, 90% CI=[{mc_res['sharpe_stats']['p5']:.4f}, {mc_res['sharpe_stats']['p95']:.4f}]"
+                f"Sharpe ngẫu nhiên: Mean={_display_metric(mc_res['sharpe_stats']['mean'], 4)}, 90% CI=[{_display_metric(mc_res['sharpe_stats']['p5'], 4)}, {_display_metric(mc_res['sharpe_stats']['p95'], 4)}]"
             )
             if "ai_comparison" in mc_res:
                 comp = mc_res["ai_comparison"]
                 print(
-                    f"P-value Sharpe:    {comp['p_value_sharpe']:.4f} (Ý nghĩa thống kê: {comp['statistically_significant_at_5pct']})"
+                    f"P-value Sharpe:    {_display_metric(comp['p_value_sharpe'], 4)} (Ý nghĩa thống kê: {comp['statistically_significant_at_5pct']})"
                 )
                 print(f"P-value ROI:       {comp['p_value_roi']:.4f}")
             print("=" * 65)
@@ -2368,23 +2563,22 @@ if __name__ == "__main__":
 
 def get_strategy_presets() -> list[dict[str, Any]]:
     """
-    Cung cấp danh mục 8 chiến thuật mẫu thực chiến học hỏi từ nền tảng DNSE Entrade X.
-    Tích hợp sẵn bộ điều kiện chỉ báo, quy tắc quản trị rủi ro (Take Profit, Stop Loss, Trailing Stop)
-    và các chỉ số hiệu suất mẫu giúp nhà đầu tư / hội đồng ĐATN kiểm thử tức thời.
+    Cung cấp danh mục 8 mẫu chiến lược khởi tạo chạy hoàn toàn trên dữ liệu OHLCV lịch sử.
+    Tích hợp sẵn bộ điều kiện chỉ báo kỹ thuật/thanh khoản và quy tắc quản trị rủi ro (Take Profit, Stop Loss, Trailing Stop).
     """
     return [
         {
             "id": "preset_ema20_breakout",
             "name": "Thuận xu hướng (Break out EMA 20)",
             "category": "Trend Following",
-            "description": "Săn tìm điểm bứt phá mạnh mẽ khi giá cắt lên EMA20 kèm khối lượng đột biến phiên mua vượt ít nhất 50% và lực mua ròng từ khối ngoại.",
-            "target_symbols": ["VIX", "STB", "VPB", "HPG"],
+            "description": "Săn tìm điểm bứt phá mạnh mẽ khi giá cắt lên EMA20 kèm khối lượng đột biến phiên mua vượt ít nhất 50% và thanh khoản bình quân 10 phiên đạt tối thiểu 10 tỷ đồng.",
+            "target_symbols": ["SSI", "STB", "VPB", "HPG"],
             "default_symbol": "HPG",
-            "conditions_summary": "Giá cắt lên EMA 20 • %KLGD đột biến ≥ 50% • Khối ngoại mua ròng",
-            "win_rate_pct": 75.0,
-            "cumulative_pnl_pct": 78.0,
-            "risk_reward_ratio": "1:2.25",
-            "copy_count": 253,
+            "conditions_summary": "Giá cắt lên EMA 20 • %KLGD đột biến ≥ 50% • GTGD 10 phiên ≥ 10 tỷ",
+            "win_rate_pct": None,
+            "cumulative_pnl_pct": None,
+            "risk_reward_ratio": None,
+            "copy_count": None,
             "take_profit_pct": 0.10,
             "stop_loss_pct": 0.07,
             "trailing_stop_pct": 0.07,
@@ -2399,10 +2593,10 @@ def get_strategy_presets() -> list[dict[str, Any]]:
             "target_symbols": ["VN30", "FPT", "MWG", "TCB"],
             "default_symbol": "FPT",
             "conditions_summary": "RSI(14) 70 - 100 • %KLGD đột biến 30% - 70%",
-            "win_rate_pct": 65.4,
-            "cumulative_pnl_pct": 62.1,
-            "risk_reward_ratio": "1:1.07",
-            "copy_count": 37,
+            "win_rate_pct": None,
+            "cumulative_pnl_pct": None,
+            "risk_reward_ratio": None,
+            "copy_count": None,
             "take_profit_pct": 0.20,
             "stop_loss_pct": 0.07,
             "trailing_stop_pct": 0.05,
@@ -2411,16 +2605,16 @@ def get_strategy_presets() -> list[dict[str, Any]]:
         },
         {
             "id": "preset_fair_val_flow",
-            "name": "Định giá hợp lý & Dòng tiền xác nhận xu hướng",
-            "category": "Value & Momentum",
-            "description": "Ưu tiên sự an toàn, kết hợp giữa nền tảng định giá P/E 12-16, giá mở cửa phiên nay cao hơn phiên trước và dòng tiền khối ngoại gom ròng lớn.",
+            "name": "Xác nhận xu hướng MACD & Động lượng giá",
+            "category": "Trend & Momentum",
+            "description": "Kết hợp tín hiệu MACD cắt lên đường tín hiệu, giá mở cửa phiên nay cao hơn phiên trước và bộ lọc RSI(14) vùng tích cực 45-70.",
             "target_symbols": ["VN30", "VNM", "VCB", "ACB"],
             "default_symbol": "VNM",
-            "conditions_summary": "P/E: 12 - 16 • Giá mở cửa T0 > T-1 • Khối ngoại gom ròng",
-            "win_rate_pct": 58.3,
-            "cumulative_pnl_pct": 32.5,
-            "risk_reward_ratio": "1:2.86",
-            "copy_count": 89,
+            "conditions_summary": "MACD cắt lên tín hiệu • Giá mở cửa T0 > T-1 • RSI(14) 45 - 70",
+            "win_rate_pct": None,
+            "cumulative_pnl_pct": None,
+            "risk_reward_ratio": None,
+            "copy_count": None,
             "take_profit_pct": 0.20,
             "stop_loss_pct": 0.07,
             "trailing_stop_pct": 0.0,
@@ -2429,16 +2623,16 @@ def get_strategy_presets() -> list[dict[str, Any]]:
         },
         {
             "id": "preset_semi_canslim",
-            "name": "CP tăng trưởng, định giá hợp lý (Mini-Canslim)",
-            "category": "Growth Investing",
-            "description": "Lọc các doanh nghiệp bứt phá doanh thu lợi nhuận trong VN100 thỏa mãn vốn hóa > 2.000 tỷ, GTGD > 10 tỷ, ROE > 5%, EPS tăng trưởng > 15%.",
-            "target_symbols": ["VN100", "FPT", "MWG", "DGC"],
+            "name": "Cổ phiếu dẫn dắt động lượng & Thanh khoản (RS)",
+            "category": "Relative Strength",
+            "description": "Lọc các cổ phiếu dẫn dắt trong VN30 có sức mạnh giá tương đối RS ≥ 70, giá nằm trên SMA 50, thanh khoản 10 phiên ≥ 10 tỷ và RSI(14) vùng 50-80.",
+            "target_symbols": ["VN30", "FPT", "MWG", "TCB"],
             "default_symbol": "MWG",
-            "conditions_summary": "Vốn hóa ≥ 2.000 tỷ • GTGD ≥ 10 tỷ • ROE trượt ≥ 5% • EPS tăng ≥ 15%",
-            "win_rate_pct": 41.1,
-            "cumulative_pnl_pct": 65.4,
-            "risk_reward_ratio": "1:2.41",
-            "copy_count": 29,
+            "conditions_summary": "Sức mạnh giá RS ≥ 70 • Giá nằm trên MA 50 • GTGD 10 phiên ≥ 10 tỷ • RSI(14) 50 - 80",
+            "win_rate_pct": None,
+            "cumulative_pnl_pct": None,
+            "risk_reward_ratio": None,
+            "copy_count": None,
             "take_profit_pct": 0.20,
             "stop_loss_pct": 0.07,
             "trailing_stop_pct": 0.05,
@@ -2447,16 +2641,16 @@ def get_strategy_presets() -> list[dict[str, Any]]:
         },
         {
             "id": "preset_cheap_bank",
-            "name": "Định giá ngân hàng rẻ (P/B < 1) & GTGD 10 tỷ",
-            "category": "Deep Value",
-            "description": "Chiến lược săn cổ phiếu vua nhóm ngân hàng giao dịch dưới giá trị sổ sách (P/B < 1) kèm thanh khoản dồi dào > 10 tỷ/phiên.",
+            "name": "Nhóm Ngân hàng hồi phục kỹ thuật & GTGD 10 tỷ",
+            "category": "Sector Rotation",
+            "description": "Chiến lược giao dịch nhóm cổ phiếu Ngân hàng khi giá cắt lên EMA 20 từ vùng tích lũy RSI(14) 35-65 kèm thanh khoản bình quân 10 phiên ≥ 10 tỷ đồng.",
             "target_symbols": ["SHB", "MBB", "VCB", "VPB", "TCB", "STB"],
             "default_symbol": "MBB",
-            "conditions_summary": "P/B: 0.00 - 1.00 • GTGD 10 phiên ≥ 10 tỷ • Nhóm Ngân hàng",
-            "win_rate_pct": 55.6,
-            "cumulative_pnl_pct": 26.8,
-            "risk_reward_ratio": "1:3.59",
-            "copy_count": 48,
+            "conditions_summary": "Giá cắt lên EMA 20 • RSI(14) 35 - 65 • GTGD 10 phiên ≥ 10 tỷ • Nhóm Ngân hàng",
+            "win_rate_pct": None,
+            "cumulative_pnl_pct": None,
+            "risk_reward_ratio": None,
+            "copy_count": None,
             "take_profit_pct": 0.30,
             "stop_loss_pct": 0.07,
             "trailing_stop_pct": 0.0,
@@ -2468,13 +2662,13 @@ def get_strategy_presets() -> list[dict[str, Any]]:
             "name": "Dò tín hiệu tăng sớm, xác nhận KLGD đột biến",
             "category": "Short-term T+",
             "description": "Chiến lược đánh nhanh thắng nhanh, tìm kiếm điểm nổ ngắn hạn khi giá mở cửa tăng kèm khối lượng tăng vọt trên 30% so với TB 10 phiên.",
-            "target_symbols": ["VN30", "HPG", "VIX", "SSI"],
+            "target_symbols": ["VN30", "HPG", "SSI", "STB"],
             "default_symbol": "HPG",
             "conditions_summary": "%KLGD đột biến 10 phiên ≥ 30% • Giá mở cửa T0 > Giá mở cửa T-1",
-            "win_rate_pct": 75.0,
-            "cumulative_pnl_pct": 15.1,
-            "risk_reward_ratio": "1:24.49",
-            "copy_count": 44,
+            "win_rate_pct": None,
+            "cumulative_pnl_pct": None,
+            "risk_reward_ratio": None,
+            "copy_count": None,
             "take_profit_pct": 0.07,
             "stop_loss_pct": 0.07,
             "trailing_stop_pct": 0.0,
@@ -2489,10 +2683,10 @@ def get_strategy_presets() -> list[dict[str, Any]]:
             "target_symbols": ["VN30", "VIC", "VHM", "MSN"],
             "default_symbol": "VIC",
             "conditions_summary": "ADX(14): 0 - 20 • Giá cắt lên dải trên Bollinger Bands",
-            "win_rate_pct": 50.7,
-            "cumulative_pnl_pct": 146.2,
-            "risk_reward_ratio": "1:2.76",
-            "copy_count": 30,
+            "win_rate_pct": None,
+            "cumulative_pnl_pct": None,
+            "risk_reward_ratio": None,
+            "copy_count": None,
             "take_profit_pct": 0.07,
             "stop_loss_pct": 0.07,
             "trailing_stop_pct": 0.0,
@@ -2507,10 +2701,10 @@ def get_strategy_presets() -> list[dict[str, Any]]:
             "target_symbols": ["VN30", "VIC", "VNM", "GAS"],
             "default_symbol": "VIC",
             "conditions_summary": "Giá cắt lên EMA 200 • Thoát đáy giảm trung dài hạn",
-            "win_rate_pct": 75.0,
-            "cumulative_pnl_pct": 78.0,
-            "risk_reward_ratio": "1:2.25",
-            "copy_count": 253,
+            "win_rate_pct": None,
+            "cumulative_pnl_pct": None,
+            "risk_reward_ratio": None,
+            "copy_count": None,
             "take_profit_pct": 0.20,
             "stop_loss_pct": 0.15,
             "trailing_stop_pct": 0.07,
@@ -2521,69 +2715,5 @@ def get_strategy_presets() -> list[dict[str, Any]]:
 
 
 def get_recent_strategy_signals() -> list[dict[str, Any]]:
-    """
-    Trả về danh sách tín hiệu Mua/Bán mới nhất (Near-realtime Signals)
-    phục vụ bảng tín hiệu bên phải theo phong cách giao diện DNSE.
-    """
-    return [
-        {
-            "signal_id": "sig_01",
-            "symbol": "HPG",
-            "action": "BUY",
-            "strategy_name": "Thuận xu hướng (Break out EMA 20)",
-            "price": 27400,
-            "target_price": 30100,
-            "stop_price": 25480,
-            "confidence": 88.5,
-            "timestamp": "Hôm nay 14:15",
-            "status": "MỚI",
-        },
-        {
-            "signal_id": "sig_02",
-            "symbol": "FPT",
-            "action": "BUY",
-            "strategy_name": "Xu hướng tăng mạnh kèm KLGD đột biến",
-            "price": 134200,
-            "target_price": 161000,
-            "stop_price": 124800,
-            "confidence": 92.1,
-            "timestamp": "Hôm nay 11:30",
-            "status": "MỚI",
-        },
-        {
-            "signal_id": "sig_03",
-            "symbol": "VNM",
-            "action": "SELL",
-            "strategy_name": "Chốt lời Take Profit (+20%)",
-            "price": 68500,
-            "target_price": 68500,
-            "stop_price": 63700,
-            "confidence": 84.0,
-            "timestamp": "Hôm nay 10:45",
-            "status": "CHỐT LÃI",
-        },
-        {
-            "signal_id": "sig_04",
-            "symbol": "MWG",
-            "action": "BUY",
-            "strategy_name": "CP tăng trưởng (Mini-Canslim)",
-            "price": 64800,
-            "target_price": 77700,
-            "stop_price": 60200,
-            "confidence": 86.7,
-            "timestamp": "Hôm qua",
-            "status": "ĐÃ KHỚP T+2",
-        },
-        {
-            "signal_id": "sig_05",
-            "symbol": "VIC",
-            "action": "HOLD",
-            "strategy_name": "Cổ phiếu chuyển từ sideway sang breakout",
-            "price": 42100,
-            "target_price": 45000,
-            "stop_price": 39150,
-            "confidence": 79.2,
-            "timestamp": "Hôm qua",
-            "status": "ĐANG NẮM GIỮ",
-        },
-    ]
+    """No persisted, timestamped signal feed is wired here yet; never invent live signals."""
+    return []

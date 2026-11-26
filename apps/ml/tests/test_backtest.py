@@ -48,6 +48,49 @@ def _create_sample_market_df(n_bars: int = 10, start_price: float = 100.0) -> pd
     })
 
 
+@pytest.fixture
+def isolated_backtest_market(monkeypatch):
+    """Synthetic OHLCV + explicit mock inference; no production artifacts or downloads."""
+    import torch
+    from types import SimpleNamespace
+    from sklearn.preprocessing import StandardScaler
+    from vn_stock.features import compute_features_per_symbol, FEATURE_COLS
+
+    dates = pd.bdate_range("2023-01-02", periods=450)
+    prices = 50 + np.arange(len(dates)) * 0.02 + np.sin(np.arange(len(dates)) / 5)
+    frame = pd.DataFrame({"Date": dates, "Symbol": "VIC", "Open": prices,
+                          "High": prices + 1, "Low": prices - 1, "Close": prices,
+                          "Volume": 1000000, "VNINDEX_Return_1d": 0.001})
+    features = compute_features_per_symbol(frame, drop_na=True)
+    scaler = StandardScaler().fit(features[FEATURE_COLS])
+
+    class MockLSTM(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.anchor = torch.nn.Parameter(torch.zeros(1), requires_grad=False)
+
+        def predict_proba(self, rows):
+            return torch.tensor([0.1, 0.1, 0.8], device=rows.device).repeat(len(rows), 1)
+
+    def load_market(symbol):
+        result = frame.copy()
+        result["Symbol"] = symbol
+        return result
+
+    def load_model(model_type, **kwargs):
+        if model_type == "lstm":
+            return MockLSTM(), scaler, {"seq_length": 20, "artifact_generation": "fixture"}
+        return SimpleNamespace(predict=lambda rows: np.tile([0.1, 0.1, 0.8], (len(rows), 1))), scaler, {"artifact_generation": "fixture"}
+
+    def forbid_fetch(*args, **kwargs):
+        pytest.fail("Isolated backtest attempted external data access")
+
+    monkeypatch.setattr("vn_stock.data_ingestion.load_local_data", load_market)
+    monkeypatch.setattr("vn_stock.data_ingestion.fetch_stock_data", forbid_fetch)
+    monkeypatch.setattr("vn_stock.data_ingestion.fetch_daily_index", forbid_fetch)
+    monkeypatch.setattr("vn_stock.modeling.predict.load_prediction_snapshot", load_model)
+
+
 def test_run_simple_backtest_backward_compatibility():
     """Kiểm tra tương thích ngược của run_simple_backtest với mã cũ."""
     prices = np.array([20.0, 21.0, 22.0, 23.0, 24.0, 25.0])
@@ -246,7 +289,9 @@ def test_run_monte_carlo_random_baseline():
     assert "mdd_stats" in mc_res
     assert "ai_comparison" in mc_res
     assert "p_value_sharpe" in mc_res["ai_comparison"]
-    assert 0.0 <= mc_res["ai_comparison"]["p_value_sharpe"] <= 1.0
+    # Some random strategies never trade: a Sharpe p-value must not drop those draws.
+    assert mc_res["sharpe_stats"]["undefined_count"] > 0
+    assert mc_res["ai_comparison"]["p_value_sharpe"] is None
 
 
 def test_backtest_result_to_dict():
@@ -298,16 +343,25 @@ def test_dnse_risk_management_stop_loss():
 def test_dnse_presets_and_signals():
     """Kiểm tra hàm get_strategy_presets và get_recent_strategy_signals."""
     from vn_stock.backtest import get_strategy_presets, get_recent_strategy_signals
+    from vn_stock.config import VN30_SYMBOLS
 
     presets = get_strategy_presets()
     assert len(presets) == 8
     assert presets[0]["id"] == "preset_ema20_breakout"
     assert "win_rate_pct" in presets[0]
     assert "take_profit_pct" in presets[0]
+    for preset in presets:
+        summary = preset["conditions_summary"]
+        for unsupported in ("P/E", "P/B", "ROE", "EPS", "Vốn hóa", "Khối ngoại"):
+            assert unsupported not in summary, f"Preset {preset['id']} references unavailable data: {unsupported}"
+        assert "VN100" not in preset["target_symbols"]
+        assert "DGC" not in preset["target_symbols"]
+        assert preset["default_symbol"] in VN30_SYMBOLS
+        for sym in preset["target_symbols"]:
+            assert sym == "VN30" or sym in VN30_SYMBOLS, f"Preset {preset['id']} has non-VN30 symbol {sym}"
 
     signals = get_recent_strategy_signals()
-    assert len(signals) >= 3
-    assert signals[0]["action"] in ["BUY", "SELL", "HOLD"]
+    assert signals == []  # No real timestamped feed is connected.
 
 
 def test_evaluate_strategy_signals():
@@ -371,7 +425,7 @@ def test_evaluate_strategy_signals_and_or_logic():
     assert any(s == 2 for s in signals_or)
 
 
-def test_run_portfolio_backtest():
+def test_run_portfolio_backtest(isolated_backtest_market):
     """Kiểm tra chạy Backtest danh mục đa mã và các chỉ số Deal thực chiến (Max Gain, Max Loss, R:R)."""
     from vn_stock.backtest import run_portfolio_backtest
 
@@ -560,6 +614,10 @@ def test_evaluate_strategy_signals_comprehensive_indicators():
         "use_bb": True,
         "bb_operator": "Nằm trên",
     }
+    # Explicit historical observations replace present-day metadata used by the old fixture.
+    df_prepared["pb"] = 1.5
+    df_prepared["market_cap"] = 20000.0
+    df_prepared["Fundamental_Available_At"] = df_prepared["Date"]
     signals = evaluate_strategy_signals(
         df_prepared,
         buy_rules=buy_rules_all,
@@ -584,11 +642,7 @@ def test_get_strategy_presets_and_recent_signals():
 
     signals = get_recent_strategy_signals()
     assert isinstance(signals, list)
-    assert len(signals) >= 5
-    first_sig = signals[0]
-    assert "symbol" in first_sig
-    assert "action" in first_sig
-    assert "strategy_name" in first_sig
+    assert signals == []  # Do not validate fabricated near-realtime samples.
 
 
 def test_calculate_financial_metrics_edge_cases():
@@ -601,13 +655,13 @@ def test_calculate_financial_metrics_edge_cases():
         initial_capital=100.0,
     )
     assert m_flat.total_return_pct == 0.0
-    assert m_flat.sharpe_ratio == 0.0
+    assert m_flat.sharpe_ratio is None
     # Khi vốn đứng yên, lợi suất thấp hơn lãi suất phi rủi ro rf_daily -> Sortino < 0 (-sqrt(252))
     assert m_flat.sortino_ratio < 0.0
     assert m_flat.max_drawdown_pct == 0.0
     assert m_flat.total_trades == 0
-    assert m_flat.win_rate_pct == 0.0
-    assert m_flat.profit_factor == 0.0
+    assert m_flat.win_rate_pct is None
+    assert m_flat.profit_factor is None
 
     # 2. Toàn bộ lệnh đều lỗ
     trades_loss = [
@@ -1084,7 +1138,7 @@ def test_calculate_financial_metrics_var_and_cvar():
 
 
 def test_calculate_financial_metrics_profit_factor_pure_win():
-    """Kiểm tra khi toàn bộ lệnh đều có lãi (gross_loss = 0) thì profit_factor = 999.0."""
+    """Kiểm tra khi toàn bộ lệnh đều có lãi (gross_loss = 0) thì profit_factor không có giá trị hữu hạn (null)."""
     trade_win = TradeRecord(
         trade_id=1,
         symbol="VIC",
@@ -1108,7 +1162,7 @@ def test_calculate_financial_metrics_profit_factor_pure_win():
     assert metrics.winning_trades == 1
     assert metrics.losing_trades == 0
     assert metrics.win_rate_pct == 100.0
-    assert metrics.profit_factor == 999.0
+    assert metrics.profit_factor is None
 
 
 def test_run_random_baseline_deterministic_seed():
@@ -1330,7 +1384,7 @@ def test_evaluate_strategy_signals_ai_and_technical_combination():
     assert sig_sell_and[4] != 0
 
 
-def test_portfolio_backtest_with_lstm_model():
+def test_portfolio_backtest_with_lstm_model(isolated_backtest_market):
     """Kiểm tra run_portfolio_backtest hỗ trợ mượt mà khi model_type='lstm'."""
     from vn_stock.backtest import run_portfolio_backtest
 
@@ -1351,7 +1405,7 @@ def test_portfolio_backtest_with_lstm_model():
     assert len(res["portfolio_equity_curve"]) > 0
 
 
-def test_portfolio_backtest_with_lstm_multi_symbol():
+def test_portfolio_backtest_with_lstm_multi_symbol(isolated_backtest_market):
     """Kiểm tra run_portfolio_backtest với LSTM trên nhiều mã VN30 (VIC, HPG, FPT)."""
     from vn_stock.backtest import run_portfolio_backtest
 
@@ -1375,7 +1429,7 @@ def test_portfolio_backtest_with_lstm_multi_symbol():
     assert len(res["portfolio_equity_curve"]) > 0
 
 
-def test_portfolio_backtest_lstm_with_combination_rules():
+def test_portfolio_backtest_lstm_with_combination_rules(isolated_backtest_market):
     """Kiểm tra chiến lược kết hợp (Phương án B): Tín hiệu AI LSTM và Bộ lọc kỹ thuật RSI."""
     from vn_stock.backtest import run_portfolio_backtest
 

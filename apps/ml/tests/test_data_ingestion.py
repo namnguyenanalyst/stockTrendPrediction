@@ -278,19 +278,51 @@ def test_validate_downloaded_data_all_error_paths():
 
 
 def test_atomic_save_parquet(tmp_path):
-    """Kiểm tra hàm _atomic_save_parquet ghi file nguyên tử và ghi đè an toàn."""
+    """Kiểm tra hàm _atomic_save_parquet ghi file nguyên tử bằng os.replace và ghi đè an toàn."""
     from vn_stock.data_ingestion import _atomic_save_parquet
 
     target_file = tmp_path / "test_stock.parquet"
     df1 = pd.DataFrame({"Date": pd.to_datetime(["2024-01-02"]), "Close": [10.0]})
-    _atomic_save_parquet(df1, target_file)
+    with patch("vn_stock.data_ingestion.os.replace", wraps=__import__("os").replace) as mock_replace:
+        _atomic_save_parquet(df1, target_file)
+        assert mock_replace.call_count == 1
     assert target_file.exists()
     assert len(pd.read_parquet(target_file)) == 1
+    assert not list(tmp_path.glob(".*.tmp"))
 
     # Ghi đè an toàn
     df2 = pd.DataFrame({"Date": pd.to_datetime(["2024-01-02", "2024-01-03"]), "Close": [10.0, 11.0]})
     _atomic_save_parquet(df2, target_file)
     assert len(pd.read_parquet(target_file)) == 2
+
+
+def test_build_panel_uses_atomic_os_replace_per_partition(tmp_path):
+    """Đảm bảo tầng trung gian (interim panel) cũng dùng chung _atomic_save_parquet + os.replace."""
+    df_vic = pd.DataFrame({
+        "Date": pd.to_datetime(["2024-01-02", "2024-01-03"]),
+        "Symbol": ["VIC", "VIC"],
+        "Open": [40.0, 41.0],
+        "High": [41.0, 42.0],
+        "Low": [39.5, 40.5],
+        "Close": [40.5, 41.5],
+        "Volume": [100000, 120000],
+    })
+    df_vni = pd.DataFrame({
+        "Date": pd.to_datetime(["2024-01-02", "2024-01-03"]),
+        "VNINDEX_Close": [1130.0, 1140.0],
+        "VNINDEX_Return_1d": [0.01, 0.0088],
+    })
+    panel_dir = tmp_path / "panel"
+    with (
+        patch("vn_stock.data_ingestion.fetch_stock_data", return_value=df_vic),
+        patch("vn_stock.data_ingestion.fetch_daily_index", return_value=df_vni),
+        patch("vn_stock.data_ingestion.PANEL_DATA_DIR", panel_dir),
+        patch("vn_stock.data_ingestion.os.replace", wraps=__import__("os").replace) as mock_replace,
+    ):
+        build_panel_dataset(symbols=["VIC"], start_date="2024-01-02", end_date="2024-01-03", save_to_interim=True)
+        assert mock_replace.call_count >= 1
+    assert (panel_dir / "Symbol=VIC" / "part-0.parquet").exists()
+    assert not list((panel_dir / "Symbol=VIC").glob(".*.tmp"))
 
 
 def test_sync_latest_market_data():

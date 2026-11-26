@@ -18,9 +18,11 @@ def test_monte_carlo_does_not_reset_callers_random_generator():
     np.testing.assert_array_equal(np.random.random(3), expected)
 
 
-def test_zero_exceedances_never_report_zero_p_value():
+def test_zero_exceedances_never_report_zero_p_value(monkeypatch):
     from types import SimpleNamespace
     ai = SimpleNamespace(metrics=SimpleNamespace(total_return_pct=1e6, sharpe_ratio=1e6))
+    monkeypatch.setattr("vn_stock.backtest.run_backtest", lambda **kwargs: SimpleNamespace(
+        metrics=SimpleNamespace(total_return_pct=0, sharpe_ratio=0, max_drawdown_pct=0)))
     result = run_monte_carlo_random_test(frame(), n_simulations=9, ai_result=ai)
     assert result["ai_comparison"]["p_value_sharpe"] == 0.1
     assert len(result["simulations"]) == 9
