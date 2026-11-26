@@ -1,5 +1,7 @@
 "use client";
 
+import { formatBacktestMetric } from "@/lib/backtestPresentation";
+
 import React, { useState } from "react";
 import { ArrowUpDown, ChevronRight, Eye } from "lucide-react";
 import { SymbolBreakdownItem } from "@/lib/types";
@@ -160,13 +162,13 @@ export const PortfolioBreakdownTable: React.FC<PortfolioBreakdownTableProps> = (
                     {item.excess_pct.toFixed(2)}%
                   </td>
                   <td className="px-3 py-2.5 text-right text-slate-300 hidden sm:table-cell">
-                    {item.sharpe.toFixed(2)}
+                    {formatBacktestMetric(item.sharpe)}
                   </td>
                   <td className="px-3 py-2.5 text-right text-rose-400 hidden sm:table-cell">
                     -{Math.abs(item.mdd_pct).toFixed(2)}%
                   </td>
                   <td className="px-3 py-2.5 text-right text-slate-200">
-                    {item.win_rate_pct.toFixed(1)}%
+                    {formatBacktestMetric(item.win_rate_pct, 1, "%")}
                   </td>
                   <td className="px-3 py-2.5 text-right text-slate-400">{item.trades}</td>
                   <td className="px-2 py-2.5 text-center text-slate-500">

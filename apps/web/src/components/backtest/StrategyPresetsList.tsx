@@ -26,7 +26,7 @@ export const StrategyPresetsList: React.FC<StrategyPresetsListProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-base font-bold text-slate-100 sm:text-lg">
-                Danh sách 8 chiến lược mẫu của DNSE Entrade X
+                Danh sách 8 mẫu chiến lược khởi tạo
               </h3>
             </div>
             <p className="text-xs text-slate-400">
@@ -127,7 +127,7 @@ export const StrategyPresetsList: React.FC<StrategyPresetsListProps> = ({
                   className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-500/10 py-2 text-xs font-bold text-emerald-400 border border-emerald-500/30 transition-all hover:bg-emerald-500 hover:text-slate-950 active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   <TrendingUp className="h-3.5 w-3.5" />
-                  <span>Nạp vào Phòng Lab &amp; Kiểm thử</span>
+                  <span>Nạp vào Phòng giả lập chiến lược</span>
                 </button>
               </div>
             </div>

@@ -788,8 +788,9 @@ describe("Strategy Storage & Laboratory Logic (strategyStorage.ts)", () => {
       // Assert
       expect(config.scope_type).toBe("sector");
       expect(config.sector_name).toBe("Ngân hàng");
-      expect(config.buy_conditions.use_pe).toBe(true);
-      expect(config.buy_conditions.max_pe).toBe(16);
+      expect(config.buy_conditions.use_macd).toBe(true);
+      expect(config.buy_conditions.use_rsi).toBe(true);
+      expect(config.buy_conditions.rsi_max).toBe(70);
     });
 
     it("should map preset with target_symbols > 1 to portfolio scope", () => {
@@ -830,7 +831,7 @@ describe("Strategy Storage & Laboratory Logic (strategyStorage.ts)", () => {
       expect(config.buy_conditions.rsi_threshold).toBe(70);
     });
 
-    it("should configure buy conditions for dnse-04 (Giá trị tăng trưởng ROE/EPS)", () => {
+    it("should configure buy conditions for dnse-04 (Sức mạnh giá RS & Thanh khoản OHLCV)", () => {
       // Arrange
       const preset: StrategyPresetItem = {
         ...basePreset,
@@ -842,13 +843,14 @@ describe("Strategy Storage & Laboratory Logic (strategyStorage.ts)", () => {
       const config = mapPresetToStrategyConfig(preset);
 
       // Assert
-      expect(config.buy_conditions.use_market_cap).toBe(true);
-      expect(config.buy_conditions.min_market_cap).toBe(2000);
-      expect(config.buy_conditions.min_roe).toBe(5.0);
-      expect(config.buy_conditions.growth_eps).toBe(true);
+      expect(config.buy_conditions.use_rs).toBe(true);
+      expect(config.buy_conditions.min_rs).toBe(70);
+      expect(config.buy_conditions.use_price_cross).toBe(true);
+      expect(config.buy_conditions.price_cross_target).toBe("MA 50");
+      expect(config.buy_conditions.min_avg_trading_val).toBe(10);
     });
 
-    it("should configure buy conditions for dnse-05 (Định giá rẻ PB)", () => {
+    it("should configure buy conditions for dnse-05 (Ngân hàng hồi phục EMA 20 & GTGD 10 tỷ)", () => {
       // Arrange
       const preset: StrategyPresetItem = {
         ...basePreset,
@@ -860,8 +862,9 @@ describe("Strategy Storage & Laboratory Logic (strategyStorage.ts)", () => {
       const config = mapPresetToStrategyConfig(preset);
 
       // Assert
-      expect(config.buy_conditions.use_pb).toBe(true);
-      expect(config.buy_conditions.max_pb).toBe(1.0);
+      expect(config.buy_conditions.use_price_cross).toBe(true);
+      expect(config.buy_conditions.price_cross_target).toBe("EMA 20");
+      expect(config.buy_conditions.use_rsi).toBe(true);
       expect(config.buy_conditions.min_avg_trading_val).toBe(10);
     });
 
@@ -909,7 +912,9 @@ describe("Strategy Storage & Laboratory Logic (strategyStorage.ts)", () => {
             expect(c.buy_conditions.price_cross_operator).toBe("Cắt lên");
             expect(c.buy_conditions.use_volume_spike).toBe(true);
             expect(c.buy_conditions.min_vol_spike_pct).toBe(50);
-            expect(c.buy_conditions.foreign_net_buy).toBe(true);
+            expect(c.buy_conditions.use_avg_trading_val).toBe(true);
+            expect(c.buy_conditions.min_avg_trading_val).toBe(10);
+            expect(c.buy_conditions.foreign_net_buy).toBeUndefined();
           },
         },
         {
@@ -926,40 +931,51 @@ describe("Strategy Storage & Laboratory Logic (strategyStorage.ts)", () => {
         },
         {
           id: "preset_fair_val_flow",
-          name: "Định giá hợp lý & Dòng tiền xác nhận xu hướng",
+          name: "Xác nhận xu hướng MACD & Động lượng giá",
           verify: (c) => {
-            expect(c.buy_conditions.use_pe).toBe(true);
-            expect(c.buy_conditions.min_pe).toBe(12);
-            expect(c.buy_conditions.max_pe).toBe(16);
+            expect(c.buy_conditions.use_macd).toBe(true);
+            expect(c.buy_conditions.macd_operator).toBe("Cắt lên");
             expect(c.buy_conditions.use_price_increase).toBe(true);
             expect(c.buy_conditions.price_t0_field).toBe("Giá mở cửa T0");
             expect(c.buy_conditions.price_t1_field).toBe("Giá mở cửa T-1");
-            expect(c.buy_conditions.foreign_net_buy).toBe(true);
+            expect(c.buy_conditions.use_rsi).toBe(true);
+            expect(c.buy_conditions.rsi_min).toBe(45);
+            expect(c.buy_conditions.rsi_max).toBe(70);
+            expect(c.buy_conditions.use_pe).toBeUndefined();
+            expect(c.buy_conditions.foreign_net_buy).toBeUndefined();
           },
         },
         {
           id: "preset_semi_canslim",
-          name: "CP tăng trưởng, định giá hợp lý (Mini-Canslim)",
+          name: "Cổ phiếu dẫn dắt động lượng & Thanh khoản (RS)",
           verify: (c) => {
-            expect(c.buy_conditions.use_market_cap).toBe(true);
-            expect(c.buy_conditions.min_market_cap).toBe(2000);
+            expect(c.buy_conditions.use_rs).toBe(true);
+            expect(c.buy_conditions.min_rs).toBe(70);
+            expect(c.buy_conditions.use_price_cross).toBe(true);
+            expect(c.buy_conditions.price_cross_operator).toBe("Nằm trên");
+            expect(c.buy_conditions.price_cross_target).toBe("MA 50");
             expect(c.buy_conditions.use_avg_trading_val).toBe(true);
             expect(c.buy_conditions.min_avg_trading_val).toBe(10);
-            expect(c.buy_conditions.use_roe).toBe(true);
-            expect(c.buy_conditions.min_roe).toBe(5.0);
-            expect(c.buy_conditions.growth_eps).toBe(true);
-            expect(c.buy_conditions.min_growth_eps).toBe(15.0);
+            expect(c.buy_conditions.use_rsi).toBe(true);
+            expect(c.buy_conditions.rsi_min).toBe(50);
+            expect(c.buy_conditions.rsi_max).toBe(80);
+            expect(c.buy_conditions.use_roe).toBeUndefined();
+            expect(c.buy_conditions.growth_eps).toBeUndefined();
           },
         },
         {
           id: "preset_cheap_bank",
-          name: "Định giá ngân hàng rẻ (P/B < 1) & GTGD 10 tỷ",
+          name: "Nhóm Ngân hàng hồi phục kỹ thuật & GTGD 10 tỷ",
           verify: (c) => {
-            expect(c.buy_conditions.use_pb).toBe(true);
-            expect(c.buy_conditions.min_pb).toBe(0.0);
-            expect(c.buy_conditions.max_pb).toBe(1.0);
+            expect(c.buy_conditions.use_price_cross).toBe(true);
+            expect(c.buy_conditions.price_cross_operator).toBe("Cắt lên");
+            expect(c.buy_conditions.price_cross_target).toBe("EMA 20");
+            expect(c.buy_conditions.use_rsi).toBe(true);
+            expect(c.buy_conditions.rsi_min).toBe(35);
+            expect(c.buy_conditions.rsi_max).toBe(65);
             expect(c.buy_conditions.use_avg_trading_val).toBe(true);
             expect(c.buy_conditions.min_avg_trading_val).toBe(10);
+            expect(c.buy_conditions.use_pb).toBeUndefined();
           },
         },
         {

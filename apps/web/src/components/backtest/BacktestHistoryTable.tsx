@@ -1,5 +1,8 @@
 "use client";
 
+import { formatBacktestMetric } from "@/lib/backtestPresentation";
+import { formatIsoDateTimeVi } from "@/lib/predictionPresentation";
+
 import React, { useState } from "react";
 import {
   ArrowDownRight,
@@ -207,7 +210,7 @@ export const BacktestHistoryTable: React.FC<BacktestHistoryTableProps> = ({
               <span className="text-slate-400">
                 Sharpe:{" "}
                 <strong className="text-slate-200">
-                  {activePreview.sharpe_ratio.toFixed(2)}
+                  {formatBacktestMetric(activePreview.sharpe_ratio)}
                 </strong>
               </span>
               <span className="text-slate-400">
@@ -248,7 +251,7 @@ export const BacktestHistoryTable: React.FC<BacktestHistoryTableProps> = ({
             Sổ nhật ký kiểm thử đang trống
           </p>
           <p className="mt-1 text-slate-500 max-w-md mx-auto text-[11px]">
-            Khi bạn chạy kiểm thử chiến lược tại Phòng Lab, hệ thống sẽ tự động ghi nhận
+            Khi bạn chạy kiểm thử chiến lược tại Phòng giả lập chiến lược, hệ thống sẽ tự động ghi nhận
             kết quả và đường cong vốn vào đây để bạn tiện theo dõi và so sánh hiệu quả qua các lần thử nghiệm.
           </p>
         </div>
@@ -297,14 +300,8 @@ export const BacktestHistoryTable: React.FC<BacktestHistoryTableProps> = ({
                 const isChecked = selectedIds.has(item.id);
                 const isUp = item.total_return >= 0;
                 const dateStr = item.executed_at
-                  ? new Date(item.executed_at).toLocaleString("vi-VN", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  : "N/A";
+                  ? formatIsoDateTimeVi(item.executed_at, false)
+                  : "—";
 
                 return (
                   <tr
@@ -385,7 +382,7 @@ export const BacktestHistoryTable: React.FC<BacktestHistoryTableProps> = ({
                     </td>
 
                     <td className="px-3 py-2.5 text-right font-mono text-slate-200">
-                      {item.sharpe_ratio.toFixed(2)}
+                      {formatBacktestMetric(item.sharpe_ratio)}
                     </td>
 
                     <td className="px-3 py-2.5 text-right font-mono text-rose-400">
@@ -393,7 +390,7 @@ export const BacktestHistoryTable: React.FC<BacktestHistoryTableProps> = ({
                     </td>
 
                     <td className="px-3 py-2.5 text-right font-mono text-slate-200">
-                      {item.win_rate.toFixed(2)}%
+                      {formatBacktestMetric(item.win_rate, 2, "%")}
                     </td>
 
                     <td className="py-2.5 pl-2 pr-4 text-center">

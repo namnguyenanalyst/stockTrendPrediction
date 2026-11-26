@@ -222,30 +222,30 @@ export interface BacktestMetricsSchema {
   initial_capital: number;
   final_equity: number;
   total_return_pct: number;
-  cagr_pct: number;
+  cagr_pct: number | null;
   buy_and_hold_return_pct: number;
   excess_return_pct: number;
-  annualized_volatility_pct: number;
-  sharpe_ratio: number;
-  sortino_ratio: number;
+  annualized_volatility_pct: number | null;
+  sharpe_ratio: number | null;
+  sortino_ratio: number | null;
   max_drawdown_pct: number;
-  calmar_ratio: number;
-  var_95_pct: number;
-  cvar_95_pct: number;
-  win_rate_pct: number;
-  profit_factor: number;
+  calmar_ratio: number | null;
+  var_95_pct: number | null;
+  cvar_95_pct: number | null;
+  win_rate_pct: number | null;
+  profit_factor: number | null;
   total_trades: number;
   winning_trades: number;
   losing_trades: number;
-  avg_trade_return_pct: number;
-  avg_holding_days: number;
+  avg_trade_return_pct: number | null;
+  avg_holding_days: number | null;
   total_fees_paid: number;
   total_taxes_paid: number;
   total_costs: number;
   cost_impact_pct: number;
-  max_gain_pct?: number;
-  max_loss_pct?: number;
-  reward_risk_ratio?: string | number;
+  max_gain_pct?: number | null;
+  max_loss_pct?: number | null;
+  reward_risk_ratio?: string | number | null;
 }
 
 export interface EquityCurvePoint {
@@ -286,11 +286,11 @@ export interface BacktestSummaryItem {
   roi_pct: number;
   bh_roi_pct: number;
   excess_pct: number;
-  sharpe: number;
-  sortino: number;
+  sharpe: number | null;
+  sortino: number | null;
   mdd_pct: number;
-  win_rate_pct: number;
-  profit_factor: number;
+  win_rate_pct: number | null;
+  profit_factor: number | null;
   trades: number;
   costs: number;
 }
@@ -308,10 +308,10 @@ export interface StrategyPresetItem {
   target_symbols: string[];
   default_symbol: string;
   conditions_summary: string;
-  win_rate_pct: number;
-  cumulative_pnl_pct: number;
-  risk_reward_ratio: string;
-  copy_count: number;
+  win_rate_pct: number | null;
+  cumulative_pnl_pct: number | null;
+  risk_reward_ratio: string | null;
+  copy_count: number | null;
   take_profit_pct: number;
   stop_loss_pct: number;
   trailing_stop_pct: number;
@@ -501,16 +501,17 @@ export interface SymbolBreakdownItem {
   roi_pct: number;
   bh_roi_pct: number;
   excess_pct: number;
-  sharpe: number;
-  sortino: number;
+  sharpe: number | null;
+  sortino: number | null;
   mdd_pct: number;
-  win_rate_pct: number;
-  profit_factor: number;
+  win_rate_pct: number | null;
+  profit_factor: number | null;
   trades: number;
   costs: number;
 }
 
 export interface PortfolioBacktestResponse {
+  config?: Record<string, unknown>;
   scope_type: BacktestScopeType;
   scope_target: string;
   start_date: string;
@@ -555,13 +556,13 @@ export interface SavedStrategyItem {
     roi_pct: number;
     bh_roi_pct: number;
     excess_pct: number;
-    sharpe: number;
+    sharpe: number | null;
     mdd_pct: number;
-    win_rate_pct: number;
+    win_rate_pct: number | null;
     trades: number;
-    max_gain_pct?: number;
-    max_loss_pct?: number;
-    reward_risk_ratio?: string | number;
+    max_gain_pct?: number | null;
+    max_loss_pct?: number | null;
+    reward_risk_ratio?: string | number | null;
   };
 }
 
@@ -624,6 +625,7 @@ export interface UserStrategyPreset {
 }
 
 export interface BacktestHistoryCreateRequest {
+  config?: Record<string, unknown>;
   symbol: string;
   strategy_name: string;
   strategy_type: string;
@@ -631,13 +633,14 @@ export interface BacktestHistoryCreateRequest {
   end_date: string;
   initial_capital: number;
   total_return: number;
-  sharpe_ratio: number;
+  sharpe_ratio: number | null;
   max_drawdown: number;
-  win_rate: number;
+  win_rate: number | null;
   equity_curve: EquityCurvePoint[];
 }
 
 export interface UserBacktestHistory {
+  config?: Record<string, unknown>;
   id: string;
   user_id?: string;
   symbol: string;
@@ -647,9 +650,9 @@ export interface UserBacktestHistory {
   end_date: string;
   initial_capital: number;
   total_return: number;
-  sharpe_ratio: number;
+  sharpe_ratio: number | null;
   max_drawdown: number;
-  win_rate: number;
+  win_rate: number | null;
   equity_curve: EquityCurvePoint[];
   executed_at: string;
 }

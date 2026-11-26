@@ -11,13 +11,13 @@ export interface StrategyMetricsSummary {
   roi_pct: number;
   bh_roi_pct: number;
   excess_pct: number;
-  sharpe: number;
+  sharpe: number | null;
   mdd_pct: number;
-  win_rate_pct: number;
+  win_rate_pct: number | null;
   trades: number;
-  max_gain_pct?: number;
-  max_loss_pct?: number;
-  reward_risk_ratio?: string | number;
+  max_gain_pct?: number | null;
+  max_loss_pct?: number | null;
+  reward_risk_ratio?: string | number | null;
 }
 
 export interface SaveStrategyInput {
@@ -58,16 +58,20 @@ export function generateStrategyId(prefix = "strat"): string {
 }
 
 /**
- * Lấy chuỗi ngày giờ theo định dạng vi-VN
+ * Lấy chuỗi ngày giờ theo chuẩn HH:mm YYYY-MM-DD (UTC+7)
  */
 export function getCurrentDateTimeString(date = new Date()): string {
-  return date.toLocaleString("vi-VN", {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Ho_Chi_Minh",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
-  });
+    hour12: false,
+  }).formatToParts(date);
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${map.hour}:${map.minute} ${map.year}-${map.month}-${map.day}`;
 }
 
 /**
@@ -404,7 +408,7 @@ export function mapPresetToStrategyConfig(
   };
 
   switch (preset.id) {
-    // 1. Thuận xu hướng (Break out EMA 20): Giá cắt lên EMA 20 • %KLGD đột biến ≥ 50% • Khối ngoại mua ròng
+    // 1. Thuận xu hướng (Break out EMA 20): Giá cắt lên EMA 20 • %KLGD đột biến ≥ 50% • GTGD 10 phiên ≥ 10 tỷ
     case "preset_ema20_breakout":
     case "dnse-01":
       updatedBuy = {
@@ -415,7 +419,9 @@ export function mapPresetToStrategyConfig(
         use_volume_spike: true,
         vol_spike_period: 10,
         min_vol_spike_pct: 50,
-        foreign_net_buy: true,
+        use_avg_trading_val: true,
+        avg_trading_val_period: 10,
+        min_avg_trading_val: 10,
       };
       break;
 
@@ -435,47 +441,58 @@ export function mapPresetToStrategyConfig(
       };
       break;
 
-    // 3. Định giá hợp lý & Dòng tiền xác nhận: P/E: 12 - 16 • Giá mở cửa T0 > T-1 • Khối ngoại gom ròng
+    // 3. Xác nhận xu hướng MACD & Động lượng giá: MACD cắt lên tín hiệu • Giá mở cửa T0 > T-1 • RSI(14) 45 - 70
     case "preset_fair_val_flow":
     case "dnse-03":
       updatedBuy = {
         ...updatedBuy,
-        use_pe: true,
-        min_pe: 12,
-        max_pe: 16,
+        use_macd: true,
+        macd_operator: "Cắt lên",
+        macd_target: "Đường tín hiệu",
         use_price_increase: true,
         price_t0_field: "Giá mở cửa T0",
         price_t0_operator: ">",
         price_t1_field: "Giá mở cửa T-1",
-        foreign_net_buy: true,
+        use_rsi: true,
+        rsi_min: 45,
+        rsi_max: 70,
+        rsi_threshold: 70,
       };
       break;
 
-    // 4. CP tăng trưởng, định giá hợp lý (Mini-Canslim): Vốn hóa ≥ 2.000 tỷ • GTGD ≥ 10 tỷ • ROE trượt ≥ 5% • EPS tăng ≥ 15%
+    // 4. Cổ phiếu dẫn dắt động lượng & Thanh khoản (RS): RS ≥ 70 • Giá nằm trên MA 50 • GTGD 10 phiên ≥ 10 tỷ • RSI(14) 50 - 80
     case "preset_semi_canslim":
     case "dnse-04":
       updatedBuy = {
         ...updatedBuy,
-        use_market_cap: true,
-        min_market_cap: 2000,
+        use_rs: true,
+        min_rs: 70,
+        max_rs: 100,
+        use_price_cross: true,
+        price_cross_operator: "Nằm trên",
+        price_cross_target: "MA 50",
         use_avg_trading_val: true,
         avg_trading_val_period: 10,
         min_avg_trading_val: 10,
-        use_roe: true,
-        min_roe: 5.0,
-        growth_eps: true,
-        min_growth_eps: 15.0,
+        use_rsi: true,
+        rsi_min: 50,
+        rsi_max: 80,
+        rsi_threshold: 80,
       };
       break;
 
-    // 5. Định giá ngân hàng rẻ (P/B < 1) & GTGD 10 tỷ: P/B: 0.00 - 1.00 • GTGD 10 phiên ≥ 10 tỷ • Nhóm Ngân hàng
+    // 5. Nhóm Ngân hàng hồi phục kỹ thuật & GTGD 10 tỷ: Giá cắt lên EMA 20 • RSI(14) 35 - 65 • GTGD 10 phiên ≥ 10 tỷ • Nhóm Ngân hàng
     case "preset_cheap_bank":
     case "dnse-05":
       updatedBuy = {
         ...updatedBuy,
-        use_pb: true,
-        min_pb: 0.0,
-        max_pb: 1.0,
+        use_price_cross: true,
+        price_cross_operator: "Cắt lên",
+        price_cross_target: "EMA 20",
+        use_rsi: true,
+        rsi_min: 35,
+        rsi_max: 65,
+        rsi_threshold: 65,
         use_avg_trading_val: true,
         avg_trading_val_period: 10,
         min_avg_trading_val: 10,

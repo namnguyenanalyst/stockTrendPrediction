@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  formatBacktestMetric,
+  formatRewardRiskRatio,
+  formatSignedPercent,
+} from "@/lib/backtestPresentation";
+
 import React, { useState } from "react";
 import {
   Plus,
@@ -56,19 +62,17 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
           <button
             type="button"
             onClick={() => setFilterStatus("all")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-              filterStatus === "all"
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${filterStatus === "all"
                 ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/40"
                 : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200"
-            }`}
+              }`}
           >
             <span>Tất cả</span>
             <span
-              className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                filterStatus === "all"
+              className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${filterStatus === "all"
                   ? "bg-emerald-500 text-slate-950"
                   : "bg-slate-700 text-slate-300"
-              }`}
+                }`}
             >
               {allCount}
             </span>
@@ -78,19 +82,17 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
           <button
             type="button"
             onClick={() => setFilterStatus("active")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-              filterStatus === "active"
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${filterStatus === "active"
                 ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/40"
                 : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200"
-            }`}
+              }`}
           >
             <span>Triển khai</span>
             <span
-              className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                filterStatus === "active"
+              className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${filterStatus === "active"
                   ? "bg-emerald-500 text-slate-950"
                   : "bg-slate-700 text-slate-300"
-              }`}
+                }`}
             >
               {activeCount}
             </span>
@@ -100,19 +102,17 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
           <button
             type="button"
             onClick={() => setFilterStatus("draft")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-              filterStatus === "draft"
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${filterStatus === "draft"
                 ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/40"
                 : "bg-slate-800 text-slate-400 border border-slate-700 hover:text-slate-200"
-            }`}
+              }`}
           >
             <span>Chưa triển khai</span>
             <span
-              className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                filterStatus === "draft"
+              className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${filterStatus === "draft"
                   ? "bg-emerald-500 text-slate-950"
                   : "bg-slate-700 text-slate-300"
-              }`}
+                }`}
             >
               {draftCount}
             </span>
@@ -138,11 +138,10 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
             <button
               type="button"
               onClick={() => setViewMode("grid")}
-              className={`rounded p-1 transition-colors ${
-                viewMode === "grid"
+              className={`rounded p-1 transition-colors ${viewMode === "grid"
                   ? "bg-slate-800 text-emerald-400"
                   : "text-slate-400 hover:text-slate-200"
-              }`}
+                }`}
               title="Xem dạng Lưới"
             >
               <LayoutGrid className="h-4 w-4" />
@@ -150,11 +149,10 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
             <button
               type="button"
               onClick={() => setViewMode("table")}
-              className={`rounded p-1 transition-colors ${
-                viewMode === "table"
+              className={`rounded p-1 transition-colors ${viewMode === "table"
                   ? "bg-slate-800 text-emerald-400"
                   : "text-slate-400 hover:text-slate-200"
-              }`}
+                }`}
               title="Xem dạng Bảng"
             >
               <List className="h-4 w-4" />
@@ -168,7 +166,7 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
             className="flex items-center gap-1.5 rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-emerald-400 transition-colors cursor-pointer"
           >
             <Plus className="h-4 w-4" />
-            <span>Tạo chiến thuật</span>
+            <span>Tạo chiến lược</span>
           </button>
         </div>
       </div>
@@ -186,10 +184,10 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
             {searchQuery
               ? "Không tìm thấy chiến lược phù hợp với từ khóa"
               : filterStatus === "active"
-              ? "Chưa có chiến lược nào đang được triển khai"
-              : filterStatus === "draft"
-              ? "Chưa có chiến lược nháp nào trong danh sách"
-              : "Tạo chiến thuật đầu tiên để xây dựng và kiểm thử"}
+                ? "Chưa có chiến lược nào đang được triển khai"
+                : filterStatus === "draft"
+                  ? "Chưa có chiến lược nháp nào trong danh sách"
+                  : "Tạo chiến lược đầu tiên để xây dựng và kiểm thử"}
           </h3>
 
           <p className="mt-2 max-w-md text-xs text-slate-400 leading-relaxed">
@@ -204,7 +202,7 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
             className="mt-5 flex items-center gap-2 rounded-md bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 hover:bg-emerald-400 transition-colors cursor-pointer"
           >
             <Plus className="h-4 w-4" />
-            <span>Tạo chiến thuật</span>
+            <span>Tạo chiến lược</span>
           </button>
         </div>
       ) : viewMode === "grid" ? (
@@ -238,16 +236,14 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
                       <div className="flex items-center gap-2">
                         {/* Status Pill */}
                         <span
-                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                            isActive
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${isActive
                               ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                               : "bg-slate-800 text-slate-400 border border-slate-700"
-                          }`}
+                            }`}
                         >
                           <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              isActive ? "bg-emerald-400 animate-pulse" : "bg-slate-500"
-                            }`}
+                            className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-emerald-400 animate-pulse" : "bg-slate-500"
+                              }`}
                           />
                           {isActive ? "Triển khai" : "Chưa triển khai"}
                         </span>
@@ -271,11 +267,10 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
                     <button
                       type="button"
                       onClick={() => onToggleStatus(strat.id)}
-                      className={`rounded-lg px-2 py-1 text-[10px] font-bold border transition-colors ${
-                        isActive
+                      className={`rounded-lg px-2 py-1 text-[10px] font-bold border transition-colors ${isActive
                           ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/30"
                           : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/30"
-                      }`}
+                        }`}
                       title={isActive ? "Bấm để tắt triển khai" : "Bấm để kích hoạt triển khai"}
                     >
                       {isActive ? "Đang chạy" : "Kích hoạt"}
@@ -354,9 +349,8 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
                         <div>
                           <div className="text-[10px] text-slate-500">ROI AI</div>
                           <div
-                            className={`text-xs font-bold ${
-                              metrics.roi_pct >= 0 ? "text-emerald-400" : "text-rose-400"
-                            }`}
+                            className={`text-xs font-bold ${metrics.roi_pct >= 0 ? "text-emerald-400" : "text-rose-400"
+                              }`}
                           >
                             {metrics.roi_pct > 0 ? "+" : ""}
                             {metrics.roi_pct.toFixed(1)}%
@@ -365,40 +359,41 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
                         <div>
                           <div className="text-[10px] text-slate-500">Sharpe</div>
                           <div className="text-xs font-bold text-slate-200">
-                            {metrics.sharpe.toFixed(2)}
+                            {formatBacktestMetric(metrics.sharpe)}
                           </div>
                         </div>
                         <div>
                           <div className="text-[10px] text-slate-500">Thắng (Win)</div>
                           <div className="text-xs font-bold text-emerald-400">
-                            {metrics.win_rate_pct.toFixed(0)}%
+                            {formatBacktestMetric(metrics.win_rate_pct, 0, "%")}
                           </div>
                         </div>
                       </div>
 
-                      {/* Hàng 2: Max Gain, Max Loss, R:R */}
-                      {(metrics.max_gain_pct !== undefined || metrics.reward_risk_ratio !== undefined) && (
-                        <div className="grid grid-cols-3 gap-1.5 border-t border-slate-800/60 pt-1.5 text-center text-[10px]">
-                          <div>
-                            <span className="text-slate-500 block">Lãi đỉnh</span>
-                            <span className="font-semibold text-emerald-400">
-                              {metrics.max_gain_pct !== undefined ? `+${metrics.max_gain_pct.toFixed(1)}%` : "---"}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-slate-500 block">Lỗ sâu</span>
-                            <span className="font-semibold text-rose-400">
-                              {metrics.max_loss_pct !== undefined ? `${metrics.max_loss_pct.toFixed(1)}%` : "---"}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-slate-500 block">Tỷ lệ R:R</span>
-                            <span className="font-semibold text-purple-300">
-                              {metrics.reward_risk_ratio ? `${metrics.reward_risk_ratio}` : "---"}
-                            </span>
-                          </div>
+                      {/* Hàng 2: Max Gain, Max Loss, R:R + Số lệnh đóng */}
+                      <div className="grid grid-cols-3 gap-1.5 border-t border-slate-800/60 pt-1.5 text-center text-[10px]">
+                        <div>
+                          <span className="text-slate-500 block">Lãi đỉnh</span>
+                          <span className="font-semibold text-emerald-400">
+                            {formatSignedPercent(metrics.max_gain_pct, 1)}
+                          </span>
                         </div>
-                      )}
+                        <div>
+                          <span className="text-slate-500 block">Lỗ sâu</span>
+                          <span className="font-semibold text-rose-400">
+                            {formatSignedPercent(metrics.max_loss_pct, 1)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block">Tỷ lệ R:R</span>
+                          <span className="font-semibold text-purple-300">
+                            {formatRewardRiskRatio(metrics.reward_risk_ratio)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="border-t border-slate-800/60 pt-1 text-center text-[10px] text-slate-400">
+                        Tổng lệnh đóng: <strong className="font-mono text-slate-200">{metrics.trades ?? 0} lệnh</strong>
+                      </div>
                     </div>
                   ) : (
                     <div className="mt-3 rounded-lg border border-dashed border-slate-800 p-2 text-center text-[10px] text-slate-500">
@@ -486,16 +481,14 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
                         <button
                           type="button"
                           onClick={() => onToggleStatus(strat.id)}
-                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold border transition-colors ${
-                            isActive
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold border transition-colors ${isActive
                               ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-rose-500/10 hover:text-rose-400"
                               : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-emerald-500/10 hover:text-emerald-400"
-                          }`}
+                            }`}
                         >
                           <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              isActive ? "bg-emerald-400 animate-pulse" : "bg-slate-500"
-                            }`}
+                            className={`h-1.5 w-1.5 rounded-full ${isActive ? "bg-emerald-400 animate-pulse" : "bg-slate-500"
+                              }`}
                           />
                           {isActive ? "Triển khai" : "Chưa triển khai"}
                         </button>
@@ -516,14 +509,14 @@ export const SavedStrategiesManager: React.FC<SavedStrategiesManagerProps> = ({
                             {metrics.roi_pct.toFixed(1)}%
                           </span>
                         ) : (
-                          <span className="text-slate-500">---</span>
+                          <span className="text-slate-500">—</span>
                         )}
                       </td>
                       <td className="px-3 py-3 text-right font-semibold text-slate-300">
-                        {metrics ? metrics.sharpe.toFixed(2) : "---"}
+                        {metrics ? formatBacktestMetric(metrics.sharpe) : "—"}
                       </td>
                       <td className="px-3 py-3 text-right font-semibold text-emerald-400">
-                        {metrics ? `${metrics.win_rate_pct.toFixed(0)}%` : "---"}
+                        {metrics ? `${formatBacktestMetric(metrics.win_rate_pct, 0, "%")}` : "—"}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
