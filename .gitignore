@@ -140,3 +140,9 @@ skills-lock.json
 
 !scripts/
 !infra/scripts/
+THESIS_ENHANCEMENT_LOG.md
+THESIS_FINAL_SYNC_LOG.md
+THESIS_FIX_LOG.md
+apps/web/src/components/tabs/BacktestSimulatorTab.tsx
+reports/backtest-audit-2026-11-23/progress.md
+scripts/regenerate_thesis_diagrams.py
