@@ -71,6 +71,18 @@ export default function AccountActionForm({ mode }: { mode: Mode }) {
       } else {
         const result = await verifyAccountEmail(token.current);
         setMessage(result.message); setDone(true);
+        try {
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem("stockpulse_email_verified_at", String(Date.now()));
+          }
+          if (typeof BroadcastChannel !== "undefined") {
+            const channel = new BroadcastChannel("stockpulse_auth_sync");
+            channel.postMessage({ type: "email_verified" });
+            channel.close();
+          }
+        } catch {
+          // Ignore storage/BroadcastChannel restrictions
+        }
         await refreshUser();
       }
     } catch (error) {

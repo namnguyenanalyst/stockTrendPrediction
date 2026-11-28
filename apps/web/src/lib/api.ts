@@ -44,6 +44,29 @@ let inMemoryToken: string | null = null;
 let authGeneration = 0;
 const pendingRefreshes = new Map<string, Promise<RefreshTokenResponse>>();
 const pendingLogins = new Set<Promise<LoginResponse>>();
+let onTokenRefreshed: ((token: string) => void) | null = null;
+let onSessionExpired: (() => void) | null = null;
+
+export function setOnTokenRefreshed(cb: ((token: string) => void) | null): void {
+  onTokenRefreshed = cb;
+}
+
+export function setOnSessionExpired(cb: (() => void) | null): void {
+  onSessionExpired = cb;
+}
+
+function shouldAttemptAutoRefresh(endpoint: string): boolean {
+  const unauthenticatedAuthEndpoints = [
+    "/api/v1/auth/login",
+    "/api/v1/auth/refresh",
+    "/api/v1/auth/register",
+    "/api/v1/auth/logout",
+    "/api/v1/auth/forgot-password",
+    "/api/v1/auth/reset-password",
+    "/api/v1/auth/verify-email",
+  ];
+  return !unauthenticatedAuthEndpoints.some((path) => endpoint.startsWith(path));
+}
 
 export function setAuthToken(token: string | null): void {
   authGeneration += 1;
@@ -54,7 +77,12 @@ export function getAuthToken(): string | null {
   return inMemoryToken;
 }
 
-async function fetchJson<T>(endpoint: string, options?: RequestInit, timeoutMs?: number): Promise<T> {
+async function fetchJson<T>(
+  endpoint: string,
+  options?: RequestInit,
+  timeoutMs?: number,
+  _isRetry = false
+): Promise<T> {
   const controller = timeoutMs ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
   const abortFromCaller = () => controller?.abort();
@@ -66,7 +94,7 @@ async function fetchJson<T>(endpoint: string, options?: RequestInit, timeoutMs?:
     ...((options?.headers as Record<string, string>) || {}),
   };
 
-  if (inMemoryToken && !headers["Authorization"]) {
+  if (inMemoryToken && (_isRetry || !headers["Authorization"])) {
     headers["Authorization"] = `Bearer ${inMemoryToken}`;
   }
 
@@ -77,6 +105,24 @@ async function fetchJson<T>(endpoint: string, options?: RequestInit, timeoutMs?:
       ...(controller ? { signal: controller.signal } : {}),
       headers,
     });
+
+    if (
+      res.status === 401 &&
+      !_isRetry &&
+      inMemoryToken &&
+      shouldAttemptAutoRefresh(endpoint)
+    ) {
+      try {
+        const refreshed = await refreshToken();
+        if (refreshed?.access_token && getAuthToken() === refreshed.access_token) {
+          onTokenRefreshed?.(refreshed.access_token);
+          return fetchJson<T>(endpoint, options, timeoutMs, true);
+        }
+      } catch {
+        setAuthToken(null);
+        onSessionExpired?.();
+      }
+    }
 
     if (!res.ok) {
       const errorText = await res.text();
@@ -447,7 +493,7 @@ export class AccountApiError extends Error {
   }
 }
 
-async function accountRequest(path: string, body: object = {}): Promise<{ message: string }> {
+async function accountRequest(path: string, body: object = {}, _isRetry = false): Promise<{ message: string }> {
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}/api/v1/auth/${path}`, {
@@ -457,6 +503,18 @@ async function accountRequest(path: string, body: object = {}): Promise<{ messag
     });
   } catch {
     throw new AccountApiError("NETWORK_ERROR", "Không thể kết nối. Vui lòng thử lại.");
+  }
+  if (response.status === 401 && !_isRetry && inMemoryToken && path === "resend-verification") {
+    try {
+      const refreshed = await refreshToken();
+      if (refreshed?.access_token && getAuthToken() === refreshed.access_token) {
+        onTokenRefreshed?.(refreshed.access_token);
+        return accountRequest(path, body, true);
+      }
+    } catch {
+      setAuthToken(null);
+      onSessionExpired?.();
+    }
   }
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));

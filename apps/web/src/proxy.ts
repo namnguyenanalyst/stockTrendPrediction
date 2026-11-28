@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-function extractRoleFromJwt(jwtToken: string): string | null {
+function parseJwtPayload(jwtToken: string): Record<string, unknown> | null {
   try {
     const parts = jwtToken.split(".");
-    if (parts.length < 2) return null;
+    if (parts.length !== 3 || parts.some((part) => !part)) return null;
     const base64Url = parts[1];
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
     const jsonPayload = decodeURIComponent(
@@ -14,18 +14,25 @@ function extractRoleFromJwt(jwtToken: string): string | null {
         .join("")
     );
     const payload = JSON.parse(jsonPayload);
-    return payload.role || null;
+    return payload && typeof payload === "object" ? (payload as Record<string, unknown>) : null;
   } catch {
     return null;
   }
 }
 
+function isValidNonExpiredJwt(jwtToken: string): boolean {
+  const payload = parseJwtPayload(jwtToken);
+  if (!payload || typeof payload.exp !== "number") return false;
+  return payload.exp * 1000 > Date.now();
+}
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token =
+  const rawToken =
     request.cookies.get("access_token")?.value ||
     request.cookies.get("auth_token")?.value;
-  const isAuthenticated = Boolean(token && token.trim().length > 0);
+  const token = rawToken?.trim() || "";
+  const isAuthenticated = Boolean(token.length > 0 && isValidNonExpiredJwt(token));
 
   // 1. Root path "/" -> redirect to "/dashboard"
   if (pathname === "/") {
@@ -51,7 +58,8 @@ export function proxy(request: NextRequest) {
       loginUrl.searchParams.set("redirect", pathname);
       return NextResponse.redirect(loginUrl);
     }
-    const role = token ? extractRoleFromJwt(token) : null;
+    const payload = parseJwtPayload(token);
+    const role = typeof payload?.role === "string" ? payload.role : null;
     if (role !== "admin") {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";

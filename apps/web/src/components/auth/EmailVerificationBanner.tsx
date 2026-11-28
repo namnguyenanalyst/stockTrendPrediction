@@ -4,7 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { AccountApiError, resendVerification } from "@/lib/api";
 
 export default function EmailVerificationBanner() {
-  const { user, refreshUser } = useAuth();
+  const { user } = useAuth();
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -15,11 +15,6 @@ export default function EmailVerificationBanner() {
     update(); const id = window.setInterval(update, 1000);
     return () => window.clearInterval(id);
   }, [until]);
-  useEffect(() => {
-    const sync = () => { if (document.visibilityState === "visible") void refreshUser(); };
-    window.addEventListener("focus", sync);
-    return () => window.removeEventListener("focus", sync);
-  }, [refreshUser]);
   if (!user || user.email_verified_at) return null;
   async function resend() {
     if (busy || remaining) return;

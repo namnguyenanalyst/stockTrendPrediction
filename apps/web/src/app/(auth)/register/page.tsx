@@ -36,9 +36,9 @@ function RegisterForm() {
       setErrorMessage("Vui lòng nhập địa chỉ email.");
       return;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
     if (!emailRegex.test(cleanEmail)) {
-      setErrorMessage("Địa chỉ email không đúng định dạng chuẩn.");
+      setErrorMessage("Địa chỉ email không đúng định dạng chuẩn (chỉ hỗ trợ ký tự ASCII, ví dụ: ten@domain.com).");
       return;
     }
     if (password.length < 8) {

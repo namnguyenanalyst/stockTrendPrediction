@@ -35,7 +35,7 @@ interface DashboardAppProps {
 }
 
 export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTabState] = useState<DashboardTab>(() =>
     initialTab === "admin-stats" && user && user.role !== "admin"
       ? "market"
@@ -70,9 +70,9 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
   );
   const [loadingBacktest, setLoadingBacktest] = useState<boolean>(false);
 
-  // Bảo vệ không cho non-admin ở lại tab admin-stats
+  // Bảo vệ không cho non-admin ở lại tab admin-stats sau khi auth khởi tạo xong
   useEffect(() => {
-    if (activeTab === "admin-stats" && user && user.role !== "admin") {
+    if (!authLoading && activeTab === "admin-stats" && user?.role !== "admin") {
       queueMicrotask(() => {
         setActiveTabState("market");
       });
@@ -80,7 +80,7 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
         window.history.replaceState(null, "", "/dashboard");
       }
     }
-  }, [activeTab, user]);
+  }, [activeTab, authLoading, user]);
 
   // Đồng bộ hóa URL browser khi chuyển tab
   const setActiveTab = (tab: DashboardTab) => {
@@ -291,7 +291,13 @@ export function DashboardApp({ initialTab = "market" }: DashboardAppProps) {
             />
           )}
 
-          {activeTab === "admin-stats" && user?.role === "admin" && (
+          {activeTab === "admin-stats" && authLoading && (
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center text-sm text-slate-400">
+              Đang xác thực quyền quản trị viên...
+            </div>
+          )}
+
+          {activeTab === "admin-stats" && !authLoading && user?.role === "admin" && (
             <SystemStatsTab />
           )}
         </main>

@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -15,6 +16,8 @@ import {
   refreshToken,
   registerUser,
   setAuthToken,
+  setOnSessionExpired,
+  setOnTokenRefreshed,
 } from "@/lib/api";
 import { User } from "@/lib/types";
 
@@ -41,9 +44,34 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const TOKEN_STORAGE_KEY = "stockpulse_access_token";
 
+function isProtectedPath(pathname: string): boolean {
+  return (
+    pathname === "/dashboard" ||
+    pathname === "/backtest" ||
+    pathname === "/admin" ||
+    pathname.startsWith("/dashboard/") ||
+    pathname.startsWith("/backtest/") ||
+    pathname.startsWith("/admin/")
+  );
+}
+
+function getTokenMaxAgeSeconds(token: string): number {
+  const defaultSeconds = 60 * 30;
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return defaultSeconds;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(base64)) as { exp?: unknown };
+    if (typeof payload.exp !== "number") return defaultSeconds;
+    return Math.max(0, Math.min(defaultSeconds, Math.floor(payload.exp - Date.now() / 1000)));
+  } catch {
+    return defaultSeconds;
+  }
+}
+
 export function setTokenCookie(token: string): void {
   if (typeof document !== "undefined") {
-    const maxAge = 60 * 60 * 24 * 7; // 7 days
+    const maxAge = getTokenMaxAgeSeconds(token);
     document.cookie = `access_token=${encodeURIComponent(
       token
     )}; path=/; max-age=${maxAge}; SameSite=Lax`;
@@ -81,6 +109,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const userRef = useRef<User | null>(null);
+  userRef.current = user;
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +125,82 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       console.warn("Không thể đồng bộ hồ sơ người dùng:", err);
     }
   }, []);
+
+  // Đăng ký callback đồng bộ token khi auto-refresh / hết phiên
+  useEffect(() => {
+    if (typeof setOnTokenRefreshed === "function") {
+      setOnTokenRefreshed((newToken: string) => {
+        setAccessToken(newToken);
+        setTokenCookie(newToken);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(TOKEN_STORAGE_KEY, newToken);
+        }
+      });
+    }
+    if (typeof setOnSessionExpired === "function") {
+      setOnSessionExpired(() => {
+        setUser(null);
+        setAccessToken(null);
+        removeTokenCookie();
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+          if (isProtectedPath(window.location.pathname)) {
+            router.push("/login");
+          }
+        }
+      });
+    }
+    return () => {
+      if (typeof setOnTokenRefreshed === "function") setOnTokenRefreshed(null);
+      if (typeof setOnSessionExpired === "function") setOnSessionExpired(null);
+    };
+  }, [router]);
+
+  // Đồng bộ trạng thái xác minh email giữa các tab trình duyệt
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const syncIfUnverified = () => {
+      if (userRef.current && !userRef.current.email_verified_at) {
+        void refreshUser();
+      }
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === "stockpulse_email_verified_at" && event.newValue) {
+        syncIfUnverified();
+      }
+    };
+
+    const handleVisibility = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        syncIfUnverified();
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== "undefined") {
+        channel = new BroadcastChannel("stockpulse_auth_sync");
+        channel.onmessage = (event: MessageEvent<{ type?: string }>) => {
+          if (event.data?.type === "email_verified") {
+            syncIfUnverified();
+          }
+        };
+      }
+    } catch {
+      channel = null;
+    }
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      channel?.close();
+    };
+  }, [refreshUser]);
 
   // Khởi tạo phiên làm việc khi mount
   useEffect(() => {
@@ -150,13 +256,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           removeTokenCookie();
           if (typeof window !== "undefined") {
             window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-            const currentPath = window.location.pathname;
-            const isProtectedRoute =
-              currentPath === "/dashboard" ||
-              currentPath === "/backtest" ||
-              currentPath.startsWith("/dashboard/") ||
-              currentPath.startsWith("/backtest/");
-            if (isProtectedRoute) {
+            if (isProtectedPath(window.location.pathname)) {
               router.push("/login");
             }
           }
@@ -198,11 +298,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         return userData;
       } catch (err: unknown) {
         const errMessage = err instanceof Error ? err.message : String(err);
-        const message =
-          errMessage.includes("401") ||
-          errMessage.includes("Incorrect email")
-            ? "Email hoặc mật khẩu không chính xác."
-            : "Chưa thể đăng nhập. Vui lòng thử lại sau.";
+        const message = errMessage.includes("Inactive user account")
+          ? "Tài khoản của bạn đã bị khóa hoặc vô hiệu hóa. Vui lòng liên hệ quản trị viên."
+          : errMessage.includes("429") || errMessage.includes("RATE_LIMITED")
+            ? "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng thử lại sau ít phút."
+            : errMessage.includes("401") || errMessage.includes("Incorrect email")
+              ? "Email hoặc mật khẩu không chính xác."
+              : "Chưa thể đăng nhập. Vui lòng thử lại sau.";
         setError(message);
         throw new Error(message);
       } finally {
@@ -220,9 +322,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         await registerUser(email, password, fullName);
       } catch (err: unknown) {
         const raw = err instanceof Error ? err.message : "";
-        const message = raw.includes("already registered") || raw.includes("409") || raw.includes("400")
-          ? "Email này đã được sử dụng. Vui lòng đăng nhập hoặc khôi phục mật khẩu."
-          : "Chưa thể tạo tài khoản. Vui lòng kiểm tra kết nối và thông tin đăng ký.";
+        const message =
+          raw.includes("already registered") || raw.includes("409")
+            ? "Email này đã được sử dụng. Vui lòng đăng nhập hoặc khôi phục mật khẩu."
+            : raw.includes("429") || raw.includes("RATE_LIMITED")
+              ? "Bạn đã gửi quá nhiều yêu cầu đăng ký. Vui lòng thử lại sau ít phút."
+              : raw.includes("422")
+                ? "Thông tin đăng ký chưa hợp lệ (email chỉ hỗ trợ ký tự ASCII chuẩn và mật khẩu tối thiểu 8 ký tự)."
+                : "Chưa thể tạo tài khoản. Vui lòng kiểm tra kết nối và thông tin đăng ký.";
         setError(message);
         setIsLoading(false);
         throw new Error(message);

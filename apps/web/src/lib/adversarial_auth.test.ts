@@ -130,9 +130,13 @@ describe("Adversarial Stress Test: Route Protection & Auth State", () => {
     });
 
     describe("Authenticated Traversal", () => {
+      const validJwt = (() => {
+        const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+        return `${enc({ alg: "HS256", typ: "JWT" })}.${enc({ role: "trader", exp: Math.floor(Date.now() / 1000) + 1800 })}.sig`;
+      })();
       const authTokens = [
-        { name: "access_token", cookie: "access_token=valid.jwt.token" },
-        { name: "auth_token", cookie: "auth_token=valid.jwt.token" },
+        { name: "access_token", cookie: `access_token=${validJwt}` },
+        { name: "auth_token", cookie: `auth_token=${validJwt}` },
       ];
 
       for (const { name, cookie } of authTokens) {
@@ -240,8 +244,12 @@ describe("Adversarial Stress Test: Route Protection & Auth State", () => {
     });
 
     it("should accept valid auth_token if access_token is truly empty string", () => {
+      const validJwt = (() => {
+        const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+        return `${enc({ alg: "HS256", typ: "JWT" })}.${enc({ role: "trader", exp: Math.floor(Date.now() / 1000) + 1800 })}.sig`;
+      })();
       const req = new NextRequest("http://localhost:3000/dashboard", {
-        headers: { cookie: "access_token=; auth_token=valid-jwt-fallback" },
+        headers: { cookie: `access_token=; auth_token=${validJwt}` },
       });
       const res = middleware(req);
       expect(res.status).toBe(200);
@@ -249,22 +257,26 @@ describe("Adversarial Stress Test: Route Protection & Auth State", () => {
     });
 
     it("should accept valid access_token if auth_token is empty string", () => {
+      const validJwt = (() => {
+        const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
+        return `${enc({ alg: "HS256", typ: "JWT" })}.${enc({ role: "trader", exp: Math.floor(Date.now() / 1000) + 1800 })}.sig`;
+      })();
       const req = new NextRequest("http://localhost:3000/dashboard", {
-        headers: { cookie: "access_token=valid-access-token; auth_token=" },
+        headers: { cookie: `access_token=${validJwt}; auth_token=` },
       });
       const res = middleware(req);
       expect(res.status).toBe(200);
       expect(res.headers.get("location")).toBeNull();
     });
 
-    it("should handle extremely large token strings (50KB) safely without crashing", () => {
+    it("should handle extremely large malformed token strings (50KB) safely without crashing", () => {
       const hugeToken = "A".repeat(50000);
       const req = new NextRequest("http://localhost:3000/dashboard", {
         headers: { cookie: `access_token=${hugeToken}` },
       });
       const res = middleware(req);
-      expect(res.status).toBe(200);
-      expect(res.headers.get("location")).toBeNull();
+      expect(res.status).toBe(307);
+      expect(res.headers.get("location")).toBe("http://localhost:3000/login?redirect=%2Fdashboard");
     });
 
     it("should parse cookie correctly in getTokenFromCookie even amidst other noisy cookies", () => {

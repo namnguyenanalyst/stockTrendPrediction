@@ -212,6 +212,16 @@ describe("Frontend Auth Suite (src/lib/auth.test.ts)", () => {
   });
 
   describe("Edge Middleware Route Protection", () => {
+    const makeJwt = (payload: Record<string, unknown>) => {
+      const encode = (obj: unknown) =>
+        Buffer.from(JSON.stringify(obj)).toString("base64url");
+      return `${encode({ alg: "HS256", typ: "JWT" })}.${encode(payload)}.sig`;
+    };
+    const validJwt = () =>
+      makeJwt({ role: "trader", exp: Math.floor(Date.now() / 1000) + 1800 });
+    const expiredJwt = () =>
+      makeJwt({ role: "trader", exp: Math.floor(Date.now() / 1000) - 60 });
+
     it("should redirect root / to /dashboard", () => {
       const req = new NextRequest("http://localhost:3000/");
       const res = middleware(req);
@@ -243,7 +253,7 @@ describe("Frontend Auth Suite (src/lib/auth.test.ts)", () => {
     it("should allow authenticated user to access /dashboard", () => {
       const req = new NextRequest("http://localhost:3000/dashboard", {
         headers: {
-          cookie: "access_token=valid-jwt-token",
+          cookie: `access_token=${validJwt()}`,
         },
       });
       const res = middleware(req);
@@ -256,7 +266,7 @@ describe("Frontend Auth Suite (src/lib/auth.test.ts)", () => {
     it("should redirect authenticated user from /login to /dashboard", () => {
       const req = new NextRequest("http://localhost:3000/login", {
         headers: {
-          cookie: "auth_token=valid-token",
+          cookie: `auth_token=${validJwt()}`,
         },
       });
       const res = middleware(req);
@@ -268,13 +278,43 @@ describe("Frontend Auth Suite (src/lib/auth.test.ts)", () => {
     it("should redirect authenticated user from /register to /dashboard", () => {
       const req = new NextRequest("http://localhost:3000/register", {
         headers: {
-          cookie: "access_token=valid-token",
+          cookie: `access_token=${validJwt()}`,
         },
       });
       const res = middleware(req);
 
       expect(res.status).toBe(307);
       expect(res.headers.get("location")).toBe("http://localhost:3000/dashboard");
+    });
+
+    it("should allow expired token user to access /login without redirect loop", () => {
+      const req = new NextRequest("http://localhost:3000/login", {
+        headers: {
+          cookie: `access_token=${expiredJwt()}`,
+        },
+      });
+      const res = middleware(req);
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+    });
+
+    it("should redirect expired token user from /dashboard and /admin to /login", () => {
+      const dashReq = new NextRequest("http://localhost:3000/dashboard", {
+        headers: { cookie: `access_token=${expiredJwt()}` },
+      });
+      const dashRes = middleware(dashReq);
+      expect(dashRes.status).toBe(307);
+      expect(dashRes.headers.get("location")).toBe("http://localhost:3000/login?redirect=%2Fdashboard");
+
+      const adminReq = new NextRequest("http://localhost:3000/admin", {
+        headers: {
+          cookie: `access_token=${makeJwt({ role: "admin", exp: Math.floor(Date.now() / 1000) - 60 })}`,
+        },
+      });
+      const adminRes = middleware(adminReq);
+      expect(adminRes.status).toBe(307);
+      expect(adminRes.headers.get("location")).toBe("http://localhost:3000/login?redirect=%2Fadmin");
     });
   });
 });
