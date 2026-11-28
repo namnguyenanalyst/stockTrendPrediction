@@ -62,6 +62,8 @@ async def register(
 ) -> UserResponse:
     """Đăng ký tài khoản mới với mật khẩu băm Bcrypt và lưu vào CSDL."""
     email_clean = req.email.strip().lower()
+    client_ip = request.client.host if request.client else "unknown"
+    await rate_limit(db, f"register:ip:{client_ip}", 10, 60)
 
     # Kiểm tra tính duy nhất của email (không phân biệt chữ hoa/thường)
     existing_user_result = await db.execute(
@@ -73,7 +75,7 @@ async def register(
             detail="Email already registered",
         )
 
-    await send_limits(db, email_clean, request.client.host if request.client else "unknown")
+    await send_limits(db, email_clean, client_ip)
     hashed_pwd = await run_in_threadpool(get_password_hash, req.password)
     user_id = uuid.uuid4()
 
@@ -103,11 +105,15 @@ async def register(
 )
 async def login(
     req: UserLoginRequest,
+    request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     """Xác thực thông tin đăng nhập, cấp JWT Access Token và thiết lập HTTP-only Refresh Cookie."""
     email_clean = req.email.strip().lower()
+    client_ip = request.client.host if request.client else "unknown"
+    await rate_limit(db, f"login:ip:{client_ip}", 20, 60)
+    await rate_limit(db, f"login:acct:{client_ip}:{email_clean}", 10, 60)
 
     result = await db.execute(
         select(User).where(func.lower(User.email) == email_clean).with_for_update()

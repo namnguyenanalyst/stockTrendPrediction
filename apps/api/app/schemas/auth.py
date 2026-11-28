@@ -4,6 +4,7 @@ import re
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.config import settings
 from app.schemas.user import UserResponse
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
@@ -59,7 +60,8 @@ class AccountEmailRequest(BaseModel):
     @classmethod
     def normalize_email(cls, value: str) -> str:
         value = value.strip().lower()
-        if not EMAIL_REGEX.fullmatch(value):
+        sole_admin = settings.SOLE_ADMIN_EMAIL.strip().lower()
+        if value != sole_admin and not EMAIL_REGEX.fullmatch(value):
             raise ValueError("Invalid email format")
         return value
 

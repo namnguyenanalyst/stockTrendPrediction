@@ -2,6 +2,7 @@
 
 import hashlib
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 from fastapi import HTTPException, Request, Response
 from sqlalchemy import delete
@@ -31,9 +32,20 @@ def set_refresh_cookie(response: Response, token: str) -> None:
 
 
 def check_cookie_origin(request: Request) -> None:
+    allowed_origins = {origin.rstrip("/").lower() for origin in settings.CORS_ORIGINS}
     origin = request.headers.get("origin")
-    if origin and origin not in settings.CORS_ORIGINS:
-        raise HTTPException(403, "Untrusted origin for cookie authentication")
+    if origin:
+        if origin.rstrip("/").lower() not in allowed_origins:
+            raise HTTPException(403, "Untrusted origin for cookie authentication")
+        return
+    referer = request.headers.get("referer")
+    if referer:
+        parsed = urlsplit(referer)
+        if not parsed.scheme or not parsed.netloc:
+            raise HTTPException(403, "Untrusted referer for cookie authentication")
+        referer_origin = f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
+        if referer_origin not in allowed_origins:
+            raise HTTPException(403, "Untrusted referer for cookie authentication")
 
 
 async def consume_refresh_session(db: AsyncSession, token: str, user_id) -> None:
